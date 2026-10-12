@@ -1,0 +1,47 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test --if-present
+      - run: npm run build
+        env:
+          VITE_BASE: /landscaping-design-calculator-staging/
+
+      - name: Publish to staging repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.STAGING_PAGES_TOKEN }}
+          external_repository: tamaradidproduct/landscaping-design-calculator-staging
+          publish_branch: gh-pages
+          publish_dir: dist
+
+      # Best-effort: an Airtable outage must not fail the deploy.
+      - name: Notify Airtable (moves referenced Findings to Ready to retest)
+        continue-on-error: true
+        env:
+          WEBHOOK: ${{ secrets.AIRTABLE_DEPLOY_WEBHOOK }}
+          COMMITS: ${{ toJson(github.event.commits.*.message) }}
+        run: |
+          # secrets can't be read in `if:`; skip here when the webhook isn't configured.
+          [ -n "$WEBHOOK" ] || { echo "No AIRTABLE_DEPLOY_WEBHOOK; skipping"; exit 0; }
+          jq -n --arg sha "$GITHUB_SHA" --argjson messages "${COMMITS:-[]}" \
+            '{sha: $sha, messages: $messages}' \
+          | curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK"
