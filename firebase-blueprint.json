@@ -1,0 +1,22 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user-specific settings like linked Google Sheet ID.",
+      "type": "object",
+      "properties": {
+        "googleSheetId": {
+          "type": "string",
+          "description": "The ID or URL of the linked Google Sheet."
+        }
+      },
+      "required": ["googleSheetId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document containing integration settings."
+    }
+  }
+}

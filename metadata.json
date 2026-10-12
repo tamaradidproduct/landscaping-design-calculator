@@ -1,0 +1,6 @@
+{
+  "name": "Pixel Area Calculator",
+  "description": "Calculate exact square footage directly from Figma plans with interactive canvas measurement tools.",
+  "requestFramePermissions": ["identity-credentials-get"],
+  "majorCapabilities": []
+}
