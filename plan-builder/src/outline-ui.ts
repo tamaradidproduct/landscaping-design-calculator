@@ -6,7 +6,7 @@ import {
   type Outline, type OutlineKind,
 } from './outline';
 import { History } from './history';
-import { findImageSnap, SNAP_WINDOW } from './snap';
+import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
 export interface ToolHost {
@@ -191,11 +191,32 @@ export class OutlineTool {
     if (this.shiftKey && anchor) {
       const c = constrain45(anchor, raw);
       this.snapped = null; this.stick = null; this.angle = c.angle;
-      return c.point;
+      return this.snapOnRay(anchor, c.point, exclude);
     }
     this.angle = null;
     return this.resolve(raw, exclude);
   }
+  /** Shift + snapping: stay on the 45° ray from `anchor`, but stop at corners on it or where it crosses a drawn line. */
+  private snapOnRay(anchor: Point, c: Point, exclude?: { kind: OutlineKind; i: number }): Point {
+    if (!this.snapOn || this.bypass) return c;
+    const len = dist(anchor, c); if (len < 1) return c;
+    const ux = (c.x - anchor.x) / len, uy = (c.y - anchor.y) / len;
+    let best: Point | null = null, bd = OWN_SNAP;
+    for (const o of Object.values(this.outlines)) o?.pts.forEach((pt, i) => {
+      if (exclude && exclude.kind === o.kind && exclude.i === i) return;
+      const s = this.host.toScreen(pt), t = (s.x - anchor.x) * ux + (s.y - anchor.y) * uy;
+      const q = { x: anchor.x + t * ux, y: anchor.y + t * uy };
+      if (t > 0 && dist(q, s) <= 6 && dist(q, c) < bd) { bd = dist(q, c); best = q; }
+    });
+    if (best) { this.snapped = 'own'; return best; }
+    const n = SNAP_WINDOW, g = this.host.sampleLuminance(c, n); if (!g) return c;
+    const o = { x: c.x - n / 2, y: c.y - n / 2 };
+    const hit = findSnapOnRay(g, { x: n / 2, y: n / 2 }, { x: anchor.x - o.x, y: anchor.y - o.y, ux, uy }, n);
+    if (!hit) return c;
+    this.snapped = hit.kind;
+    return { x: o.x + hit.x, y: o.y + hit.y };
+  }
+
   /** The corner an edge is drawn from: the last corner while drawing, the previous corner while dragging one. */
   private anchorFor(c: { kind: OutlineKind; i: number } | null): Point | null {
     const o = c ? this.outlines[c.kind] : this.current(); if (!o || !o.pts.length) return null;

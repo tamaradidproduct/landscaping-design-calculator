@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { findImageSnap } from './snap';
+import { findImageSnap, findSnapOnRay } from './snap';
 
 const N = 48; // fixed test window; findImageSnap takes the window size
 /** A white window with dark pixels where `ink` says so. */
@@ -67,5 +67,26 @@ describe('findImageSnap on cluttered corners', () => {
     const s = findImageSnap(g, { x: c, y: c }, N)!;
     expect(s.kind).toBe('corner');
     expect(Math.hypot(s.x - 21, s.y - 31)).toBeLessThan(1.5);
+  });
+});
+
+describe('findSnapOnRay (Shift held)', () => {
+  // ray: horizontal through y = 24 from the left
+  const ray = { x: 0, y: 24, ux: 1, uy: 0 };
+  test('stops where the ray crosses a drawn line', () => {
+    const g = image((x) => x >= 30 && x <= 31); // vertical line at x ≈ 31
+    const s = findSnapOnRay(g, { x: 26, y: 24 }, ray, N)!;
+    expect(s.kind).toBe('line');
+    expect(s.x).toBeCloseTo(31, 0); expect(s.y).toBeCloseTo(24, 9);
+  });
+  test('takes a drawn corner sitting on the ray, kept exactly on the ray', () => {
+    const g = image((x, y) => (x >= 30 && x <= 31 && y <= 25) || (y >= 24 && y <= 25 && x >= 30)); // corner ≈ (31, 25)
+    const s = findSnapOnRay(g, { x: 27, y: 24 }, ray, N)!;
+    expect(s.kind).toBe('corner');
+    expect(s.y).toBeCloseTo(24, 9); expect(s.x).toBeCloseTo(31, 0);
+  });
+  test('ignores lines parallel to the ray', () => {
+    const g = image((x, y) => y >= 30 && y <= 31);
+    expect(findSnapOnRay(g, { x: 26, y: 24 }, ray, N)).toBeNull();
   });
 });

@@ -15,7 +15,7 @@ await page.mouse.move(...await toScreen([390, 380]));
 await page.keyboard.down('Control'); for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(900);
 await page.click('#outline'); await page.click('[data-outline=boundary]');
-const preview = () => page.evaluate(() => { const d = document.querySelector('.overlay .hover-dot'); const l = document.querySelector('.overlay .snap-label'); return d ? { x: +d.getAttribute('cx'), y: +d.getAttribute('cy'), label: l?.textContent ?? null } : null; });
+const preview = () => page.evaluate(() => { const d = document.querySelector('.overlay .hover-dot'); const l = [...document.querySelectorAll('.overlay .snap-label')].map(e => e.textContent).join(' + '); return d ? { x: +d.getAttribute('cx'), y: +d.getAttribute('cy'), label: l || null } : null; });
 const tl = await toScreen(TL);
 for (const off of [30, 24, 18, 10, 4]) {
   await page.mouse.move(tl[0] + off, tl[1] - off * 0.6); await page.waitForTimeout(60);
@@ -33,7 +33,17 @@ results.push(['Shift held, pointer 10° above horizontal', sp ? `angle label ${s
 await page.mouse.move(tl[0] + 150, tl[1] + 140); await page.waitForTimeout(80);
 const sp2 = await preview();
 results.push(['Shift held, pointer ~43° down-right', sp2 ? `angle label ${sp2.label} · |dx|-|dy| ${(Math.abs(sp2.x - placed[0][0]) - Math.abs(sp2.y - placed[0][1])).toFixed(2)} px (0 = 45°)` : 'no preview']);
+// Shift + snapping: draw from TL horizontally... TL→TR is ~1.3° off horizontal, so instead aim at the left
+// property line from a point right of it: the ray should stop exactly where it crosses that line.
 await page.keyboard.up('Shift'); await page.waitForTimeout(80);
+const bl = await toScreen([253.21, 545.22]), left = await toScreen([253.18, 380]);
+await page.keyboard.press('Escape'); await page.click('#outline'); await page.click('[data-outline=house]');
+await page.click('#snap'); await page.mouse.click(left[0] + 120, left[1]); await page.waitForTimeout(400); await page.click('#snap');
+await page.keyboard.down('Shift');
+await page.mouse.move(left[0] + 6, left[1] + 4); await page.waitForTimeout(80);
+const sl = await preview();
+results.push(['Shift + snap: heading left onto the left property line', sl ? `${sl.label} · stops ${(sl.x - left[0]).toFixed(1)} px from the line (0 = on it), dy ${(sl.y - left[1]).toFixed(1)}` : 'no preview']);
+await page.keyboard.up('Shift');
 results.push(['Shift released', `label now ${(await preview())?.label ?? 'none'}`]);
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();
