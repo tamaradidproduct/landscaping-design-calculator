@@ -1,7 +1,7 @@
 // Steps 2a–2b: outline the plot boundary or the house, then set the scale from one printed edge length.
 // 2b adds snapping to what's drawn on the plan, angle/alignment hints (shown, never locked) and nudging.
 import {
-  OUTLINE_LABEL, areaPt2, bulgeToward, constrain45, dist, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
+  OUTLINE_LABEL, areaPt2, bulgeToward, constrain45, dist, snapToGuides, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
   outlinePath, parseFeet, percentOff,
   type Outline, type OutlineKind,
 } from './outline';
@@ -28,6 +28,7 @@ const EDGE_HIT = 16;        // screen px
 const TOUCH_OFFSET = 64;    // the point being placed sits this far above the finger
 const DOUBLE_TAP_MS = 350;
 const BEND_HIT = 20;        // screen px around an edge's middle handle
+const GUIDE_SNAP = 6;       // screen px: pull into line with other corners / square to the previous edge
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
 const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', house: 'var(--outline-house)' };
@@ -51,7 +52,8 @@ export class OutlineTool {
   snapOn = true;
   private bypass = false;                      // held Option/Alt or a second finger: place freely
   private rawAt: Point | null = null;          // where the point would be without snapping
-  private snapped: 'corner' | 'line' | 'own' | null = null;
+  private snapped: 'corner' | 'line' | 'own' | 'guide' | null = null;
+  private guideLabel = '';
   private stick: { page: Point; kind: 'corner' | 'line' | 'own' } | null = null; // current snap target (sticky)
   private shiftKey = false;
   private angle: number | null = null;        // Shift-constrained direction, degrees
@@ -194,7 +196,32 @@ export class OutlineTool {
       return this.snapOnRay(anchor, c.point, exclude);
     }
     this.angle = null;
+    // Priority: the outline's own corners, then guides (alignment, square, straight), then the drawing.
+    if (this.snapOn && !this.bypass) {
+      const ctx = this.guideContext(exclude);
+      if (!this.ownCornerNear(raw, exclude)) {
+        const g = snapToGuides(raw, ctx.prevprev, ctx.prev, ctx.others, GUIDE_SNAP);
+        if (g) { this.snapped = 'guide'; this.guideLabel = g.label; this.stick = null; return g.point; }
+      }
+    }
     return this.resolve(raw, exclude);
+  }
+  private ownCornerNear(raw: Point, exclude?: { kind: OutlineKind; i: number }): boolean {
+    return Object.values(this.outlines).some(o => o?.pts.some((pt, i) => !(exclude && exclude.kind === o.kind && exclude.i === i) && dist(this.host.toScreen(pt), raw) < OWN_SNAP));
+  }
+  /** Neighbouring corners (screen px) for guides: the edge being drawn or dragged, and every other corner. */
+  private guideContext(exclude?: { kind: OutlineKind; i: number }): { prevprev: Point | null; prev: Point | null; others: Point[] } {
+    const h = this.host, others: Point[] = [];
+    for (const o of Object.values(this.outlines)) o?.pts.forEach((p, i) => { if (!(exclude && exclude.kind === o.kind && exclude.i === i)) others.push(h.toScreen(p)); });
+    let prev: Point | null = null, prevprev: Point | null = null;
+    if (exclude) {
+      const o = this.outlines[exclude.kind]!, n = o.pts.length, at = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
+      prev = at(exclude.i - 1); prevprev = at(exclude.i - 2);
+    } else {
+      const o = this.current();
+      if (o?.pts.length) { prev = h.toScreen(o.pts[o.pts.length - 1]); prevprev = o.pts.length > 1 ? h.toScreen(o.pts[o.pts.length - 2]) : null; }
+    }
+    return { prevprev, prev, others };
   }
   /** Shift + snapping: stay on the 45° ray from `anchor`, but stop at corners on it or where it crosses a drawn line. */
   private snapOnRay(anchor: Point, c: Point, exclude?: { kind: OutlineKind; i: number }): Point {
@@ -320,7 +347,11 @@ export class OutlineTool {
     this.render();
   }
 
-  tapEmpty() { if (this.selectedEdge) { this.selectedEdge = null; this.update(); } }
+  /** A tap or click outside any shape: drop the selection (corner and edge). */
+  tapEmpty() {
+    if (this.drawing || (!this.selectedEdge && !this.selectedCorner)) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.update();
+  }
 
   hover(p: Point | null, shift = this.shiftKey) {
     this.hoverAt = p; this.shiftKey = shift;
@@ -415,8 +446,8 @@ export class OutlineTool {
       if (this.angle !== null) svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${this.angle}°</text>`;
       if (this.snapped) {
         svg += `<circle cx="${x}" cy="${y}" r="16" class="snap-halo"/>`;
-        const label = { corner: 'Corner', line: 'On line', own: 'Corner' }[this.snapped];
-        svg += this.snapped === 'line'
+        const label = { corner: 'Corner', line: 'On line', own: 'Corner', guide: this.guideLabel }[this.snapped];
+        svg += this.snapped === 'line' || this.snapped === 'guide'
           ? `<path d="M${x} ${y - 9}L${x + 9} ${y}L${x} ${y + 9}L${x - 9} ${y}Z" class="snap-mark"/>`
           : `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" class="snap-mark"/>`;
         svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${label}</text>`;

@@ -52,9 +52,10 @@
 - Outline kinds now: plot boundary, house. 📝 More kinds later: other existing structures and surfaces (driveway, patio, deck…).
 - Placing: tap corners. On touch the point sits **above the finger** with a **magnifier**.
 - Closing: **Close shape** button, **double-tap/double-click**, or tap the first corner.
+- Clicking/tapping **outside a shape clears its selection** (selected corner, edge popover).
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
 - **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, or **hold Option/Alt or a second finger** to place freely.
-- **Guides are hints only, never locks**: 90°, straight-on, and alignment with other corners.
+- **Guides snap first** (within ~6 px / 3°, bypassable like all snapping): square (90°) or straight continuation of the previous edge, and alignment with another corner's column or row; when both apply, the point lands where they meet. Guides take priority over lines in the image underneath (own corners still come first).
 - **Snap gravity:** corners pull from ~26 px (outline corners from ~22 px); once snapped, the point **stays put** until the pointer moves ~34 px away or a closer target appears; with a mouse, the **snap preview shows before clicking** (halo + label).
 - **Shift** (while placing or dragging a corner) locks the edge from the previous corner to **45° steps** (0°, 45°, 90°… on screen) and shows the angle. **Snapping still works with Shift**: the point stays on the 45° line but stops at a drawn corner on it or where it crosses a drawn line.
 - Snapping recognises **dashed lines** (property lines are often dashed) and lines with labels written alongside them.
@@ -440,3 +441,8 @@
 ### Round 29 — Shift keeps snapping (2026-10-13)
 - ❌ Shift turned snapping off. ✅ Now Shift + snapping combine: the point stays on the 45° line and stops at drawn corners on it or where it crosses a drawn line.
 - Found while fixing: Riesberg's left property line is dashed (~6 px gaps) with a rotated bearing label alongside; snapping now handles both. Riesberg: Shift-drawing left onto that line stops exactly on it (0.0 px). Real-pixel sample: 18/24 within 2.5 px of the corner (was 19/24).
+
+### Round 30 — selection & guide priority (2026-10-13)
+- ✅ Clicking outside a shape deselects it.
+- 🔄 Guides change from "show only, never lock" to **snap targets with priority over the image** (still bypassable with Option/Alt, a second finger, or Snap off). Priority: own corners → guides → drawing underneath.
+- Check: a 3rd corner ~2° off square lands exactly square; a 4th near both the 1st corner's column and the 3rd's row lands on both; Riesberg corner snapping, area and curve results unchanged.
