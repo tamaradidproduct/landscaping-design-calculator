@@ -19,5 +19,10 @@ Distilled summary of the working sessions behind PR #1. Full decision log: `docs
 - Left edge 138.30′ vs printed 138.31′; street curve 62.03′ vs 62.02′; lot area +0.7% vs printed 13,504 sq ft.
 - The plan's two printed scales disagree (1"=30' and 1"=20'); only 1"=30' is right — reading the printed scale is unreliable.
 
+## Step 3 — existing features (built 2026-10-13)
+- The separate "House" outline is gone; the house is one of any number of named **existing features**, drawn with the same tool and shown as grey fill + name. The plot boundary stays special.
+- Naming happens before drawing (quick picks or typed). Tap inside a feature to rename, redraw or delete it; overlaps allowed, the smallest feature under the tap wins.
+- Found while checking on Riesberg: tapping a corner shared with another outline dragged that outline. While drawing, other outlines' corners are now snap targets only.
+
 ## Next
-- Step 3: mark existing features (any number, custom names, grey fill + label; the house becomes one of them).
+- Step 4+: material zones, plant symbols, edging/walls — to be defined.

@@ -36,7 +36,7 @@
 | 2b | Snapping to the plan's lines/corners; 90°/straight/alignment hints (never locked); snap toggle + Option/second-finger bypass; nudge | 🔨 done | `feat/plan-builder` |
 | — | Undo/redo (⌘Z / ⇧⌘Z, toolbar buttons), including dots of an unfinished outline | 🔨 done | `feat/plan-builder` |
 | 2c | Curved edges: drag an edge's middle handle to bend it into an arc; "Make straight"; lengths and area follow the curve | 🔨 done, in review | `feat/plan-builder-2c-curves` |
-| 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | ✅ defined, not built | — |
+| 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
 | 4+ | Material zones, plant symbols, edging/walls… | ❓ | — |
 
 ## 6. Current requirements, by area
@@ -80,18 +80,25 @@
 - Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
 - Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
 
-### 6.7 Existing features (Step 3) ✅
+### 6.7 Existing features (Step 3) ✅🔨
 - After outlining and scaling, the contractor marks **existing features** — anything already on the lot that isn't new work.
 - **Any number** of features; each gets a **name the contractor types** (e.g. "Driveway", "AC pad", "Window well"). The **house is just one of them** (no separate house tool); the plot boundary stays special.
 - Drawn with the same outline tool (snapping, guides, curves, undo/redo).
 - Shown as **grey fill + its name**, like the house on the Servin plan sheet.
 - Result of Step 3 is **visual only** — no quantities or totals yet.
+- 🔨 **Outline** menu = **Plot boundary** · **Existing feature…**. A feature is named first: quick picks (House, Driveway, Patio, Walk, Deck) or any typed name.
+- 🔨 **Tap inside** a feature to select it → **Rename**, **Redo outline** (Cancel puts the old one back), **Delete**. Overlapping features: the tap picks the smallest one under the finger (a porch inside the house).
+- 🔨 Features may overlap each other and the boundary; nothing is clipped. Any feature edge can still set the scale.
+- 🔨 While drawing, other outlines' corners are snap targets, not handles — tapping a shared corner (driveway meeting the garage) places a new point there instead of dragging the house's corner.
+- 🔨 Undo/redo covers naming, renaming, deleting and redrawing.
+- 📝 Small features: at low zoom the edge-bend handles can cover the middle, so a tap bends/opens an edge instead of selecting — zoom in, or revisit hit priority later.
 
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')
 - Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
 - Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
 - Lot area with the curve → **13,597 sq ft** vs printed 13,504 (+0.7%).
 - Snapping: taps ~9 px off the three test corners landed 0.4–1.8 px from the drawn corner; ~79% of 24 real-pixel samples land within 2.5 px (misses in dense hatching).
+- Step 3: house (10 corners), driveway and porch marked; porch inside the house selects on tap; rename, delete, undo/redo and redraw-then-cancel all behave (`scripts/check-step3.mjs`).
 - Not yet tested with real touch on a tablet.
 
 ## 8. Open questions
@@ -456,3 +463,7 @@
 ### Round 32 — touch placement offset (2026-10-13)
 - ❌ On iPad, taps placed the point ~64 px above the finger (the always-on offset cursor) — felt like a misplaced cursor.
 - ✅ A tap now places right where the finger touches; the offset only appears (gradually) while dragging to fine-tune.
+
+### Round 33 — Step 3 built: existing features (2026-10-13)
+- ✅ House folded into "Existing feature…"; name first (quick picks or typed); grey fill + name label; tap inside to rename / redo outline / delete; overlaps allowed.
+- ❌→✅ Found on Riesberg: drawing the driveway from the garage's corners grabbed and moved the house's corners. Other outlines' corners now only snap while drawing.

@@ -2,7 +2,7 @@ import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
-import type { OutlineKind } from './outline';
+import { FEATURE_PRESETS } from './outline';
 import { fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
 
 registerSW({ immediate: true });
@@ -90,10 +90,18 @@ $('snap').onclick = () => {
   tool.update();
 };
 
-$('outline').onclick = () => { $('outline-menu').hidden = !$('outline-menu').hidden; };
-document.querySelectorAll<HTMLButtonElement>('[data-outline]').forEach(b => {
-  b.onclick = () => { $('outline-menu').hidden = true; tool.start(b.dataset.outline as OutlineKind); };
-});
+// Outline menu: the plot boundary, or an existing feature (named first: a quick pick or any typed name).
+const closeMenus = () => { $('outline-menu').hidden = true; $('feature-menu').hidden = true; };
+$('outline').onclick = () => { const open = !$('outline-menu').hidden || !$('feature-menu').hidden; closeMenus(); $('outline-menu').hidden = open; };
+document.querySelector<HTMLButtonElement>('[data-outline=boundary]')!.onclick = () => { closeMenus(); tool.startBoundary(); };
+document.querySelector<HTMLButtonElement>('[data-outline=feature]')!.onclick = () => {
+  closeMenus(); $('feature-menu').hidden = false; $<HTMLInputElement>('feature-name').value = '';
+};
+const startFeature = (name: string) => { if (!name.trim()) return; closeMenus(); tool.startFeature(name); };
+$('feature-presets').append(...FEATURE_PRESETS.map(name => Object.assign(document.createElement('button'), {
+  type: 'button', textContent: name, onclick: () => startFeature(name),
+})));
+$<HTMLFormElement>('feature-menu').onsubmit = e => { e.preventDefault(); startFeature($<HTMLInputElement>('feature-name').value); };
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 
 // ---------- Opening a file ----------
@@ -239,7 +247,7 @@ function endPointer(e: PointerEvent) {
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
   pinch = null;
-  if (!moved) tool.tapEmpty();
+  if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
     if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30) {

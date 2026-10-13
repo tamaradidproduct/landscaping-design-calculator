@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, snapToGuides, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff } from './outline';
+import { areaPt2, bulgeToward, constrain45, snapToGuides, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff, labelPoint, insidePolygon } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -132,5 +132,21 @@ describe('snapToGuides', () => {
   });
   test('nothing nearby: no snap', () => {
     expect(snapToGuides({ x: 130, y: 77 }, { x: 0, y: 0 }, { x: 100, y: 0 }, [{ x: 10, y: 10 }], 6)).toBeNull();
+  });
+});
+
+describe('labelPoint / insidePolygon', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  test('label sits at the centre of a convex shape', () => {
+    expect(labelPoint(sq)).toEqual({ x: 5, y: 5 });
+  });
+  test('label stays inside an L-shape even when the centroid falls outside', () => {
+    const L = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 2 }, { x: 2, y: 2 }, { x: 2, y: 10 }, { x: 0, y: 10 }];
+    expect(insidePolygon(L, labelPoint(L))).toBe(true);
+  });
+  test('inside / outside', () => {
+    expect(insidePolygon(sq, { x: 3, y: 4 })).toBe(true);
+    expect(insidePolygon(sq, { x: 11, y: 4 })).toBe(false);
+    expect(insidePolygon(sq, { x: -1, y: -1 })).toBe(false);
   });
 });

@@ -1,8 +1,8 @@
-// Steps 2a–2b: outline the plot boundary or the house, then set the scale from one printed edge length.
-// 2b adds snapping to what's drawn on the plan, angle/alignment hints (shown, never locked) and nudging.
+// Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
+// of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  OUTLINE_LABEL, areaPt2, bulgeToward, constrain45, dist, snapToGuides, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
-  outlinePath, parseFeet, percentOff,
+  areaPt2, bulgeToward, constrain45, dist, snapToGuides, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
+  insidePolygon, labelPoint, outlinePath, parseFeet, percentOff,
   type Outline, type OutlineKind,
 } from './outline';
 import { History } from './history';
@@ -33,23 +33,24 @@ const BEND_HIT = 20;        // screen px around an edge's middle handle
 const GUIDE_SNAP = 6;       // screen px: pull into line with other corners / square to the previous edge
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
-const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', house: 'var(--outline-house)' };
+const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', feature: 'var(--outline-feature)' };
+const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
   | { type: 'place'; finger: Point; start: Point; touch: boolean; offsetY: number }
-  | { type: 'corner'; kind: OutlineKind; i: number; grab: Point; moved: boolean }
-  | { type: 'bend'; kind: OutlineKind; i: number; grab: Point; moved: boolean };
+  | { type: 'corner'; id: string; i: number; grab: Point; moved: boolean }
+  | { type: 'bend'; id: string; i: number; grab: Point; moved: boolean };
 
 export class OutlineTool {
-  outlines: Partial<Record<OutlineKind, Outline>> = {};
-  drawing: OutlineKind | null = null;
+  outlines: Record<string, Outline> = {};
+  drawing: string | null = null;
   ftPerPt: number | null = null;
   printedLotSqft: number | null = null;
   private drag: Drag | null = null;
   private dragAt: Point | null = null;        // screen position of the point being placed or moved
   private hoverAt: Point | null = null;       // mouse position, for the rubber-band line
-  private hoverEdge: { kind: OutlineKind; i: number } | null = null;
-  private selectedEdge: { kind: OutlineKind; i: number } | null = null;
+  private hoverEdge: { id: string; i: number } | null = null;
+  private selectedEdge: { id: string; i: number } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
   snapOn = true;
   private bypass = false;                      // held Option/Alt or a second finger: place freely
@@ -60,10 +61,12 @@ export class OutlineTool {
   private shiftKey = false;
   private angle: number | null = null;        // Shift-constrained direction, degrees
   private hoverPlaced: Point | null = null;   // where a click would place the next corner (mouse)
-  selectedCorner: { kind: OutlineKind; i: number } | null = null;
+  selectedCorner: { id: string; i: number } | null = null;
+  selectedFeature: string | null = null;
+  private replaced: Outline | null = null;     // the outline being redrawn, put back on Cancel
   private history = new History<Snapshot>();
   private dragBefore: Snapshot | null = null;
-  private lastNudge: { t: number; kind: OutlineKind; i: number } | null = null;
+  private lastNudge: { t: number; id: string; i: number } | null = null;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -84,12 +87,16 @@ export class OutlineTool {
 
   // ---------- Undo / redo ----------
   private snapshot(): Snapshot {
-    return { outlines: structuredClone(this.outlines), drawing: this.drawing, ftPerPt: this.ftPerPt, selectedCorner: this.selectedCorner };
+    return {
+      outlines: structuredClone(this.outlines), drawing: this.drawing, ftPerPt: this.ftPerPt, selectedCorner: this.selectedCorner,
+      selectedFeature: this.selectedFeature, replaced: structuredClone(this.replaced),
+    };
   }
   /** Call right before every change the user may want to undo. */
   private record() { this.history.record(this.snapshot()); this.lastNudge = null; }
   private restore(s: Snapshot) {
     this.outlines = s.outlines; this.drawing = s.drawing; this.ftPerPt = s.ftPerPt; this.selectedCorner = s.selectedCorner;
+    this.selectedFeature = s.selectedFeature; this.replaced = s.replaced;
     this.drag = null; this.dragAt = null; this.snapped = null; this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
     this.update();
@@ -98,27 +105,53 @@ export class OutlineTool {
   redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
 
   // ---------- Commands ----------
-  start(kind: OutlineKind) {
+  /** Outline the plot boundary (replacing the current one, if any). */
+  startBoundary() { this.begin(BOUNDARY, 'boundary', 'Plot boundary'); }
+  /** Outline a new existing feature with the name the contractor picked or typed. */
+  startFeature(name: string) {
+    let n = Object.keys(this.outlines).length + 1;
+    while (this.outlines[`f${n}`]) n++;
+    this.begin(`f${n}`, 'feature', name.trim() || 'Feature');
+  }
+  /** Draw an existing outline again from scratch, keeping its name; Cancel puts the old one back. */
+  redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name); }
+  private begin(id: string, kind: OutlineKind, name: string) {
+    if (this.drawing) this.cancel();
     this.record();
-    this.drawing = kind;
-    this.outlines[kind] = { kind, pts: [], closed: false };
-    this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null;
+    this.replaced = this.outlines[id] ?? null;
+    this.outlines[id] = { id, kind, name, pts: [], closed: false };
+    this.drawing = id;
+    this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selectedFeature = null;
     this.update();
   }
   cancel() {
     if (!this.drawing) return;
     this.record();
-    delete this.outlines[this.drawing];
-    this.drawing = null; this.update();
+    if (this.replaced) this.outlines[this.drawing] = this.replaced; else delete this.outlines[this.drawing];
+    this.replaced = null; this.drawing = null; this.update();
+  }
+  renameFeature(id: string, name: string) {
+    const o = this.outlines[id], n = name.trim(); if (!o || !n || n === o.name) return;
+    this.record(); o.name = n; this.update();
+  }
+  deleteFeature(id: string) {
+    const o = this.outlines[id]; if (!o || o.kind !== 'feature') return;
+    this.record();
+    delete this.outlines[id];
+    if (this.selectedFeature === id) this.selectedFeature = null;
+    if (this.selectedCorner?.id === id) this.selectedCorner = null;
+    if (this.selectedEdge?.id === id) this.selectedEdge = null;
+    this.host.toast(`${o.name} deleted.`);
+    this.update();
   }
   close() {
     const o = this.current(); if (!o || o.pts.length < 3) return;
     this.record();
-    o.closed = true; this.drawing = null;
+    o.closed = true; this.drawing = null; this.replaced = null;
     o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
     this.host.toast(this.ftPerPt
-      ? `${OUTLINE_LABEL[o.kind]} outlined. Tap an edge to see its length.`
-      : `${OUTLINE_LABEL[o.kind]} outlined. Now tap an edge and type its printed length to set the scale.`);
+      ? `${o.name} outlined. Tap an edge to see its length.`
+      : `${o.name} outlined. Now tap an edge and type its printed length to set the scale.`);
     this.update();
   }
   private current(): Outline | undefined { return this.drawing ? this.outlines[this.drawing] : undefined; }
@@ -139,17 +172,17 @@ export class OutlineTool {
     }
     const hit = this.cornerAt(p);
     if (hit) {
-      const s = this.host.toScreen(this.outlines[hit.kind]!.pts[hit.i]);
-      this.drag = { type: 'corner', kind: hit.kind, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
-      this.selectedCorner = { kind: hit.kind, i: hit.i };
+      const s = this.host.toScreen(this.outlines[hit.id]!.pts[hit.i]);
+      this.drag = { type: 'corner', id: hit.id, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
+      this.selectedCorner = { id: hit.id, i: hit.i };
       this.dragBefore = this.snapshot();
       this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
       return true;
     }
     const bend = this.drawing ? null : this.bendHandleAt(p);
     if (bend) {
-      const m = this.host.toScreen(edgeMid(this.outlines[bend.kind]!.pts, bend.i, this.outlines[bend.kind]!.bulges));
-      this.drag = { type: 'bend', kind: bend.kind, i: bend.i, grab: { x: m.x - p.x, y: m.y - p.y }, moved: false };
+      const m = this.host.toScreen(edgeMid(this.outlines[bend.id]!.pts, bend.i, this.outlines[bend.id]!.bulges));
+      this.drag = { type: 'bend', id: bend.id, i: bend.i, grab: { x: m.x - p.x, y: m.y - p.y }, moved: false };
       this.dragBefore = this.snapshot();
       this.rawAt = m; this.dragAt = m; this.snapped = null; this.selectedEdge = null; this.update();
       return true;
@@ -166,7 +199,7 @@ export class OutlineTool {
       return true;
     }
     const edge = this.edgeAt(p);
-    if (edge) { this.selectedEdge = edge; this.update(); return true; }
+    if (edge) { this.selectedEdge = edge; this.selectedFeature = null; this.update(); return true; }
     return false;
   }
 
@@ -192,10 +225,10 @@ export class OutlineTool {
     const d = this.drag; if (!d || !this.rawAt) return;
     this.bypass = this.bypassKey || this.bypassHold;
     this.dragAt = d.type === 'bend' ? this.resolve(this.rawAt, undefined, true) : this.placeAt(this.rawAt, this.anchorFor(d.type === 'corner' ? d : null), d.type === 'corner' ? d : undefined);
-    if (d.type === 'corner') this.outlines[d.kind]!.pts[d.i] = this.host.toPage(this.dragAt);
+    if (d.type === 'corner') this.outlines[d.id]!.pts[d.i] = this.host.toPage(this.dragAt);
     if (d.type === 'bend') {
       // Bend edge i so its arc passes through the handle. Within 2 px of straight, keep it straight.
-      const o = this.outlines[d.kind]!, a = o.pts[d.i], b = o.pts[(d.i + 1) % o.pts.length];
+      const o = this.outlines[d.id]!, a = o.pts[d.i], b = o.pts[(d.i + 1) % o.pts.length];
       const hgt = bulgeToward(a, b, this.host.toPage(this.dragAt));
       o.bulges![d.i] = Math.abs(hgt) * this.host.pxPerPt() < 2 ? 0 : hgt;
     }
@@ -207,7 +240,7 @@ export class OutlineTool {
    * Where a corner placed or dragged to screen position `raw` lands. Shift locks the edge from
    * `anchor` to 45° steps; otherwise snapping applies.
    */
-  private placeAt(raw: Point, anchor: Point | null, exclude?: { kind: OutlineKind; i: number }): Point {
+  private placeAt(raw: Point, anchor: Point | null, exclude?: { id: string; i: number }): Point {
     if (this.shiftKey && anchor) {
       const c = constrain45(anchor, raw);
       this.snapped = null; this.stick = null; this.angle = c.angle;
@@ -224,16 +257,16 @@ export class OutlineTool {
     }
     return this.resolve(raw, exclude);
   }
-  private ownCornerNear(raw: Point, exclude?: { kind: OutlineKind; i: number }): boolean {
-    return Object.values(this.outlines).some(o => o?.pts.some((pt, i) => !(exclude && exclude.kind === o.kind && exclude.i === i) && dist(this.host.toScreen(pt), raw) < OWN_SNAP));
+  private ownCornerNear(raw: Point, exclude?: { id: string; i: number }): boolean {
+    return Object.values(this.outlines).some(o => o?.pts.some((pt, i) => !(exclude && exclude.id === o.id && exclude.i === i) && dist(this.host.toScreen(pt), raw) < OWN_SNAP));
   }
   /** Neighbouring corners (screen px) for guides: the edge being drawn or dragged, and every other corner. */
-  private guideContext(exclude?: { kind: OutlineKind; i: number }): { prevprev: Point | null; prev: Point | null; others: Point[] } {
+  private guideContext(exclude?: { id: string; i: number }): { prevprev: Point | null; prev: Point | null; others: Point[] } {
     const h = this.host, others: Point[] = [];
-    for (const o of Object.values(this.outlines)) o?.pts.forEach((p, i) => { if (!(exclude && exclude.kind === o.kind && exclude.i === i)) others.push(h.toScreen(p)); });
+    for (const o of Object.values(this.outlines)) o?.pts.forEach((p, i) => { if (!(exclude && exclude.id === o.id && exclude.i === i)) others.push(h.toScreen(p)); });
     let prev: Point | null = null, prevprev: Point | null = null;
     if (exclude) {
-      const o = this.outlines[exclude.kind]!, n = o.pts.length, at = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
+      const o = this.outlines[exclude.id]!, n = o.pts.length, at = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
       prev = at(exclude.i - 1); prevprev = at(exclude.i - 2);
     } else {
       const o = this.current();
@@ -242,13 +275,13 @@ export class OutlineTool {
     return { prevprev, prev, others };
   }
   /** Shift + snapping: stay on the 45° ray from `anchor`, but stop at corners on it or where it crosses a drawn line. */
-  private snapOnRay(anchor: Point, c: Point, exclude?: { kind: OutlineKind; i: number }): Point {
+  private snapOnRay(anchor: Point, c: Point, exclude?: { id: string; i: number }): Point {
     if (!this.snapOn || this.bypass) return c;
     const len = dist(anchor, c); if (len < 1) return c;
     const ux = (c.x - anchor.x) / len, uy = (c.y - anchor.y) / len;
     let best: Point | null = null, bd = OWN_SNAP;
     for (const o of Object.values(this.outlines)) o?.pts.forEach((pt, i) => {
-      if (exclude && exclude.kind === o.kind && exclude.i === i) return;
+      if (exclude && exclude.id === o.id && exclude.i === i) return;
       const s = this.host.toScreen(pt), t = (s.x - anchor.x) * ux + (s.y - anchor.y) * uy;
       const q = { x: anchor.x + t * ux, y: anchor.y + t * uy };
       if (t > 0 && dist(q, s) <= 6 && dist(q, c) < bd) { bd = dist(q, c); best = q; }
@@ -263,15 +296,15 @@ export class OutlineTool {
   }
 
   /** The corner an edge is drawn from: the last corner while drawing, the previous corner while dragging one. */
-  private anchorFor(c: { kind: OutlineKind; i: number } | null): Point | null {
-    const o = c ? this.outlines[c.kind] : this.current(); if (!o || !o.pts.length) return null;
+  private anchorFor(c: { id: string; i: number } | null): Point | null {
+    const o = c ? this.outlines[c.id] : this.current(); if (!o || !o.pts.length) return null;
     if (!c) return this.host.toScreen(o.pts[o.pts.length - 1]);
     if (c.i === 0 && !o.closed) return null;
     return this.host.toScreen(o.pts[(c.i - 1 + o.pts.length) % o.pts.length]);
   }
 
   /** Where a point placed at screen position `raw` lands: own corners first, then the drawing, else free. */
-  private resolve(raw: Point, exclude?: { kind: OutlineKind; i: number }, lineOnly = false): Point {
+  private resolve(raw: Point, exclude?: { id: string; i: number }, lineOnly = false): Point {
     this.snapped = null;
     if (!this.snapOn || this.bypass) { this.stick = null; return raw; }
     const found = this.findSnap(raw, exclude, lineOnly), foundKind = this.snapped;
@@ -288,7 +321,7 @@ export class OutlineTool {
     if (found) this.stick = { page: this.host.toPage(found), kind: foundKind! };
     return found ?? raw;
   }
-  private findSnap(raw: Point, exclude: { kind: OutlineKind; i: number } | undefined, lineOnly: boolean): Point | null {
+  private findSnap(raw: Point, exclude: { id: string; i: number } | undefined, lineOnly: boolean): Point | null {
     if (lineOnly) {
       // Bending: follow the drawn curve, so snap onto lines only (never to corners).
       const n = SNAP_WINDOW, g = this.host.sampleLuminance(raw, n), hit = g && findImageSnap(g, { x: n / 2, y: n / 2 });
@@ -299,7 +332,7 @@ export class OutlineTool {
     let best: Point | null = null, bd = OWN_SNAP;
     for (const o of Object.values(this.outlines)) {
       o?.pts.forEach((pt, i) => {
-        if (exclude && exclude.kind === o.kind && exclude.i === i) return;
+        if (exclude && exclude.id === o.id && exclude.i === i) return;
         const s = this.host.toScreen(pt), d = dist(s, raw);
         if (d < bd) { bd = d; best = s; }
       });
@@ -313,11 +346,11 @@ export class OutlineTool {
   }
 
   nudge(dx: number, dy: number) {
-    const c = this.selectedCorner, o = c && this.outlines[c.kind]; if (!c || !o?.pts[c.i]) return;
+    const c = this.selectedCorner, o = c && this.outlines[c.id]; if (!c || !o?.pts[c.i]) return;
     // Consecutive nudges of the same corner undo as one step.
     const now = performance.now(), ln = this.lastNudge;
-    if (!(ln && ln.kind === c.kind && ln.i === c.i && now - ln.t < 1500)) this.record();
-    this.lastNudge = { t: now, kind: c.kind, i: c.i };
+    if (!(ln && ln.id === c.id && ln.i === c.i && now - ln.t < 1500)) this.record();
+    this.lastNudge = { t: now, id: c.id, i: c.i };
     const k = 1 / this.host.pxPerPt(), p = o.pts[c.i];
     o.pts[c.i] = { x: p.x + dx * k, y: p.y + dy * k };
     this.update();
@@ -330,7 +363,7 @@ export class OutlineTool {
     if (!d) return;
     if (d.type === 'bend') {
       if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
-      else this.selectedEdge = { kind: d.kind, i: d.i }; // a tap on the handle opens the edge
+      else this.selectedEdge = { id: d.id, i: d.i }; // a tap on the handle opens the edge
       this.dragBefore = null; this.dragAt = null; this.snapped = null; this.update(); return;
     }
     if (d.type === 'corner') {
@@ -338,7 +371,7 @@ export class OutlineTool {
       // A tap (no drag) while drawing: the first corner closes the shape; a quick second tap on the
       // corner just placed is a double-tap, which also closes it.
       const o = this.current(), now = performance.now();
-      const tapped = !d.moved && o && d.kind === o.kind;
+      const tapped = !d.moved && o && d.id === o.id;
       if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS))) {
         this.lastTap = null; this.dragAt = null; this.close(); return;
       }
@@ -352,7 +385,7 @@ export class OutlineTool {
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
     this.record();
     o.pts.push(this.host.toPage(this.dragAt));
-    this.selectedCorner = { kind: o.kind, i: o.pts.length - 1 };
+    this.selectedCorner = { id: o.id, i: o.pts.length - 1 };
     this.lastTap = { t: now, finger: d.finger };
     this.dragAt = null; this.snapped = null;
     this.update();
@@ -372,10 +405,31 @@ export class OutlineTool {
     this.update();
   }
 
-  /** A tap or click outside any shape: drop the selection (corner and edge). */
-  tapEmpty() {
-    if (this.drawing || (!this.selectedEdge && !this.selectedCorner)) return;
-    this.selectedEdge = null; this.selectedCorner = null; this.update();
+  /**
+   * A tap or click no corner, edge or handle took: select the existing feature under it (the smallest,
+   * where features overlap), or drop the selection when it's outside every feature.
+   */
+  tap(p: Point) {
+    if (this.drawing) return;
+    const hit = this.featureAt(p);
+    if (hit === this.selectedFeature && !this.selectedEdge && !this.selectedCorner) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selectedFeature = hit;
+    this.update();
+  }
+  /** Escape: drop every selection. */
+  deselect() {
+    if (!this.selectedEdge && !this.selectedCorner && !this.selectedFeature) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selectedFeature = null; this.update();
+  }
+  private featureAt(p: Point): string | null {
+    const pp = this.host.toPage(p);
+    let best: string | null = null, ba = Infinity;
+    for (const o of Object.values(this.outlines)) {
+      if (o.kind !== 'feature' || !o.closed) continue;
+      const a = Math.abs(areaPt2(o.pts, o.bulges));
+      if (a < ba && insidePolygon(outlinePath(o.pts, o.bulges, true), pp)) { ba = a; best = o.id; }
+    }
+    return best;
   }
 
   hover(p: Point | null, shift = this.shiftKey) {
@@ -384,48 +438,50 @@ export class OutlineTool {
     this.hoverPlaced = p && this.drawing ? this.placeAt(p, this.anchorFor(null)) : null;
     if (!this.hoverPlaced) { this.snapped = null; this.angle = null; }
     const edge = p && !this.drawing ? this.edgeAt(p) : null;
-    const changed = edge?.kind !== this.hoverEdge?.kind || edge?.i !== this.hoverEdge?.i;
+    const changed = edge?.id !== this.hoverEdge?.id || edge?.i !== this.hoverEdge?.i;
     this.hoverEdge = edge;
     if (edge && p) this.showTip(edge, p); else this.hideTip();
     if (changed || this.drawing) this.render();
   }
 
-  private bendHandleAt(p: Point): { kind: OutlineKind; i: number } | null {
-    let best: { kind: OutlineKind; i: number } | null = null, bd = BEND_HIT;
+  private bendHandleAt(p: Point): { id: string; i: number } | null {
+    let best: { id: string; i: number } | null = null, bd = BEND_HIT;
     for (const o of Object.values(this.outlines)) {
       if (!o?.closed) continue;
-      o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { kind: o.kind, i }; } });
+      o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
   }
-  private cornerAt(p: Point): { kind: OutlineKind; i: number } | null {
-    let best: { kind: OutlineKind; i: number } | null = null, bd = CORNER_HIT;
+  private cornerAt(p: Point): { id: string; i: number } | null {
+    let best: { id: string; i: number } | null = null, bd = CORNER_HIT;
     for (const o of Object.values(this.outlines)) {
-      if (!o) continue;
-      o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < bd) { bd = d; best = { kind: o.kind, i }; } });
+      // While drawing, other outlines' corners are snap targets (a shared corner places a new point
+      // there), not handles to drag.
+      if (this.drawing && o.id !== this.drawing) continue;
+      o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
   }
-  private edgeAt(p: Point): { kind: OutlineKind; i: number } | null {
+  private edgeAt(p: Point): { id: string; i: number } | null {
     const tol = EDGE_HIT / this.host.pxPerPt(), pp = this.host.toPage(p);
     for (const o of Object.values(this.outlines)) {
       if (!o?.closed) continue;
       const i = nearestEdge(o.pts, pp, tol, o.bulges);
-      if (i !== null) return { kind: o.kind, i };
+      if (i !== null) return { id: o.id, i };
     }
     return null;
   }
 
   // ---------- Scale ----------
-  setScaleFromEdge(kind: OutlineKind, i: number, feet: number) {
+  setScaleFromEdge(id: string, i: number, feet: number) {
     this.record();
-    this.ftPerPt = feet / edgeLengthPt(this.outlines[kind]!.pts, i, this.outlines[kind]!.bulges);
+    this.ftPerPt = feet / edgeLengthPt(this.outlines[id]!.pts, i, this.outlines[id]!.bulges);
     this.host.toast(`Scale set: ${formatScale(this.ftPerPt)}.`);
     this.selectedEdge = null;
     this.update();
   }
-  private edgeFeet(kind: OutlineKind, i: number) {
-    return this.ftPerPt ? edgeLengthPt(this.outlines[kind]!.pts, i, this.outlines[kind]!.bulges) * this.ftPerPt : null;
+  private edgeFeet(id: string, i: number) {
+    return this.ftPerPt ? edgeLengthPt(this.outlines[id]!.pts, i, this.outlines[id]!.bulges) * this.ftPerPt : null;
   }
 
   // ---------- Rendering ----------
@@ -438,14 +494,15 @@ export class OutlineTool {
     for (const o of Object.values(this.outlines)) {
       if (!o || !o.pts.length) continue;
       const pts = o.pts.map(p => h.toScreen(p));
-      const drawingThis = this.drawing === o.kind;
+      const drawingThis = this.drawing === o.id;
       if (drawingThis && this.dragAt) pts.push(this.dragAt);
       else if (drawingThis && this.hoverPlaced && !this.drag) pts.push(this.hoverPlaced);
       const line = o.closed ? outlinePath(o.pts, o.bulges, true).map(p => h.toScreen(p)) : pts;
       const d = line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed ? ' Z' : '');
-      svg += `<path d="${d}" class="shape${o.closed ? ' closed' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+      const sel = this.selectedFeature === o.id;
+      svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
-        if (e?.kind !== o.kind || !o.closed) continue;
+        if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
         svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${COLORS[o.kind]}"/>`;
       }
@@ -461,9 +518,15 @@ export class OutlineTool {
         svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? 7 : 6}" class="corner" style="--c:${COLORS[o.kind]}"/>`;
       });
     }
+    for (const o of Object.values(this.outlines)) {
+      // Names go on top of every shape so overlapping features stay readable.
+      if (o.kind !== 'feature' || !o.closed) continue;
+      const c = h.toScreen(labelPoint(outlinePath(o.pts, o.bulges, true)));
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="feature-label${this.selectedFeature === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+    }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);
-    const sel = this.selectedCorner && !this.dragAt ? this.outlines[this.selectedCorner.kind]?.pts[this.selectedCorner.i] : null;
+    const sel = this.selectedCorner && !this.dragAt ? this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i] : null;
     if (sel) { const s = h.toScreen(sel); svg += `<circle cx="${s.x}" cy="${s.y}" r="11" class="selected-corner"/>`; }
     const at = this.dragAt ?? (this.drawing && !this.drag ? this.hoverPlaced : null);
     if (at) {
@@ -490,18 +553,18 @@ export class OutlineTool {
   private renderGuides(at: Point): string {
     const h = this.host, d = this.drag;
     let out = '', prev: Point | null = null, prevprev: Point | null = null, next: Point | null = null, nextnext: Point | null = null;
-    let skip: { kind: OutlineKind; i: number } | null = null;
+    let skip: { id: string; i: number } | null = null;
     if ((!d || d.type === 'place') && this.drawing) {
       const pts = this.outlines[this.drawing]!.pts.map(p => h.toScreen(p));
       prev = pts.at(-1) ?? null; prevprev = pts.at(-2) ?? null;
     } else if (d?.type === 'corner') {
-      const o = this.outlines[d.kind]!, n = o.pts.length, at2 = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
+      const o = this.outlines[d.id]!, n = o.pts.length, at2 = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
       prev = at2(d.i - 1); prevprev = at2(d.i - 2); next = at2(d.i + 1); nextnext = at2(d.i + 2);
       skip = d;
     }
     const others: Point[] = [];
     for (const o of Object.values(this.outlines)) o?.pts.forEach((p, i) => {
-      if (skip && skip.kind === o.kind && skip.i === i) return;
+      if (skip && skip.id === o.id && skip.i === i) return;
       const s = h.toScreen(p);
       if ((prev && dist(s, prev) < 0.5) || (next && dist(s, next) < 0.5)) return; // the edge itself already shows that line
       others.push(s);
@@ -538,8 +601,8 @@ export class OutlineTool {
     m.style.top = `${above ? at.y - size - 40 : at.y + 40}px`;
   }
 
-  private showTip(e: { kind: OutlineKind; i: number }, p: Point) {
-    const ft = this.edgeFeet(e.kind, e.i);
+  private showTip(e: { id: string; i: number }, p: Point) {
+    const ft = this.edgeFeet(e.id, e.i);
     this.tip.textContent = ft ? formatFeet(ft) : 'Tap to set this edge’s length';
     this.tip.style.left = `${p.x + 14}px`; this.tip.style.top = `${p.y + 14}px`;
     this.tip.hidden = false;
@@ -548,12 +611,12 @@ export class OutlineTool {
 
   private renderPopover() {
     const e = this.selectedEdge;
-    if (!e || !this.outlines[e.kind]?.closed) { this.popover.hidden = true; return; }
-    const ft = this.edgeFeet(e.kind, e.i);
+    if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
+    const ft = this.edgeFeet(e.id, e.i);
     this.popover.innerHTML = `
-      <div class="pop-head"><strong>${OUTLINE_LABEL[e.kind]} edge</strong><button type="button" class="icon" data-act="close" aria-label="Close">×</button></div>
-      <div class="pop-measure">${ft ? `Measures <b>${formatFeet(ft)}</b>${this.outlines[e.kind]!.bulges?.[e.i] ? ' along the curve' : ''}` : 'No scale yet'}</div>
-      ${this.outlines[e.kind]!.bulges?.[e.i] ? '<button type="button" data-act="straighten">Make straight</button>' : '<p class="pop-hint">Drag the square in the middle of the edge to curve it.</p>'}
+      <div class="pop-head"><strong>${esc(this.outlines[e.id]!.name)} edge</strong><button type="button" class="icon" data-act="close" aria-label="Close">×</button></div>
+      <div class="pop-measure">${ft ? `Measures <b>${formatFeet(ft)}</b>${this.outlines[e.id]!.bulges?.[e.i] ? ' along the curve' : ''}` : 'No scale yet'}</div>
+      ${this.outlines[e.id]!.bulges?.[e.i] ? '<button type="button" data-act="straighten">Make straight</button>' : '<p class="pop-hint">Drag the square in the middle of the edge to curve it.</p>'}
       <form class="pop-form">
         <label for="edge-len">Printed length on the plan</label>
         <div class="row"><input id="edge-len" inputmode="decimal" autocomplete="off" placeholder="e.g. 116.45 or 116' 5&quot;" />
@@ -563,19 +626,19 @@ export class OutlineTool {
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
-    if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.kind]!.bulges![e.i] = 0; this.update(); };
+    if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.id]!.bulges![e.i] = 0; this.update(); };
     const form = this.popover.querySelector('form')!;
     form.onsubmit = ev => {
       ev.preventDefault();
       const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
       if (!feet) { this.popover.querySelector<HTMLElement>('.pop-error')!.hidden = false; return; }
-      this.setScaleFromEdge(e.kind, e.i, feet);
+      this.setScaleFromEdge(e.id, e.i, feet);
     };
     this.positionPopover();
   }
   private positionPopover() {
     const e = this.selectedEdge; if (!e || this.popover.hidden) return;
-    const o = this.outlines[e.kind]; if (!o) return;
+    const o = this.outlines[e.id]; if (!o) return;
     const a = this.host.toScreen(o.pts[e.i]), b = this.host.toScreen(o.pts[(e.i + 1) % o.pts.length]);
     const stage = this.svg.getBoundingClientRect(), w = this.popover.offsetWidth || 300, hgt = this.popover.offsetHeight || 170;
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
@@ -587,7 +650,7 @@ export class OutlineTool {
     const p = this.panel, o = this.current();
     if (o) {
       p.innerHTML = `
-        <p class="panel-text">Tap each corner of the <b>${OUTLINE_LABEL[o.kind].toLowerCase()}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
+        <p class="panel-text">Tap each corner of the <b>${esc(o.kind === 'boundary' ? 'plot boundary' : o.name)}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
         <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. To place one freely, hold Option (Alt) — on touch, press and hold before moving. Two fingers move and zoom.' : 'Snapping is off.'}</p>
         ${this.nudgePad()}
         <div class="row">
@@ -595,8 +658,10 @@ export class OutlineTool {
         <button type="button" data-act="cancel">Cancel</button></div>`;
       p.hidden = false;
     } else {
-      const closed = Object.values(this.outlines).filter(x => x?.closed) as Outline[];
+      const closed = Object.values(this.outlines).filter(x => x.closed);
       if (!closed.length) { p.hidden = true; return; }
+      const f = this.selectedFeature ? this.outlines[this.selectedFeature] : null;
+      if (f) { this.renderFeaturePanel(f); return; }
       const b = this.outlines.boundary?.closed ? this.outlines.boundary : null;
       const area = b && this.ftPerPt ? areaPt2(b.pts, b.bulges) * this.ftPerPt * this.ftPerPt : null;
       const off = area && this.printedLotSqft ? percentOff(area, this.printedLotSqft) : null;
@@ -606,7 +671,8 @@ export class OutlineTool {
           <label for="lot-size">Printed lot size</label><input id="lot-size" inputmode="numeric" placeholder="13,504" value="${this.printedLotSqft ?? ''}" />
           ${off !== null ? `<span class="${Math.abs(off) <= 1 ? 'ok' : 'warn'}">${Math.abs(off) < 0.05 ? 'matches' : `${Math.abs(off).toFixed(1)}% ${off > 0 ? 'over' : 'under'}`}</span>` : ''}</div>` : ''}
         ${this.nudgePad()}
-        <div class="row">${closed.map(c => `<button type="button" data-redo="${c.kind}">Redo ${OUTLINE_LABEL[c.kind].toLowerCase()}</button>`).join('')}</div>`;
+        ${closed.some(c => c.kind === 'feature') ? '<p class="panel-hint">Tap inside an existing feature to rename, delete or redraw it.</p>' : ''}
+        ${b ? '<div class="row"><button type="button" data-redo="boundary">Redo plot boundary</button></div>' : ''}`;
       p.hidden = false;
       const lot = p.querySelector<HTMLInputElement>('#lot-size');
       if (lot) lot.onchange = () => { const v = Number(lot.value.replace(/[^\d.]/g, '')); this.printedLotSqft = v > 0 ? v : null; this.renderPanel(); };
@@ -617,11 +683,38 @@ export class OutlineTool {
     p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
       btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
     });
-    p.querySelectorAll<HTMLButtonElement>('[data-redo]').forEach(btn => { btn.onclick = () => this.start(btn.dataset.redo as OutlineKind); });
+    p.querySelectorAll<HTMLButtonElement>('[data-redo]').forEach(btn => { btn.onclick = () => this.redraw(btn.dataset.redo!); });
+  }
+
+  /** Panel for a selected existing feature: rename, redraw, delete. */
+  private renderFeaturePanel(f: Outline) {
+    const p = this.panel;
+    p.innerHTML = `
+      <form class="rename-row">
+        <label for="feature-name-edit">Existing feature</label>
+        <input id="feature-name-edit" autocomplete="off" value="${esc(f.name)}" />
+        <button type="submit">Rename</button>
+      </form>
+      ${this.nudgePad()}
+      <div class="row">
+        <button type="button" data-act="redraw">Redo outline</button>
+        <button type="button" data-act="delete" class="danger">Delete</button>
+        <button type="button" data-act="done">Done</button>
+      </div>`;
+    p.hidden = false;
+    const input = p.querySelector<HTMLInputElement>('#feature-name-edit')!;
+    p.querySelector('form')!.onsubmit = ev => { ev.preventDefault(); this.renameFeature(f.id, input.value); input.blur(); };
+    const act: Record<string, () => void> = {
+      redraw: () => this.redraw(f.id), delete: () => this.deleteFeature(f.id), done: () => this.deselect(),
+    };
+    p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => { btn.onclick = act[btn.dataset.act!]; });
+    p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
+      btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
+    });
   }
 
   private nudgePad(): string {
-    if (!this.selectedCorner || !this.outlines[this.selectedCorner.kind]?.pts[this.selectedCorner.i]) return '';
+    if (!this.selectedCorner || !this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i]) return '';
     return `<div class="nudge"><span class="panel-hint">Nudge the selected corner</span>
       <button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="0,-1" aria-label="Nudge up">↑</button>
       <button type="button" data-nudge="0,1" aria-label="Nudge down">↓</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button></div>`;
@@ -645,15 +738,20 @@ export class OutlineTool {
       if (e.key === 'Enter') { e.preventDefault(); this.close(); }
       else if (e.key === 'Escape') this.cancel();
       else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.undo(); }
-    } else if (e.key === 'Escape') this.tapEmpty();
+    } else if (e.key === 'Escape') this.deselect();
   }
 }
 
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
 function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; }
 
 interface Snapshot {
-  outlines: Partial<Record<OutlineKind, Outline>>;
-  drawing: OutlineKind | null;
+  outlines: Record<string, Outline>;
+  drawing: string | null;
   ftPerPt: number | null;
-  selectedCorner: { kind: OutlineKind; i: number } | null;
+  selectedCorner: { id: string; i: number } | null;
+  selectedFeature: string | null;
+  replaced: Outline | null;
 }
