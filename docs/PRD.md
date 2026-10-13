@@ -319,3 +319,9 @@
 - PDF.js was too slow on real plot plans: the Riesberg plan draws its text as ~12k vector shapes → ~12 s to first paint. Switched to **PDFium (WebAssembly)** in a background worker: ~0.7 s to open once the engine has warmed up (~3 s after app launch), ~1.5–2 s if opened immediately.
 - Measured in headless Chrome on a Mac (820×1180, 2x); **not yet measured on a real iPad**.
 - ⚠️ Later steps: this plan's scale label (`1" = 30'`) disagrees with its title block (`1"=20'`), and its text is drawn as shapes (no extractable text) → auto-detecting scale would need OCR.
+
+### Round 21 (2026-10-12)
+- ✅ Two-finger trackpad drag = pan; pinch = zoom (shipped `bc4cca8`).
+- 📝 Backlog (low priority): replace "Open another" with an **edit button next to the file name**. ❓ Edit = rename, or replace the file?
+- ✅ iPad testing deferred for now.
+- ✅ Next step: **Step 2 — scale calibration flow** (to be defined before building).
