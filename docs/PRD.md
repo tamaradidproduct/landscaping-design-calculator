@@ -383,3 +383,8 @@
 - **Hints, never locked:** "90°" mark when an edge is square to the previous one, "Straight" when it continues it, dashed line when the point lines up with another corner. Shown while dragging, and on mouse hover while drawing.
 - **Nudge:** arrow buttons in the panel and arrow keys (Shift = 10 px) move the selected corner.
 - Riesberg check (tap ~9 px off): all three test corners snapped onto the drawn corner (0.4–1.8 px). On 24 captured real windows across two zoom levels, ~79% land within 2.5 px of the corner; misses are in dense spots (bottom-left corner with hatch dots and double lines) — nudge or bypass there.
+
+### Round 26 (2026-10-12)
+- ✅ Parked Figma-takeoff code **archived** as git tag `archive/figma-takeoff-hardening` (branch removed); its requirements stay in this PRD for context.
+- ✅ Each build step now gets its own branch off `feat/plan-builder`.
+- ✅ **Undo/redo** (branch `feat/plan-builder-undo`): ⌘Z / Ctrl+Z undoes, ⇧⌘Z / Ctrl+Shift+Z (or Ctrl+Y) redoes; toolbar Undo/Redo buttons for touch. Works mid-outline (each placed dot is a step), and on close, corner drags, nudges (consecutive nudges of one corner = one step), starting/cancelling an outline and setting the scale. Text fields keep their own undo.

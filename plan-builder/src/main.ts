@@ -42,6 +42,10 @@ const tool = new OutlineTool({
     }
   },
   toast: msg => toast(msg),
+  historyChanged(canUndo, canRedo) {
+    ($('undo') as HTMLButtonElement).disabled = !canUndo;
+    ($('redo') as HTMLButtonElement).disabled = !canRedo;
+  },
   sampleLuminance(c, n) {
     // Read what's on screen (sharp layer when ready, else the base layer) at 1 sample per screen px.
     const out = new Float32Array(n * n).fill(255), x0 = Math.round(c.x - n / 2), y0 = Math.round(c.y - n / 2);
@@ -72,6 +76,9 @@ const tool = new OutlineTool({
 
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
+
+$('undo').onclick = () => tool.undo();
+$('redo').onclick = () => tool.redo();
 
 $('snap').onclick = () => {
   tool.snapOn = !tool.snapOn;

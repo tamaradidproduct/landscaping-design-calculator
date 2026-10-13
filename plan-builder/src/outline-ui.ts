@@ -4,6 +4,7 @@ import {
   OUTLINE_LABEL, areaPt2, dist, edgeLengthPt, formatArea, formatFeet, formatScale, guides, nearestEdge, parseFeet, percentOff,
   type Outline, type OutlineKind,
 } from './outline';
+import { History } from './history';
 import { findImageSnap, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -15,6 +16,8 @@ export interface ToolHost {
   /** Draw the plan under screen point `s` into ctx (for the magnifier), magnified by `zoom`. */
   drawMagnified(ctx: CanvasRenderingContext2D, s: Point, zoom: number, size: number): void;
   toast(msg: string): void;
+  /** Called whenever what can be undone/redone changes. */
+  historyChanged(canUndo: boolean, canRedo: boolean): void;
   /** Luminance (0–255) of the plan as shown, n×n samples at 1 per screen px, centred on screen point c. */
   sampleLuminance(c: Point, n: number): Float32Array | null;
 }
@@ -46,6 +49,9 @@ export class OutlineTool {
   private rawAt: Point | null = null;          // where the point would be without snapping
   private snapped: 'corner' | 'line' | 'own' | null = null;
   selectedCorner: { kind: OutlineKind; i: number } | null = null;
+  private history = new History<Snapshot>();
+  private dragBefore: Snapshot | null = null;
+  private lastNudge: { t: number; kind: OutlineKind; i: number } | null = null;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -64,8 +70,24 @@ export class OutlineTool {
     window.addEventListener('keydown', e => this.onKey(e));
   }
 
+  // ---------- Undo / redo ----------
+  private snapshot(): Snapshot {
+    return { outlines: structuredClone(this.outlines), drawing: this.drawing, ftPerPt: this.ftPerPt, selectedCorner: this.selectedCorner };
+  }
+  /** Call right before every change the user may want to undo. */
+  private record() { this.history.record(this.snapshot()); this.lastNudge = null; }
+  private restore(s: Snapshot) {
+    this.outlines = s.outlines; this.drawing = s.drawing; this.ftPerPt = s.ftPerPt; this.selectedCorner = s.selectedCorner;
+    this.drag = null; this.dragAt = null; this.snapped = null; this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
+    this.magnifier.hidden = true;
+    this.update();
+  }
+  undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
+  redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
+
   // ---------- Commands ----------
   start(kind: OutlineKind) {
+    this.record();
     this.drawing = kind;
     this.outlines[kind] = { kind, pts: [], closed: false };
     this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null;
@@ -73,15 +95,13 @@ export class OutlineTool {
   }
   cancel() {
     if (!this.drawing) return;
+    this.record();
     delete this.outlines[this.drawing];
     this.drawing = null; this.update();
   }
-  undoPoint() {
-    const o = this.current(); if (!o) return;
-    o.pts.pop(); this.selectedCorner = o.pts.length ? { kind: o.kind, i: o.pts.length - 1 } : null; this.update();
-  }
   close() {
     const o = this.current(); if (!o || o.pts.length < 3) return;
+    this.record();
     o.closed = true; this.drawing = null;
     this.host.toast(this.ftPerPt
       ? `${OUTLINE_LABEL[o.kind]} outlined. Tap an edge to see its length.`
@@ -100,6 +120,7 @@ export class OutlineTool {
       const s = this.host.toScreen(this.outlines[hit.kind]!.pts[hit.i]);
       this.drag = { type: 'corner', kind: hit.kind, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
       this.selectedCorner = { kind: hit.kind, i: hit.i };
+      this.dragBefore = this.snapshot();
       this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
       return true;
     }
@@ -161,6 +182,10 @@ export class OutlineTool {
 
   nudge(dx: number, dy: number) {
     const c = this.selectedCorner, o = c && this.outlines[c.kind]; if (!c || !o?.pts[c.i]) return;
+    // Consecutive nudges of the same corner undo as one step.
+    const now = performance.now(), ln = this.lastNudge;
+    if (!(ln && ln.kind === c.kind && ln.i === c.i && now - ln.t < 1500)) this.record();
+    this.lastNudge = { t: now, kind: c.kind, i: c.i };
     const k = 1 / this.host.pxPerPt(), p = o.pts[c.i];
     o.pts[c.i] = { x: p.x + dx * k, y: p.y + dy * k };
     this.update();
@@ -179,12 +204,15 @@ export class OutlineTool {
       if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS))) {
         this.lastTap = null; this.dragAt = null; this.close(); return;
       }
+      if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
+      this.dragBefore = null;
       this.dragAt = null; this.snapped = null; this.update(); return;
     }
     const o = this.current(); if (!o || !this.dragAt) return;
     const now = performance.now();
     const isDouble = this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS && dist(this.lastTap.finger, d.finger) < 30;
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
+    this.record();
     o.pts.push(this.host.toPage(this.dragAt));
     this.selectedCorner = { kind: o.kind, i: o.pts.length - 1 };
     this.lastTap = { t: now, finger: d.finger };
@@ -194,6 +222,8 @@ export class OutlineTool {
 
   /** A second finger arrived: abandon the single-finger action. */
   cancelPointer() {
+    if (this.drag?.type === 'corner' && this.drag.moved && this.dragBefore) this.history.record(this.dragBefore);
+    this.dragBefore = null;
     this.drag = null; this.magnifier.hidden = true; this.dragAt = null; // a moved corner keeps where it got to
     this.render();
   }
@@ -229,6 +259,7 @@ export class OutlineTool {
 
   // ---------- Scale ----------
   setScaleFromEdge(kind: OutlineKind, i: number, feet: number) {
+    this.record();
     this.ftPerPt = feet / edgeLengthPt(this.outlines[kind]!.pts, i);
     this.host.toast(`Scale set: ${formatScale(this.ftPerPt)}.`);
     this.selectedEdge = null;
@@ -240,7 +271,7 @@ export class OutlineTool {
 
   // ---------- Rendering ----------
   /** Redraw overlay, popover and panel. */
-  update() { this.render(); this.renderPopover(); this.renderPanel(); }
+  update() { this.render(); this.renderPopover(); this.renderPanel(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); }
 
   render() {
     const h = this.host;
@@ -386,7 +417,7 @@ export class OutlineTool {
         <p class="panel-text">Tap each corner of the <b>${OUTLINE_LABEL[o.kind].toLowerCase()}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
         <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. Hold Option (Alt) or a second finger to place freely.' : 'Snapping is off.'}</p>
         ${this.nudgePad()}
-        <div class="row"><button type="button" data-act="undo" ${o.pts.length ? '' : 'disabled'}>Undo corner</button>
+        <div class="row">
         <button type="button" data-act="close" class="primary" ${o.pts.length >= 3 ? '' : 'disabled'}>Close shape</button>
         <button type="button" data-act="cancel">Cancel</button></div>`;
       p.hidden = false;
@@ -408,7 +439,7 @@ export class OutlineTool {
       if (lot) lot.onchange = () => { const v = Number(lot.value.replace(/[^\d.]/g, '')); this.printedLotSqft = v > 0 ? v : null; this.renderPanel(); };
     }
     p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => {
-      btn.onclick = () => ({ undo: () => this.undoPoint(), close: () => this.close(), cancel: () => this.cancel() } as Record<string, () => void>)[btn.dataset.act!]();
+      btn.onclick = () => ({ close: () => this.close(), cancel: () => this.cancel() } as Record<string, () => void>)[btn.dataset.act!]();
     });
     p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
       btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
@@ -424,15 +455,25 @@ export class OutlineTool {
   }
 
   private onKey(e: KeyboardEvent) {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    if ((e.target as HTMLElement).tagName === 'INPUT') return; // let text fields keep their own undo
+    const mod = e.metaKey || e.ctrlKey, key = e.key.toLowerCase();
+    if (mod && key === 'z') { e.preventDefault(); if (e.shiftKey) this.redo(); else this.undo(); return; }
+    if (mod && key === 'y') { e.preventDefault(); this.redo(); return; }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (arrows[e.key] && this.selectedCorner) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudge(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
     if (this.drawing) {
       if (e.key === 'Enter') { e.preventDefault(); this.close(); }
       else if (e.key === 'Escape') this.cancel();
-      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.undoPoint(); }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.undo(); }
     } else if (e.key === 'Escape') this.tapEmpty();
   }
 }
 
 function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; }
+
+interface Snapshot {
+  outlines: Partial<Record<OutlineKind, Outline>>;
+  drawing: OutlineKind | null;
+  ftPerPt: number | null;
+  selectedCorner: { kind: OutlineKind; i: number } | null;
+}
