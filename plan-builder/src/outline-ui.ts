@@ -53,7 +53,6 @@ export class OutlineTool {
   private selectedEdge: { id: string; i: number } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
   snapOn = true;
-  private bypass = false;                      // held Option/Alt or a second finger: place freely
   private rawAt: Point | null = null;          // where the point would be without snapping
   private snapped: 'corner' | 'line' | 'own' | 'guide' | null = null;
   private guideLabel = '';
@@ -97,9 +96,11 @@ export class OutlineTool {
   private restore(s: Snapshot) {
     this.outlines = s.outlines; this.drawing = s.drawing; this.ftPerPt = s.ftPerPt; this.selectedCorner = s.selectedCorner;
     this.selectedFeature = s.selectedFeature; this.replaced = s.replaced;
-    this.drag = null; this.dragAt = null; this.snapped = null; this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
+    this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
+    this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
     this.update();
+    if (this.hoverAt) this.hover(this.hoverAt);
   }
   undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
   redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
@@ -162,6 +163,7 @@ export class OutlineTool {
   pointerDown(p: Point, pointerType: string): boolean {
     this.hideTip();
     this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p;
+    if (!this.drawing) this.stick = null; // keep only the target the placing preview is showing
     if (pointerType !== 'mouse') {
       // Press and hold still before moving: place this point freely (no snapping).
       this.holdTimer = window.setTimeout(() => {
@@ -175,6 +177,7 @@ export class OutlineTool {
       const s = this.host.toScreen(this.outlines[hit.id]!.pts[hit.i]);
       this.drag = { type: 'corner', id: hit.id, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
       this.selectedCorner = { id: hit.id, i: hit.i };
+      if (!this.drawing) this.selectedFeature = this.outlines[hit.id]!.kind === 'feature' ? hit.id : null;
       this.dragBefore = this.snapshot();
       this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
       return true;
@@ -203,10 +206,9 @@ export class OutlineTool {
     return false;
   }
 
-  pointerMove(p: Point, alt = false, shift = false) {
+  pointerMove(p: Point) {
     const d = this.drag; if (!d) return;
     if (this.downFinger && dist(p, this.downFinger) > HOLD_SLOP && !this.bypassHold) clearTimeout(this.holdTimer);
-    this.bypassKey = alt; this.shiftKey = shift;
     if (d.type === 'place') {
       d.finger = p;
       if (d.touch) d.offsetY = Math.max(d.offsetY, Math.min(TOUCH_OFFSET, (dist(p, d.start) - HOLD_SLOP) * 1.5));
@@ -216,14 +218,13 @@ export class OutlineTool {
     this.applyDrag();
   }
 
-  private bypassKey = false;
+  private bypassKey = false;    // Option/Alt held: place freely
   private bypassHold = false;   // touch: pressed and held still before moving → place freely
   private holdTimer = 0;
   private downFinger: Point | null = null;
 
   private applyDrag() {
     const d = this.drag; if (!d || !this.rawAt) return;
-    this.bypass = this.bypassKey || this.bypassHold;
     this.dragAt = d.type === 'bend' ? this.resolve(this.rawAt, undefined, true) : this.placeAt(this.rawAt, this.anchorFor(d.type === 'corner' ? d : null), d.type === 'corner' ? d : undefined);
     if (d.type === 'corner') this.outlines[d.id]!.pts[d.i] = this.host.toPage(this.dragAt);
     if (d.type === 'bend') {
@@ -357,7 +358,7 @@ export class OutlineTool {
   }
 
   pointerUp() {
-    clearTimeout(this.holdTimer); this.downFinger = null;
+    clearTimeout(this.holdTimer); this.downFinger = null; this.bypassHold = false;
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
@@ -432,11 +433,14 @@ export class OutlineTool {
     return best;
   }
 
-  hover(p: Point | null, shift = this.shiftKey) {
-    this.hoverAt = p; this.shiftKey = shift;
+  /** Place freely (no snapping): derived on every use, so it never outlives the key or hold behind it. */
+  private get bypass() { return this.bypassKey || this.bypassHold; }
+
+  hover(p: Point | null) {
+    this.hoverAt = p;
     // Preview where a click would land, so snapping (and Shift) is visible before clicking.
     this.hoverPlaced = p && this.drawing ? this.placeAt(p, this.anchorFor(null)) : null;
-    if (!this.hoverPlaced) { this.snapped = null; this.angle = null; }
+    if (!this.hoverPlaced) { this.snapped = null; this.angle = null; if (!this.drag) this.stick = null; }
     const edge = p && !this.drawing ? this.edgeAt(p) : null;
     const changed = edge?.id !== this.hoverEdge?.id || edge?.i !== this.hoverEdge?.i;
     this.hoverEdge = edge;
@@ -720,11 +724,15 @@ export class OutlineTool {
       <button type="button" data-nudge="0,1" aria-label="Nudge down">↓</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button></div>`;
   }
 
-  /** Shift pressed or released while the pointer is still: update the preview right away. */
-  setShift(on: boolean) {
-    if (on === this.shiftKey) return;
-    this.shiftKey = on;
-    if (this.drag) this.applyDrag(); else if (this.hoverAt) this.hover(this.hoverAt, on);
+  /**
+   * The modifier keys as the latest input event reports them (Shift = 45° steps, Option/Alt = place
+   * freely). Fed from every pointer and key event, and cleared when the window loses focus, so a
+   * missed keyup (e.g. ⇧⌘4 screenshot) can't leave a modifier stuck on.
+   */
+  setModifiers(shift: boolean, alt: boolean) {
+    if (shift === this.shiftKey && alt === this.bypassKey) return;
+    this.shiftKey = shift; this.bypassKey = alt;
+    if (this.drag) this.applyDrag(); else if (this.hoverAt) this.hover(this.hoverAt);
   }
 
   private onKey(e: KeyboardEvent) {
