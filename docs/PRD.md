@@ -325,3 +325,9 @@
 - 📝 Backlog (low priority): replace "Open another" with an **edit button next to the file name**. ❓ Edit = rename, or replace the file?
 - ✅ iPad testing deferred for now.
 - ✅ Next step: **Step 2 — scale calibration flow** (to be defined before building).
+
+### Step 2 — Scale calibration (agreed 2026-10-12)
+- **Method:** known dimension only — tap both ends of one printed dimension, type its length.
+- 📝 Later: try "trace the lot" and "printed scale bar/label" methods.
+- **Confidence:** check a second printed dimension — the app shows what it measures vs. what's printed.
+- **Done when:** endpoints can be placed precisely (zoom in, land exactly on the tick) · a second Riesberg dimension measures within 1% · calibration can be redone anytime.
