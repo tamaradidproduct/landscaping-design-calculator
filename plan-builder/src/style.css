@@ -16,7 +16,7 @@
   :root { --bg: #1f2523; --surface: #2a312e; --ink: #e5ece8; --muted: #9eaba5; --line: #3a4440; --accent: #7fc4ab; --accent-ink: #10201b; --outline-boundary: #f06ac0; --outline-house: #6aa8ff; --ok: #6fd3a2; --warn: #f2a65a; color-scheme: dark; }
 }
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; }
+html, body { height: 100%; margin: 0; touch-action: none; } /* no browser pinch/double-tap zoom anywhere: only the plan zooms */
 body { background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
 .app { position: fixed; inset: 0; }
 .stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; -webkit-touch-callout: none; }

@@ -264,6 +264,15 @@ stage.addEventListener('wheel', e => {
   else applyView(panBy(view, -e.deltaX * lines, -e.deltaY * lines));
 }, { passive: false });
 
+// iOS browsers ignore user-scalable=no: block page pinch-zoom and double-tap zoom outside the plan too.
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350 && !(e.target as Element).closest('input, button, label')) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+
 // Safari on Mac reports trackpad pinch as gesture events instead of ctrl+wheel.
 type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number };
 let gestureStart: { scale: number; view: View } | null = null;
