@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1f2523" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>Plan Builder</title>
+  </head>
+  <body>
+    <main class="app">
+      <div class="stage" id="stage">
+        <div class="page" id="page" hidden><canvas id="base"></canvas></div>
+        <canvas class="sharp" id="sharp" hidden></canvas>
+        <div class="empty" id="empty">
+          <h1>Open the homeowner's plot plan</h1>
+          <p>Pick the PDF from Files or Google Drive. It stays on this device.</p>
+          <button type="button" class="primary" id="open-empty">Open plot plan</button>
+        </div>
+        <div class="loading" id="loading" hidden>Opening plot plan…</div>
+      </div>
+      <div class="bar" id="bar" hidden>
+        <button type="button" id="open-again">Open another</button>
+        <span class="spacer"></span><span class="name" id="name"></span><span class="spacer"></span>
+        <button type="button" id="undo" disabled aria-label="Undo" title="Undo (⌘Z)">Undo</button>
+        <button type="button" id="redo" disabled aria-label="Redo" title="Redo (⇧⌘Z)">Redo</button>
+        <button type="button" id="snap" class="toggle" aria-pressed="true">Snap on</button>
+        <div class="menu-wrap">
+          <button type="button" id="outline">Outline</button>
+          <div class="menu" id="outline-menu" hidden>
+            <button type="button" data-outline="boundary">Plot boundary</button>
+            <button type="button" data-outline="house">House</button>
+          </div>
+        </div>
+        <button type="button" id="fit">Fit page</button>
+      </div>
+      <div class="panel" id="panel" hidden></div>
+      <div class="toast" id="toast" role="status" hidden></div>
+      <input type="file" id="file" accept="application/pdf,.pdf" hidden />
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
