@@ -343,3 +343,9 @@
   - ⚠️ Actual drawing scale ≈ **1" = 40'**: 116.45' measures 207.8 pt → 0.560 ft/pt. Neither printed scale (1"=30', 1"=20') matches the PDF as delivered → calibration from a known dimension is essential.
   - Cross-check available: printed **lot size 13,504 sq ft** can validate a traced boundary's area.
 - Image (raster) plans: feasible without heavy libraries — find dark-line pixels near the tap, fit up to two lines, snap to their intersection (corner) or onto the line. Not yet tested (no raster sample).
+
+### Round 22 (2026-10-12)
+- ✅ Step 2 becomes **outline first, then set scale**.
+- ✅ Contractor picks what to outline (plot boundary or house footprint).
+- ✅ Prototype **vector-PDF snapping first**; image-plan snapping later.
+- ✅ Plot plans arrive **mostly as vector PDFs**.
