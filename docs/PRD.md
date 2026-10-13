@@ -54,7 +54,8 @@
 - Closing: **Close shape** button, **double-tap/double-click**, or tap the first corner.
 - Clicking/tapping **outside a shape clears its selection** (selected corner, edge popover).
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
-- **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, or **hold Option/Alt or a second finger** to place freely.
+- **Touch navigation while outlining:** one finger places and drags points; **two fingers always pan and zoom** (a second finger cancels whatever the first started, so nothing gets placed or moved by accident).
+- **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, **hold Option/Alt** (keyboard), or on touch **press and hold still (~½ s) before moving** to place that point freely ("Free" label).
 - **Guides snap first** (within ~6 px / 3°, bypassable like all snapping): square (90°) or straight continuation of the previous edge, and alignment with another corner's column or row; when both apply, the point lands where they meet. Guides take priority over lines in the image underneath (own corners still come first).
 - **Snap gravity:** corners pull from ~26 px (outline corners from ~22 px); once snapped, the point **stays put** until the pointer moves ~34 px away or a closer target appears; with a mouse, the **snap preview shows before clicking** (halo + label).
 - **Shift** (while placing or dragging a corner) locks the edge from the previous corner to **45° steps** (0°, 45°, 90°… on screen) and shows the angle. **Snapping still works with Shift**: the point stays on the 45° line but stops at a drawn corner on it or where it crosses a drawn line.
@@ -446,3 +447,8 @@
 - ✅ Clicking outside a shape deselects it.
 - 🔄 Guides change from "show only, never lock" to **snap targets with priority over the image** (still bypassable with Option/Alt, a second finger, or Snap off). Priority: own corners → guides → drawing underneath.
 - Check: a 3rd corner ~2° off square lands exactly square; a 4th near both the 1st corner's column and the 3rd's row lands on both; Riesberg corner snapping, area and curve results unchanged.
+
+### Round 31 — iPad navigation (2026-10-13)
+- ❌ On iPad the app couldn't tell moving around from placing a corner (the "second finger = place freely" trick blocked two-finger panning).
+- ✅ One finger draws, two fingers move (Procreate-style). ✅ Free placement on touch = press and hold before moving. Second-finger bypass removed.
+- Checked with simulated multi-touch: tap places; two-finger drag pans and pinch zooms (1.00 → 2.28) without placing anything; press-and-hold places a point with no snapping. Still needs a real-iPad try.

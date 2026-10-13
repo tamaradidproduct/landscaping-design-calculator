@@ -27,6 +27,8 @@ const CORNER_HIT = 24;      // screen px
 const EDGE_HIT = 16;        // screen px
 const TOUCH_OFFSET = 64;    // the point being placed sits this far above the finger
 const DOUBLE_TAP_MS = 350;
+const HOLD_MS = 450;        // touch: press and hold this long without moving to place freely
+const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holding still
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const GUIDE_SNAP = 6;       // screen px: pull into line with other corners / square to the previous edge
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
@@ -126,6 +128,15 @@ export class OutlineTool {
   // ---------- Pointer input (screen coordinates) ----------
   pointerDown(p: Point, pointerType: string): boolean {
     this.hideTip();
+    this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p;
+    if (pointerType !== 'mouse') {
+      // Press and hold still before moving: place this point freely (no snapping).
+      this.holdTimer = window.setTimeout(() => {
+        if (!this.drag || this.drag.type === 'bend') return;
+        this.bypassHold = true;
+        if (this.rawAt) this.applyDrag();
+      }, HOLD_MS);
+    }
     const hit = this.cornerAt(p);
     if (hit) {
       const s = this.host.toScreen(this.outlines[hit.kind]!.pts[hit.i]);
@@ -159,20 +170,21 @@ export class OutlineTool {
 
   pointerMove(p: Point, alt = false, shift = false) {
     const d = this.drag; if (!d) return;
+    if (this.downFinger && dist(p, this.downFinger) > HOLD_SLOP && !this.bypassHold) clearTimeout(this.holdTimer);
     this.bypassKey = alt; this.shiftKey = shift;
     if (d.type === 'place') { d.finger = p; this.rawAt = { x: p.x, y: p.y - d.offsetY }; }
     else { this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true; }
     this.applyDrag();
   }
 
-  /** Hold a second finger while dragging to place freely. */
-  setBypassFinger(on: boolean) { this.bypassFinger = on; if (this.drag) this.applyDrag(); }
   private bypassKey = false;
-  private bypassFinger = false;
+  private bypassHold = false;   // touch: pressed and held still before moving → place freely
+  private holdTimer = 0;
+  private downFinger: Point | null = null;
 
   private applyDrag() {
     const d = this.drag; if (!d || !this.rawAt) return;
-    this.bypass = this.bypassKey || this.bypassFinger;
+    this.bypass = this.bypassKey || this.bypassHold;
     this.dragAt = d.type === 'bend' ? this.resolve(this.rawAt, undefined, true) : this.placeAt(this.rawAt, this.anchorFor(d.type === 'corner' ? d : null), d.type === 'corner' ? d : undefined);
     if (d.type === 'corner') this.outlines[d.kind]!.pts[d.i] = this.host.toPage(this.dragAt);
     if (d.type === 'bend') {
@@ -306,6 +318,7 @@ export class OutlineTool {
   }
 
   pointerUp() {
+    clearTimeout(this.holdTimer); this.downFinger = null;
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
@@ -340,11 +353,17 @@ export class OutlineTool {
   }
 
   /** A second finger arrived: abandon the single-finger action. */
+  /** A second finger arrived: the gesture is navigation, so drop the single-finger action entirely. */
   cancelPointer() {
-    if ((this.drag?.type === 'corner' || this.drag?.type === 'bend') && this.drag.moved && this.dragBefore) this.history.record(this.dragBefore);
-    this.dragBefore = null;
-    this.drag = null; this.magnifier.hidden = true; this.dragAt = null; // a moved corner keeps where it got to
-    this.render();
+    clearTimeout(this.holdTimer); this.downFinger = null; this.bypassHold = false;
+    if ((this.drag?.type === 'corner' || this.drag?.type === 'bend') && this.drag.moved && this.dragBefore) {
+      // Put a corner or bend back where it was before the accidental drag.
+      const before = this.dragBefore;
+      this.outlines = before.outlines; this.ftPerPt = before.ftPerPt;
+    }
+    this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
+    this.drag = null; this.magnifier.hidden = true; this.dragAt = null;
+    this.update();
   }
 
   /** A tap or click outside any shape: drop the selection (corner and edge). */
@@ -444,6 +463,7 @@ export class OutlineTool {
     if (at) {
       const { x, y } = at;
       if (this.angle !== null) svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${this.angle}°</text>`;
+      if (this.dragAt && this.bypassHold) svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">Free</text>`;
       if (this.snapped) {
         svg += `<circle cx="${x}" cy="${y}" r="16" class="snap-halo"/>`;
         const label = { corner: 'Corner', line: 'On line', own: 'Corner', guide: this.guideLabel }[this.snapped];
@@ -562,7 +582,7 @@ export class OutlineTool {
     if (o) {
       p.innerHTML = `
         <p class="panel-text">Tap each corner of the <b>${OUTLINE_LABEL[o.kind].toLowerCase()}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
-        <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. Hold Option (Alt) or a second finger to place freely.' : 'Snapping is off.'}</p>
+        <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. To place one freely, hold Option (Alt) — on touch, press and hold before moving. Two fingers move and zoom.' : 'Snapping is off.'}</p>
         ${this.nudgePad()}
         <div class="row">
         <button type="button" data-act="close" class="primary" ${o.pts.length >= 3 ? '' : 'disabled'}>Close shape</button>

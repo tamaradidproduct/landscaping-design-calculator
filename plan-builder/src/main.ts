@@ -209,7 +209,8 @@ stage.addEventListener('pointerdown', e => {
   if ((e.target as Element).closest('.popover')) return; // let the edge popover's own controls work
   stage.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, local(e));
-  if (pointers.size === 2 && toolDrag) { tool.setBypassFinger(true); return; } // second finger while placing = place freely
+  // Two fingers always move the plan: a second finger cancels whatever the first one started.
+  if (pointers.size === 2 && toolDrag) { tool.cancelPointer(); toolDrag = false; }
   if (pointers.size === 2) { startPinch(); moved = true; }
   if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = tool.pointerDown(local(e), e.pointerType); }
 });
@@ -233,8 +234,7 @@ function endPointer(e: PointerEvent) {
   const p = local(e);
   pointers.delete(e.pointerId);
   if (toolDrag) {
-    if (e.pointerId !== toolPointer) { tool.setBypassFinger(false); return; }
-    toolDrag = false; tool.setBypassFinger(false); tool.pointerUp(); return;
+    toolDrag = false; tool.pointerUp(); return;
   }
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
