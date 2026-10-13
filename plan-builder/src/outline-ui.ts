@@ -25,7 +25,7 @@ export interface ToolHost {
 
 const CORNER_HIT = 24;      // screen px
 const EDGE_HIT = 16;        // screen px
-const TOUCH_OFFSET = 64;    // the point being placed sits this far above the finger
+const TOUCH_OFFSET = 56;    // when dragging to place on touch, the point rises this far above the finger
 const DOUBLE_TAP_MS = 350;
 const HOLD_MS = 450;        // touch: press and hold this long without moving to place freely
 const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holding still
@@ -36,7 +36,7 @@ const RELEASE = 34;         // screen px: once snapped, the point stays put unti
 const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', house: 'var(--outline-house)' };
 
 type Drag =
-  | { type: 'place'; finger: Point; offsetY: number }
+  | { type: 'place'; finger: Point; start: Point; touch: boolean; offsetY: number }
   | { type: 'corner'; kind: OutlineKind; i: number; grab: Point; moved: boolean }
   | { type: 'bend'; kind: OutlineKind; i: number; grab: Point; moved: boolean };
 
@@ -155,11 +155,13 @@ export class OutlineTool {
       return true;
     }
     if (this.drawing) {
-      const offsetY = pointerType === 'touch' ? TOUCH_OFFSET : 0;
-      this.drag = { type: 'place', finger: p, offsetY };
-      this.rawAt = { x: p.x, y: p.y - offsetY };
+      // A tap places right under the finger; only when the finger starts dragging does the point
+      // rise above it (gradually, so it doesn't jump), keeping it visible while adjusting.
+      const touch = pointerType !== 'mouse';
+      this.drag = { type: 'place', finger: p, start: p, touch, offsetY: 0 };
+      this.rawAt = { x: p.x, y: p.y };
       this.dragAt = this.placeAt(this.rawAt, this.anchorFor(null));
-      if (offsetY) this.showMagnifier();
+      if (touch) this.showMagnifier();
       this.render();
       return true;
     }
@@ -172,7 +174,11 @@ export class OutlineTool {
     const d = this.drag; if (!d) return;
     if (this.downFinger && dist(p, this.downFinger) > HOLD_SLOP && !this.bypassHold) clearTimeout(this.holdTimer);
     this.bypassKey = alt; this.shiftKey = shift;
-    if (d.type === 'place') { d.finger = p; this.rawAt = { x: p.x, y: p.y - d.offsetY }; }
+    if (d.type === 'place') {
+      d.finger = p;
+      if (d.touch) d.offsetY = Math.max(d.offsetY, Math.min(TOUCH_OFFSET, (dist(p, d.start) - HOLD_SLOP) * 1.5));
+      this.rawAt = { x: p.x, y: p.y - d.offsetY };
+    }
     else { this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true; }
     this.applyDrag();
   }

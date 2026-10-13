@@ -50,7 +50,7 @@
 ### 6.2 Outlining ✅🔨
 - **Pure drawing** — works the same for vector PDFs and scans; never relies on the PDF's vector data.
 - Outline kinds now: plot boundary, house. 📝 More kinds later: other existing structures and surfaces (driveway, patio, deck…).
-- Placing: tap corners. On touch the point sits **above the finger** with a **magnifier**.
+- Placing: tap corners. On touch, a **tap places exactly under the finger**; when the finger **drags** to adjust, the point rises gradually to ~56 px **above the finger** so it stays visible, with a **magnifier**.
 - Closing: **Close shape** button, **double-tap/double-click**, or tap the first corner.
 - Clicking/tapping **outside a shape clears its selection** (selected corner, edge popover).
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
@@ -452,3 +452,7 @@
 - ❌ On iPad the app couldn't tell moving around from placing a corner (the "second finger = place freely" trick blocked two-finger panning).
 - ✅ One finger draws, two fingers move (Procreate-style). ✅ Free placement on touch = press and hold before moving. Second-finger bypass removed.
 - Checked with simulated multi-touch: tap places; two-finger drag pans and pinch zooms (1.00 → 2.28) without placing anything; press-and-hold places a point with no snapping. Still needs a real-iPad try.
+
+### Round 32 — touch placement offset (2026-10-13)
+- ❌ On iPad, taps placed the point ~64 px above the finger (the always-on offset cursor) — felt like a misplaced cursor.
+- ✅ A tap now places right where the finger touches; the offset only appears (gradually) while dragging to fine-tune.
