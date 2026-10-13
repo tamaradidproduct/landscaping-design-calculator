@@ -32,15 +32,23 @@ results.push(['Opens fast (cold)', `${first.wall.toFixed(2)} s wall · app says 
 await page.waitForTimeout(1500);
 await page.screenshot({ path: `${outDir}/step1-fit.png` });
 
-// Zoom toward the right-hand property line label (~"155.55'") with the mouse wheel, then let the sharp pass finish.
+// Zoom toward the right-hand property line label (~"155.55'") with trackpad pinch (ctrl+wheel), then let the sharp pass finish.
 const box = await page.locator('#page').boundingBox();
 const target = { x: box.x + box.width * 0.79, y: box.y + box.height * 0.37 };
 await page.mouse.move(target.x, target.y);
-for (let i = 0; i < 12; i++) { await page.mouse.wheel(0, -120); await page.waitForTimeout(16); }
+await page.keyboard.down('Control');
+for (let i = 0; i < 12; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(16); }
+await page.keyboard.up('Control');
 await page.waitForTimeout(1500);
 const zoom = await page.evaluate(() => document.getElementById('page').style.transform);
 const sharpShown = await page.evaluate(() => !document.getElementById('sharp').hidden);
 await page.screenshot({ path: `${outDir}/step1-zoomed.png` });
+// Two-finger trackpad drag (plain wheel) must pan, not zoom.
+const before = await page.evaluate(() => document.getElementById('page').style.transform);
+await page.mouse.wheel(0, 200); await page.waitForTimeout(100);
+const after = await page.evaluate(() => document.getElementById('page').style.transform);
+const sc = t => t.match(/scale\(([\d.]+)\)/)[1];
+results.push(['Two-finger drag pans', `zoom ${sc(before)} -> ${sc(after)} (same = pan) · ${before === after ? 'did not move' : 'moved'}`]);
 results.push(['Sharp when zoomed', `transform ${zoom} · sharp layer shown: ${sharpShown}`]);
 
 // Offline: service worker must be controlling, then reload with the network off and open the PDF again.

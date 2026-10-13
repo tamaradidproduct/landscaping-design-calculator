@@ -169,14 +169,30 @@ function endPointer(e: PointerEvent) {
 }
 stage.addEventListener('pointerup', endPointer);
 stage.addEventListener('pointercancel', endPointer);
+// Trackpad: two-finger drag pans; pinch (reported as ctrl+wheel) zooms. Mouse wheel: ctrl+wheel zooms.
 stage.addEventListener('wheel', e => {
   if (!page) return;
   e.preventDefault();
   const r = stage.getBoundingClientRect();
-  applyView(zoomAt(view, Math.exp(-e.deltaY * 0.0018), { x: e.clientX - r.left, y: e.clientY - r.top }));
+  const lines = e.deltaMode === 1 ? 16 : 1; // some mice report lines, not pixels
+  if (e.ctrlKey) applyView(zoomAt(view, Math.exp(-e.deltaY * lines * 0.01), { x: e.clientX - r.left, y: e.clientY - r.top }));
+  else applyView(panBy(view, -e.deltaX * lines, -e.deltaY * lines));
 }, { passive: false });
-// Safari fires its own pinch gesture events; keep them from zooming the whole page.
-document.addEventListener('gesturestart', e => e.preventDefault());
+
+// Safari on Mac reports trackpad pinch as gesture events instead of ctrl+wheel.
+type GestureEvent = UIEvent & { scale: number; clientX: number; clientY: number };
+let gestureStart: { scale: number; view: View } | null = null;
+document.addEventListener('gesturestart', e => {
+  e.preventDefault();
+  if (page && pointers.size === 0) gestureStart = { scale: (e as GestureEvent).scale, view };
+});
+document.addEventListener('gesturechange', e => {
+  e.preventDefault();
+  if (!gestureStart) return;
+  const g = e as GestureEvent, r = stage.getBoundingClientRect();
+  applyView(zoomAt(gestureStart.view, g.scale / gestureStart.scale, { x: g.clientX - r.left, y: g.clientY - r.top }), false);
+});
+document.addEventListener('gestureend', e => { e.preventDefault(); if (gestureStart) { gestureStart = null; renderSharpSoon(); } });
 
 // ---------- Toast ----------
 let toastTimer = 0;
