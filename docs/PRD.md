@@ -300,3 +300,7 @@
 - ✅ Symbols at true mature size.
 - ✅ Quantities on selection.
 - ✅ Any tablet browser.
+
+### Round 20 — zone prototype feedback (2026-10-12)
+- ❌ Zone Drawing Lab prototype judged **unusable**: couldn't draw at all; too many modes at once; plan too small to see; wrong starting point (should start from the plot plan / lot setup).
+- ✅ Process change: go **slowly, one step at a time**, agreeing on each step before building it. Next step: the first screen of the workflow (job + plot plan → scaled base).
