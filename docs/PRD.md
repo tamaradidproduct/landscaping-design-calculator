@@ -363,3 +363,8 @@
 - ✅ **Snapping to the underlying image** (lines/corners as rendered pixels) — works the same for vector PDFs and raster plans, no reliance on PDF vector data.
 - ✅ Snapping **on by default**; turn it off with a **toolbar toggle** and/or **hold to bypass** while dragging (both).
 - ✅ Curves: **bend an edge** — draw straight, drag the edge's middle to curve it (arc through 3 points).
+
+### Round 25 (2026-10-12)
+- 📝 Outlines will need more kinds than plot boundary and house — other **existing structures and surfaces** (driveway, patio, deck, etc.). 2a builds boundary + house only.
+- ✅ Guides (2b): **never lock** — only *show* when an angle is right (90°) or a point is aligned.
+- ✅ Go ahead with **Step 2a**.
