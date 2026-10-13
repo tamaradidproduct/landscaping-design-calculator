@@ -33,7 +33,7 @@
 - **Priced proposal** — quantities × contractor's prices. ⚠️ Pricing is now IN scope (the parked prototype excluded it).
 - HOA: nice to have — the plan sheet may double as an HOA submission; not a driver.
 
-### Pricing ✅
+### Pricing ⏸ (deferred — focus is the editor)
 - Contractor maintains their **own price list** (unit price per sq ft / linear ft / each), reused across jobs.
 ### Library ✅
 - **Built-in shared library** — the Landscaping symbols set ported into the app; contractors don't add their own items (for now).
@@ -41,6 +41,32 @@
 - Proposal delivered as a **PDF** (plan sheet + priced proposal).
 ### Validation ❓
 - No pilot contractor yet — recruiting is an open task (Servin used only as a visual reference).
+
+### End-to-end workflow ✅ (draft)
+1. **Create job on site** — contractor enters client name/address and uploads the plot plan PDF from the tablet.
+2. **Scale the base** (trace → auto-detect → known-dimension fallback).
+3. **Draw** zones + drop symbols — contractor drafts alone.
+4. **Price** from the contractor's price list.
+5. **Present at the end** — homeowner sees the finished plan + proposal (not co-designed live).
+6. **Send PDF.**
+- ✅ Whole session on site, ~30–60 min, with the homeowner present.
+- ✅ After the first proposal: nothing yet (no versions, tiers, or job conversion in scope).
+
+### Step details ✅
+- **Trace:** contractor taps the property-line and house corners on the PDF image, then types each edge's length → this sets the scale.
+- **Draw** captures: zones with materials; symbols; **existing features** (house, driveway, patio — not billed); **edging & walls** as lines; **plant spacing fill** (fill a bed with a plant at a spacing, auto-count); **dimension labels**.
+- **Offline:** internet is often unavailable on site → the full on-site workflow must work **offline**, with sync later.
+- **Presenting:** show the plan sheet first, then the price.
+
+### Editor ✅
+- **Zone drawing input:** to be prototyped — likely a combination of tap corners, freehand trace (smoothed), tap-then-bend curves, and paint-bucket fill inside existing lines.
+- **Curves are essential** — natural bed and lawn edges.
+- **Zone model: default fill** — the whole lot starts as one material (e.g. rock); zones carve into it. (Matches the parked prototype's "visible area" math.)
+- **v1 editing must-haves:** undo/redo · move/reshape points · snap (lot lines, house edges, other zones) · copy/repeat symbols.
+- **Library picker:** search + category tabs (surfaces, plants, objects).
+- **Symbol size:** true mature size at plan scale (plant spread → symbol diameter). ❓ Requires mature-spread data per plant in the library.
+- **Quantities while drawing:** shown on selection (tap a zone/symbol to see its area/count); no always-on totals panel.
+- **Platform:** web app for any tablet browser (iPad + Android); offline-capable (PWA implied).
 
 ## 3a. Superseded by the reset
 - Figma as design source; designer-run takeoff; Figma token handling.
@@ -246,3 +272,31 @@
 - ✅ Built-in shared symbol library.
 - ✅ No pilot contractor yet.
 - ✅ Homeowner gets a PDF.
+
+### Round 15 — workflow (2026-10-12)
+- ✅ Job created by contractor on site.
+- ✅ Full plan done on site in ~30–60 min.
+- ✅ Homeowner shown the plan at the end.
+- ✅ Post-proposal steps out of scope for now.
+
+### Round 16 — workflow details (2026-10-12)
+- ✅ Trace over the PDF (tap corners, type lengths).
+- ✅ Draw: existing features, edging/walls, plant spacing fill, dimensions.
+- ✅ Often offline on site.
+- ✅ Present plan sheet first.
+
+### Round 17 (2026-10-12)
+- ✅ Pricing details (price-list setup, proposal contents, price view) deferred — focus on the **editor**.
+- Plant spacing fill behavior: no preference yet.
+
+### Round 18 — editor (2026-10-12)
+- ✅ Zone input method → prototype (combination likely).
+- ✅ Curves essential.
+- ✅ Default-fill zone model.
+- ✅ Undo/redo, reshape, snap, copy/repeat all v1.
+
+### Round 19 — editor details (2026-10-12)
+- ✅ Library: search + categories.
+- ✅ Symbols at true mature size.
+- ✅ Quantities on selection.
+- ✅ Any tablet browser.
