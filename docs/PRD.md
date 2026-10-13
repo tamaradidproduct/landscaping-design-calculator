@@ -349,3 +349,10 @@
 - ✅ Contractor picks what to outline (plot boundary or house footprint).
 - ✅ Prototype **vector-PDF snapping first**; image-plan snapping later.
 - ✅ Plot plans arrive **mostly as vector PDFs**.
+
+### Round 23 — Step 2 feedback (2026-10-12)
+- ✅ Points must always be **freely repositionable**, even after snapping to the wrong place.
+- ✅ Closing a shape: an explicit **Confirm/Close button**, plus **double-click/double-tap** to close (in addition to tapping the first point).
+- ✅ Edge length labels appear only on **hover or tap** over an edge, not all at once.
+- ✅ Snapping can be disruptive → need a way to **unsnap** (temporarily or entirely).
+- 🔄 Direction shift under discussion: **pure drawing** (no reliance on the PDF's vector data) as the primary, foolproof workflow that works the same for vector PDFs and raster images. Vector snapping becomes optional at most.
