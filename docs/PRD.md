@@ -356,3 +356,10 @@
 - ✅ Edge length labels appear only on **hover or tap** over an edge, not all at once.
 - ✅ Snapping can be disruptive → need a way to **unsnap** (temporarily or entirely).
 - 🔄 Direction shift under discussion: **pure drawing** (no reliance on the PDF's vector data) as the primary, foolproof workflow that works the same for vector PDFs and raster images. Vector snapping becomes optional at most.
+
+### Round 24 — pure drawing decisions (2026-10-12)
+- ✅ **Pure drawing** is the primary workflow (same for vector PDFs and images).
+- ✅ Precision aids: magnifier while dragging · offset cursor (point above the finger) · right-angle & straight guides · nudge arrows.
+- ✅ **Snapping to the underlying image** (lines/corners as rendered pixels) — works the same for vector PDFs and raster plans, no reliance on PDF vector data.
+- ✅ Snapping **on by default**; turn it off with a **toolbar toggle** and/or **hold to bypass** while dragging (both).
+- ✅ Curves: **bend an edge** — draw straight, drag the edge's middle to curve it (arc through 3 points).
