@@ -331,3 +331,15 @@
 - 📝 Later: try "trace the lot" and "printed scale bar/label" methods.
 - **Confidence:** check a second printed dimension — the app shows what it measures vs. what's printed.
 - **Done when:** endpoints can be placed precisely (zoom in, land exactly on the tick) · a second Riesberg dimension measures within 1% · calibration can be redone anytime.
+
+### Step 2 — exploration: snapping & outline-first (2026-10-12)
+- 💡 Stakeholder idea: **outline first, then set scale** — trace the plot boundary or a structure, then use those outlines to set the scale.
+- 💡 Stakeholder idea: **snap tapped points** to the drawing — vector points for true-vector PDFs; corners/lines for image plans.
+- 🔬 Feasibility on Riesberg (vector PDF), via PDFium:
+  - All 11,861 page objects are paths; 98k straight segments + curves extracted in **~0.15 s** with exact coordinates → vector snapping is feasible.
+  - ~95% of segments are under 5 pt (text drawn as shapes) → snapping must ignore tiny glyph strokes and favor long lines.
+  - Property lines are **broken into several pieces** (e.g. the 155.55' line is 3–4 segments; the 116.45' line is one 207.8 pt segment) → snap to merged lines and their **intersections (corners)**, not just segment ends.
+  - The boundary includes **curves** (top-right corner arc; front edge along Riesberg Lane, L=62.02', R=222.50') → tracing needs arc support.
+  - ⚠️ Actual drawing scale ≈ **1" = 40'**: 116.45' measures 207.8 pt → 0.560 ft/pt. Neither printed scale (1"=30', 1"=20') matches the PDF as delivered → calibration from a known dimension is essential.
+  - Cross-check available: printed **lot size 13,504 sq ft** can validate a traced boundary's area.
+- Image (raster) plans: feasible without heavy libraries — find dark-line pixels near the tap, fit up to two lines, snap to their intersection (corner) or onto the line. Not yet tested (no raster sample).
