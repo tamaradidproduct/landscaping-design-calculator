@@ -27,7 +27,7 @@ await page.keyboard.down('Control'); for (let i = 0; i < 8; i++) { await page.mo
 await page.waitForTimeout(800);
 await page.click('#snap'); // exact placement from the known coordinates
 
-const labels = () => page.$$eval('.overlay .feature-label', ts => ts.map(t => t.textContent).join(', ') || '(none)');
+const labels = () => page.$$eval('.overlay .label.feature', ts => ts.map(t => t.textContent).join(', ') || '(none)');
 const step = async (label, fn) => { await fn(); await page.waitForTimeout(150); results.push([label, await labels()]); };
 const outline = async name => {
   await page.click('#outline'); await page.click('[data-outline=feature]');

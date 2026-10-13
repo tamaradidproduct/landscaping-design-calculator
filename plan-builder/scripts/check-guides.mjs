@@ -10,7 +10,7 @@ await page.goto(url); await page.waitForTimeout(3500);
 await page.setInputFiles('#file', pdf);
 await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
 const corners = () => page.$$eval('.overlay circle.corner', cs => cs.map(c => [+(+c.getAttribute('cx')).toFixed(1), +(+c.getAttribute('cy')).toFixed(1)]));
-const label = () => page.$$eval('.overlay .snap-label', ls => ls.map(l => l.textContent).join(' + '));
+const label = () => page.$$eval('.overlay .label.snap', ls => ls.map(l => l.textContent).join(' + '));
 await page.click('#outline'); await page.click('[data-outline=boundary]');
 // empty space left of the page (x ≈ 60–200)
 await page.mouse.click(60, 200); await page.waitForTimeout(400);

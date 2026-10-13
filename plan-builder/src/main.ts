@@ -3,6 +3,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { FEATURE_PRESETS } from './outline';
+import { button, esc } from './ui';
 import { fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
 
 registerSW({ immediate: true });
@@ -100,9 +101,8 @@ document.querySelector<HTMLButtonElement>('[data-outline=feature]')!.onclick = (
   closeMenus(); $('feature-menu').hidden = false; $<HTMLInputElement>('feature-name').value = '';
 };
 const startFeature = (name: string) => { if (!name.trim()) return; closeMenus(); tool.startFeature(name); };
-$('feature-presets').append(...FEATURE_PRESETS.map(name => Object.assign(document.createElement('button'), {
-  type: 'button', textContent: name, onclick: () => startFeature(name),
-})));
+$('feature-presets').innerHTML = FEATURE_PRESETS.map(name => button(esc(name), { mods: ['chip'], data: { preset: name } })).join('');
+$('feature-presets').querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(b => { b.onclick = () => startFeature(b.dataset.preset!); });
 $<HTMLFormElement>('feature-menu').onsubmit = e => { e.preventDefault(); startFeature($<HTMLInputElement>('feature-name').value); };
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 

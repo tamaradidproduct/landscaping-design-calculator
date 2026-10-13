@@ -1,0 +1,160 @@
+/*
+ * Design tokens — the only place raw values live. Everything else uses var(--…).
+ * Two layers: primitives (the palette, never used directly by components) and semantic tokens
+ * (what components use). Dark mode only remaps semantic colour tokens.
+ */
+:root {
+  /* ---------- Primitives: palette ---------- */
+  --sage-50: #f0f3f1;
+  --sage-100: #e7ebe9;
+  --sage-200: #ccd5d1;
+  --sage-300: #a6aba8;
+  --sage-400: #8a928e;
+  --sage-500: #6b726f;
+  --sage-600: #5b6863;
+  --sage-650: #5d6461;
+  --sage-700: #3d4a45;
+  --sage-750: #3a4440;
+  --sage-800: #2a312e;
+  --sage-850: #1f2523;
+  --sage-900: #1e2422;
+  --sage-950: #18201d;
+  --sage-text-dark: #e5ece8;
+  --sage-muted-dark: #9eaba5;
+  --sage-feature-dark: #d6ddd9;
+  --white: #ffffff;
+  --black: #000000;
+  --pine-700: #245e4f;
+  --pine-300: #7fc4ab;
+  --pine-950: #10201b;
+  --magenta-600: #c2318f;
+  --magenta-500: #d0349a;
+  --magenta-300: #f06ac0;
+  --green-600: #1d7a4f;
+  --green-300: #6fd3a2;
+  --teal-600: #0b8f6a;
+  --amber-700: #a34b00;
+  --amber-300: #f2a65a;
+
+  /* ---------- Semantic: app colours ---------- */
+  --color-bg: var(--sage-100);           /* canvas behind the plan, input wells */
+  --color-surface: var(--white);         /* cards, buttons, menus */
+  --color-paper: var(--white);           /* the plot plan page */
+  --color-ink: var(--sage-950);          /* body text */
+  --color-muted: var(--sage-600);        /* hints, labels, secondary text */
+  --color-line: var(--sage-200);         /* borders, dividers */
+  --color-accent: var(--pine-700);       /* primary action, focus, selection */
+  --color-on-accent: var(--white);
+  --color-ok: var(--green-600);          /* within tolerance */
+  --color-warn: var(--amber-700);        /* out of tolerance, errors, destructive */
+  --color-shadow: var(--black);
+  --color-inverse-bg: var(--color-ink);  /* toast, edge tip */
+  --color-inverse-ink: var(--color-bg);
+
+  /* ---------- Semantic: plan drawing ---------- */
+  --color-boundary: var(--magenta-600);          /* plot boundary outline */
+  --color-feature: var(--sage-700);              /* existing feature: drawing / selected */
+  --color-feature-fill: var(--sage-300);         /* existing feature: grey fill */
+  --color-feature-stroke: var(--sage-500);
+  --color-feature-ink: var(--sage-900);          /* existing feature name */
+  --color-snap: var(--magenta-500);              /* point being placed, snap marks, magnifier crosshair */
+  --color-guide: var(--teal-600);                /* 90° / straight / alignment hints */
+
+  /* ---------- Typography ---------- */
+  --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --text-xs: 13px;       /* on-plan labels */
+  --text-sm: 14px;       /* hints, field labels, errors */
+  --text-md: 15px;       /* file name pill, edge tip */
+  --text-base: 16px;     /* toast, figures row */
+  --text-lg: 17px;       /* body, buttons, inputs */
+  --text-xl: 18px;       /* loading */
+  --text-2xl: 20px;      /* arrow glyphs */
+  --text-3xl: 22px;      /* close glyph */
+  --text-display: 26px;  /* empty-state heading */
+  --weight-regular: 400;
+  --weight-strong: 600;
+  --leading-tight: 1;
+  --leading-body: 1.4;
+  --measure-body: 36ch;
+  --measure-toast: 44ch;
+
+  /* ---------- Space (4 px grid, with 2/6/10/14 half steps for tight controls) ---------- */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 20px;
+  --space-10: 24px;
+  --space-11: 32px;
+
+  /* ---------- Radius ---------- */
+  --radius-xs: 2px;      /* bend handle */
+  --radius-sm: 8px;      /* tip */
+  --radius-md: 12px;     /* buttons, inputs, toast */
+  --radius-lg: 14px;     /* menus, popover */
+  --radius-xl: 16px;     /* panel */
+  --radius-pill: 999px;
+
+  /* ---------- Elevation ---------- */
+  --shadow-sm: 0 2px 10px rgb(0 0 0 / 0.12);   /* floating toolbar controls */
+  --shadow-page: 0 2px 18px rgb(0 0 0 / 0.18); /* the plan page */
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.3);    /* magnifier */
+  --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.2);    /* cards: panel, popover, menus */
+  --z-toast: 5;
+  --offset-toast: 76px;                         /* below the toolbar */
+
+  /* ---------- Controls (touch first: nothing tappable under 40 px) ---------- */
+  --control-sm: 40px;    /* icon button in a card header */
+  --control-md: 48px;    /* inputs, nudge arrows */
+  --control-lg: 52px;    /* default button */
+  --control-xl: 60px;    /* hero button (empty state) */
+  --border-width: 1px;
+  --focus-ring: 3px;
+  --opacity-disabled: 0.45;
+  --width-card: 320px;
+  --width-panel: 640px;
+  --width-menu: 190px;
+  --width-menu-wide: 280px;
+  --width-field-short: 140px;
+
+  /* ---------- Plan overlay ---------- */
+  --stroke-hairline: 1.5px;
+  --stroke-regular: 2px;
+  --stroke-bold: 2.5px;
+  --stroke-heavy: 3px;
+  --stroke-label-halo: 4px;
+  --stroke-highlight: 6px;
+  --opacity-feature-fill: 0.55;
+  --opacity-feature-fill-selected: 0.7;
+  --opacity-edge-highlight: 0.55;
+  --opacity-handle: 0.85;
+  --mix-shape-fill: 10%;
+  --mix-snap-halo: 18%;
+  --magnifier-ring: 3px;
+  --dash-close-target: 4 3;
+  --dash-guide: 5 4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: var(--sage-850);
+    --color-surface: var(--sage-800);
+    --color-ink: var(--sage-text-dark);
+    --color-muted: var(--sage-muted-dark);
+    --color-line: var(--sage-750);
+    --color-accent: var(--pine-300);
+    --color-on-accent: var(--pine-950);
+    --color-ok: var(--green-300);
+    --color-warn: var(--amber-300);
+    --color-boundary: var(--magenta-300);
+    --color-feature: var(--sage-feature-dark);
+    --color-feature-fill: var(--sage-650);
+    --color-feature-stroke: var(--sage-400);
+    --color-feature-ink: var(--sage-50);
+    color-scheme: dark;
+  }
+}

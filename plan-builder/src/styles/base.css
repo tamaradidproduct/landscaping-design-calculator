@@ -1,0 +1,22 @@
+/* Base: element defaults and page-level layout. */
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; touch-action: none; } /* no browser pinch/double-tap zoom anywhere: only the plan zooms */
+body {
+  background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans);
+  -webkit-user-select: none; user-select: none; overscroll-behavior: none;
+}
+.app { position: fixed; inset: 0; }
+
+/* Layout primitives */
+.row { display: flex; gap: var(--space-4); flex-wrap: wrap; align-items: center; }
+.stack { display: flex; flex-direction: column; gap: var(--space-6); }
+.spacer { flex: 1; }
+
+/* Text styles */
+.text-body { margin: 0; font-size: var(--text-lg); line-height: var(--leading-body); }
+.text-hint { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
+.text-label { display: block; font-size: var(--text-sm); color: var(--color-muted); }
+.text-error { margin: 0; font-size: var(--text-sm); color: var(--color-warn); }
+.text-figure { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.status-ok { color: var(--color-ok); font-weight: var(--weight-strong); }
+.status-warn { color: var(--color-warn); font-weight: var(--weight-strong); }

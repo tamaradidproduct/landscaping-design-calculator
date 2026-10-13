@@ -1,0 +1,101 @@
+/*
+ * Components. Each block is one component; variants are modifier classes on the same element.
+ * Markup for the dynamic ones comes from src/ui.ts so classes stay in one place.
+ */
+
+/* ---------- Button ----------
+ * <button>                 default: surface, 52 px tall
+ * .primary                 filled accent (one per surface)
+ * .danger                  destructive text colour
+ * .large                   hero size (empty state)
+ * .icon                    square glyph button (48 px); .icon.small = 40 px (card header close)
+ * .toggle[aria-pressed]    on/off state
+ * .chip                    centred quick pick inside a chip group
+ * .menu-item               left-aligned row inside a menu
+ */
+button {
+  font: inherit; font-size: var(--text-lg); color: var(--color-ink);
+  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md);
+  min-height: var(--control-lg); padding: 0 var(--space-9); cursor: pointer;
+}
+button:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outline-offset: var(--space-1); }
+button:disabled { opacity: var(--opacity-disabled); cursor: default; }
+button.primary { background: var(--color-accent); color: var(--color-on-accent); border-color: var(--color-accent); font-weight: var(--weight-strong); }
+button.danger { color: var(--color-warn); }
+button.large { min-height: var(--control-xl); padding: 0 var(--space-11); }
+button.icon { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-2xl); line-height: var(--leading-tight); }
+button.icon.small { min-width: var(--control-sm); min-height: var(--control-sm); font-size: var(--text-3xl); }
+button.toggle[aria-pressed="false"] { color: var(--color-muted); }
+button.toggle[aria-pressed="true"] { border-color: var(--color-accent); }
+button.chip { text-align: center; }
+button.menu-item { text-align: left; }
+
+/* ---------- Text field ---------- */
+input {
+  font: inherit; font-size: var(--text-lg); color: var(--color-ink);
+  background: var(--color-bg); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md);
+  min-height: var(--control-md); padding: 0 var(--space-6); min-width: 0; flex: 1;
+}
+input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outline-offset: var(--border-width); }
+input.short { flex: 0 1 var(--width-field-short); }
+
+/* ---------- Card: the floating surface behind panels, popovers and menus ---------- */
+.card {
+  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-7);
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* Panel: card docked at the bottom centre (instructions, figures, selection actions) */
+.panel {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+  width: min(var(--width-panel), calc(100% - 2 * var(--space-8)));
+  border-radius: var(--radius-xl); padding: var(--space-7) var(--space-8); gap: var(--space-6);
+}
+/* Popover: card anchored next to what it describes (an edge) */
+.popover { position: absolute; width: min(var(--width-card), calc(100% - 2 * var(--space-4))); }
+/* Menu: card dropping from a toolbar button */
+.menu-wrap { position: relative; pointer-events: auto; }
+.menu { position: absolute; right: 0; top: calc(100% + var(--space-4)); min-width: var(--width-menu); padding: var(--space-4); gap: var(--space-3); }
+.menu.wide { min-width: var(--width-menu-wide); gap: var(--space-5); }
+.menu-title { margin: var(--space-1) var(--space-2); font-weight: var(--weight-strong); }
+.menu .text-label { margin: 0 var(--space-2); }
+
+/* ---------- Field: stacked label over a control ---------- */
+.field > .text-label { margin-bottom: var(--space-3); }
+
+/* ---------- Field group: label + input (+ action) on one wrapping line ---------- */
+.field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); font-size: var(--text-base); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.nudge { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ---------- Toolbar: floating controls along the top ---------- */
+.bar {
+  position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: var(--space-6);
+  padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--space-8) var(--space-5); pointer-events: none;
+}
+.bar > button, .bar > .menu-wrap > button { pointer-events: auto; box-shadow: var(--shadow-sm); }
+
+/* ---------- Pill: read-only label (file name) ---------- */
+.pill {
+  min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-muted); font-size: var(--text-md);
+  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-pill);
+  padding: var(--space-3) var(--space-7); box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Bubble: inverse, non-interactive message (toast, edge tip) ---------- */
+.bubble { pointer-events: none; position: absolute; background: var(--color-inverse-bg); color: var(--color-inverse-ink); }
+.toast {
+  left: 50%; top: calc(var(--offset-toast) + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: var(--z-toast);
+  padding: var(--space-6) var(--space-9); border-radius: var(--radius-md); font-size: var(--text-base);
+  max-width: min(90vw, var(--measure-toast)); text-align: center;
+}
+.tip { padding: var(--space-3) var(--space-5); border-radius: var(--radius-sm); font-size: var(--text-md); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- Empty / loading states ---------- */
+.empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: var(--space-6); padding: var(--space-10); text-align: center; }
+.empty h1 { margin: 0; font-size: var(--text-display); font-weight: var(--weight-strong); text-wrap: balance; }
+.empty p { margin: 0 0 var(--space-4); color: var(--color-muted); font-size: var(--text-lg); max-width: var(--measure-body); line-height: var(--leading-body); }
+.loading { position: absolute; inset: 0; display: grid; place-content: center; font-size: var(--text-xl); color: var(--color-muted); }
