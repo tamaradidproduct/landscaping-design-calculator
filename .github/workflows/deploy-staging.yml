@@ -24,7 +24,7 @@ jobs:
           cache-dependency-path: plan-builder/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run test --if-present
+      - run: npm test
       - run: npm run build
         env:
           VITE_BASE: /landscaping-design-calculator-staging/
@@ -35,7 +35,7 @@ jobs:
           personal_token: ${{ secrets.STAGING_PAGES_TOKEN }}
           external_repository: tamaradidproduct/landscaping-design-calculator-staging
           publish_branch: gh-pages
-          publish_dir: dist
+          publish_dir: plan-builder/dist
 
       # Best-effort: an Airtable outage must not fail the deploy.
       - name: Notify Airtable (moves referenced Findings to Ready to retest)

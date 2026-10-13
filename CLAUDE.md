@@ -7,8 +7,9 @@ Workflow conventions (branches, CI, staging, production gate, Airtable QA loop) 
 
 Read by the `dev-setup` skill. Unknown values are marked `TODO`.
 
+- **App directory:** `plan-builder/` (run all commands there; workflows set `working-directory: plan-builder`)
 - **Check commands:** `npm run lint`, `npm run typecheck`, `npm test`
-- **Build output:** `dist/` (Vite; `VITE_BASE` sets the Pages sub-path)
+- **Build output:** `plan-builder/dist/` (Vite; `VITE_BASE` sets the Pages sub-path)
 - **Staging URL:** https://tamaradidproduct.github.io/landscaping-design-calculator-staging/
 - **Staging repo:** `tamaradidproduct/landscaping-design-calculator-staging` (`gh-pages`), pushed with the `STAGING_PAGES_TOKEN` secret
 - **Production URL:** https://tamaradidproduct.github.io/landscaping-design-calculator/
