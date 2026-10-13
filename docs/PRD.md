@@ -36,7 +36,8 @@
 | 2b | Snapping to the plan's lines/corners; 90°/straight/alignment hints (never locked); snap toggle + Option/second-finger bypass; nudge | 🔨 done | `feat/plan-builder` |
 | — | Undo/redo (⌘Z / ⇧⌘Z, toolbar buttons), including dots of an unfinished outline | 🔨 done | `feat/plan-builder` |
 | 2c | Curved edges: drag an edge's middle handle to bend it into an arc; "Make straight"; lengths and area follow the curve | 🔨 done, in review | `feat/plan-builder-2c-curves` |
-| 3 | Designing on the plan (zones, symbols, existing features…) | ❓ next to define | — |
+| 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | ✅ defined, not built | — |
+| 4+ | Material zones, plant symbols, edging/walls… | ❓ | — |
 
 ## 6. Current requirements, by area
 ### 6.1 Viewing the plan ✅🔨
@@ -74,6 +75,13 @@
 - Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
 - Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
 
+### 6.7 Existing features (Step 3) ✅
+- After outlining and scaling, the contractor marks **existing features** — anything already on the lot that isn't new work.
+- **Any number** of features; each gets a **name the contractor types** (e.g. "Driveway", "AC pad", "Window well"). The **house is just one of them** (no separate house tool); the plot boundary stays special.
+- Drawn with the same outline tool (snapping, guides, curves, undo/redo).
+- Shown as **grey fill + its name**, like the house on the Servin plan sheet.
+- Result of Step 3 is **visual only** — no quantities or totals yet.
+
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')
 - Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
 - Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
@@ -82,7 +90,6 @@
 - Not yet tested with real touch on a tablet.
 
 ## 8. Open questions
-- ❓ Step 3 scope: which design tools first (material zones, plant symbols, existing features)?
 - ❓ Homeowners (DIY) as a later audience?
 - ❓ Saving jobs: on-device only, or sync/accounts?
 - ❓ Multi-page plot plans; edit-name button meaning.
@@ -415,3 +422,9 @@
 ### Step 2c — built (2026-10-12)
 - Drag the square at the middle of any edge of a closed outline to bend it into a circular arc through that point; the handle snaps onto drawn lines (never corners) so it follows the plan's curve. Tapping the handle opens the edge; "Make straight" undoes a bend. Corner drags keep the bend. Undo/redo cover bends.
 - Riesberg: street curve 62.03′ vs printed 62.02′; lot area 13,597 vs printed 13,504 sq ft (+0.7%, within the 1% target; was +1.7% with the edge straight).
+
+### Round 27 — Step 3 defined (2026-10-13)
+- ✅ Step 3 = **mark existing features**. Result: visual plan only (no quantities yet).
+- ✅ Feature names are typed by the contractor (custom); any number of features.
+- ✅ Look: grey fill + label.
+- ✅ House merges into existing features (a feature named "House").
