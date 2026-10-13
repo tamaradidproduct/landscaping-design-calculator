@@ -49,3 +49,24 @@ export const formatArea = (sqft: number) => `${Math.round(sqft).toLocaleString('
 export const formatScale = (ftPerPt: number) => `1 in on paper = ${(ftPerPt * 72).toFixed(1)} ft`;
 /** Signed % difference of measured vs printed. */
 export const percentOff = (measured: number, printed: number) => (measured - printed) / printed * 100;
+
+export interface Guides { rightAngle: boolean; straight: boolean; alignX: Point | null; alignY: Point | null; }
+/**
+ * Visual hints only (nothing is locked). Points are in screen px.
+ * rightAngle/straight: the new edge prev→p turns 90° / continues straight from edge prevprev→prev.
+ * alignX/alignY: another corner sits in the same column / row as p.
+ */
+export function guides(prevprev: Point | null, prev: Point | null, p: Point, others: Point[], tolPx: number, tolDeg = 1.5): Guides {
+  let rightAngle = false, straight = false;
+  if (prevprev && prev) {
+    const ax = prev.x - prevprev.x, ay = prev.y - prevprev.y, bx = p.x - prev.x, by = p.y - prev.y;
+    const la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+    if (la > 0 && lb > 8) {
+      const ang = Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb)))) * 180 / Math.PI; // 0 = straight on
+      rightAngle = Math.abs(ang - 90) <= tolDeg;
+      straight = ang <= tolDeg;
+    }
+  }
+  const near = (f: (o: Point) => number) => others.reduce<Point | null>((best, o) => (Math.abs(f(o)) <= tolPx && (!best || Math.abs(f(o)) < Math.abs(f(best))) ? o : best), null);
+  return { rightAngle, straight, alignX: near(o => o.x - p.x), alignY: near(o => o.y - p.y) };
+}

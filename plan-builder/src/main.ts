@@ -42,7 +42,43 @@ const tool = new OutlineTool({
     }
   },
   toast: msg => toast(msg),
+  sampleLuminance(c, n) {
+    // Read what's on screen (sharp layer when ready, else the base layer) at 1 sample per screen px.
+    const out = new Float32Array(n * n).fill(255), x0 = Math.round(c.x - n / 2), y0 = Math.round(c.y - n / 2);
+    if (!sharp.hidden) {
+      const r = sharp.width / stageSize.w, sx = Math.round(x0 * r), sy = Math.round(y0 * r), sw = Math.round(n * r);
+      const data = sharp.getContext('2d', { willReadFrequently: true })!.getImageData(sx, sy, sw, sw).data;
+      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+        // darkest device pixel within this screen px, so 1-device-px lines still register
+        let m = 255;
+        for (let dy = 0; dy < r; dy++) for (let dx = 0; dx < r; dx++) {
+          const i = ((Math.floor(y * r) + dy) * sw + Math.floor(x * r) + dx) * 4;
+          if (data[i + 3] === 0) continue; // off the page
+          m = Math.min(m, 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]);
+        }
+        out[y * n + x] = m;
+      }
+      return out;
+    }
+    const k = base.width / pageSize.w / (fitScale * view.scale); // base px per screen px
+    const tmp = document.createElement('canvas'); tmp.width = tmp.height = n;
+    const ctx = tmp.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(base, (x0 - view.x) * k, (y0 - view.y) * k, n * k, n * k, 0, 0, n, n);
+    const data = ctx.getImageData(0, 0, n, n).data;
+    for (let i = 0; i < n * n; i++) if (data[i * 4 + 3]) out[i] = 0.3 * data[i * 4] + 0.59 * data[i * 4 + 1] + 0.11 * data[i * 4 + 2];
+    return out;
+  },
 }, stage, $('panel'));
+
+// Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
+if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
+
+$('snap').onclick = () => {
+  tool.snapOn = !tool.snapOn;
+  $('snap').setAttribute('aria-pressed', String(tool.snapOn));
+  $('snap').textContent = tool.snapOn ? 'Snap on' : 'Snap off';
+  tool.update();
+};
 
 $('outline').onclick = () => { $('outline-menu').hidden = !$('outline-menu').hidden; };
 document.querySelectorAll<HTMLButtonElement>('[data-outline]').forEach(b => {
@@ -147,6 +183,7 @@ let pinch: { dist: number; mid: Point; view: View } | null = null;
 let lastTap = { t: 0, p: { x: 0, y: 0 } };
 let downAt: Point | null = null, moved = false;
 let toolDrag = false; // the current single-finger action belongs to the outline tool
+let toolPointer = -1;
 
 const local = (e: PointerEvent): Point => { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -162,17 +199,15 @@ stage.addEventListener('pointerdown', e => {
   if ((e.target as Element).closest('.popover')) return; // let the edge popover's own controls work
   stage.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, local(e));
-  if (pointers.size === 2) {
-    if (toolDrag) { tool.cancelPointer(); toolDrag = false; }
-    startPinch(); moved = true;
-  }
-  if (pointers.size === 1) { downAt = local(e); moved = false; toolDrag = tool.pointerDown(local(e), e.pointerType); }
+  if (pointers.size === 2 && toolDrag) { tool.setBypassFinger(true); return; } // second finger while placing = place freely
+  if (pointers.size === 2) { startPinch(); moved = true; }
+  if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = tool.pointerDown(local(e), e.pointerType); }
 });
 stage.addEventListener('pointermove', e => {
   if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e)); return; }
   const prev = pointers.get(e.pointerId)!, p = local(e);
   pointers.set(e.pointerId, p);
-  if (toolDrag) { tool.pointerMove(p); return; }
+  if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p, e.altKey); return; }
   if (pinch && pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
     const m = mid(a, b);
@@ -187,7 +222,10 @@ function endPointer(e: PointerEvent) {
   if (!pointers.has(e.pointerId)) return;
   const p = local(e);
   pointers.delete(e.pointerId);
-  if (toolDrag) { toolDrag = false; tool.pointerUp(); return; }
+  if (toolDrag) {
+    if (e.pointerId !== toolPointer) { tool.setBypassFinger(false); return; }
+    toolDrag = false; tool.setBypassFinger(false); tool.pointerUp(); return;
+  }
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
   pinch = null;

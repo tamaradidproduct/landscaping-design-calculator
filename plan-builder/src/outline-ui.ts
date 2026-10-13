@@ -1,8 +1,10 @@
-// Step 2a: outline the plot boundary or the house, then set the scale from one printed edge length.
+// Steps 2a–2b: outline the plot boundary or the house, then set the scale from one printed edge length.
+// 2b adds snapping to what's drawn on the plan, angle/alignment hints (shown, never locked) and nudging.
 import {
-  OUTLINE_LABEL, areaPt2, dist, edgeLengthPt, formatArea, formatFeet, formatScale, nearestEdge, parseFeet, percentOff,
+  OUTLINE_LABEL, areaPt2, dist, edgeLengthPt, formatArea, formatFeet, formatScale, guides, nearestEdge, parseFeet, percentOff,
   type Outline, type OutlineKind,
 } from './outline';
+import { findImageSnap, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
 export interface ToolHost {
@@ -13,12 +15,15 @@ export interface ToolHost {
   /** Draw the plan under screen point `s` into ctx (for the magnifier), magnified by `zoom`. */
   drawMagnified(ctx: CanvasRenderingContext2D, s: Point, zoom: number, size: number): void;
   toast(msg: string): void;
+  /** Luminance (0–255) of the plan as shown, n×n samples at 1 per screen px, centred on screen point c. */
+  sampleLuminance(c: Point, n: number): Float32Array | null;
 }
 
 const CORNER_HIT = 24;      // screen px
 const EDGE_HIT = 16;        // screen px
 const TOUCH_OFFSET = 64;    // the point being placed sits this far above the finger
 const DOUBLE_TAP_MS = 350;
+const OWN_SNAP = 14;        // screen px: snap to the outlines' own corners first
 const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', house: 'var(--outline-house)' };
 
 type Drag =
@@ -36,6 +41,11 @@ export class OutlineTool {
   private hoverEdge: { kind: OutlineKind; i: number } | null = null;
   private selectedEdge: { kind: OutlineKind; i: number } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
+  snapOn = true;
+  private bypass = false;                      // held Option/Alt or a second finger: place freely
+  private rawAt: Point | null = null;          // where the point would be without snapping
+  private snapped: 'corner' | 'line' | 'own' | null = null;
+  selectedCorner: { kind: OutlineKind; i: number } | null = null;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -58,7 +68,7 @@ export class OutlineTool {
   start(kind: OutlineKind) {
     this.drawing = kind;
     this.outlines[kind] = { kind, pts: [], closed: false };
-    this.selectedEdge = null; this.lastTap = null;
+    this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null;
     this.update();
   }
   cancel() {
@@ -68,7 +78,7 @@ export class OutlineTool {
   }
   undoPoint() {
     const o = this.current(); if (!o) return;
-    o.pts.pop(); this.update();
+    o.pts.pop(); this.selectedCorner = o.pts.length ? { kind: o.kind, i: o.pts.length - 1 } : null; this.update();
   }
   close() {
     const o = this.current(); if (!o || o.pts.length < 3) return;
@@ -89,13 +99,15 @@ export class OutlineTool {
     if (hit) {
       const s = this.host.toScreen(this.outlines[hit.kind]!.pts[hit.i]);
       this.drag = { type: 'corner', kind: hit.kind, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
-      this.dragAt = s; this.showMagnifier(); this.render();
+      this.selectedCorner = { kind: hit.kind, i: hit.i };
+      this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
       return true;
     }
     if (this.drawing) {
       const offsetY = pointerType === 'touch' ? TOUCH_OFFSET : 0;
       this.drag = { type: 'place', finger: p, offsetY };
-      this.dragAt = { x: p.x, y: p.y - offsetY };
+      this.rawAt = { x: p.x, y: p.y - offsetY };
+      this.dragAt = this.resolve(this.rawAt);
       if (offsetY) this.showMagnifier();
       this.render();
       return true;
@@ -105,16 +117,53 @@ export class OutlineTool {
     return false;
   }
 
-  pointerMove(p: Point) {
+  pointerMove(p: Point, alt = false) {
     const d = this.drag; if (!d) return;
-    if (d.type === 'place') { d.finger = p; this.dragAt = { x: p.x, y: p.y - d.offsetY }; this.showMagnifier(); }
-    else {
-      this.dragAt = { x: p.x + d.grab.x, y: p.y + d.grab.y };
-      d.moved = true;
-      this.outlines[d.kind]!.pts[d.i] = this.host.toPage(this.dragAt);
-      this.showMagnifier();
-    }
+    this.bypassKey = alt;
+    if (d.type === 'place') { d.finger = p; this.rawAt = { x: p.x, y: p.y - d.offsetY }; }
+    else { this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true; }
+    this.applyDrag();
+  }
+
+  /** Hold a second finger while dragging to place freely. */
+  setBypassFinger(on: boolean) { this.bypassFinger = on; if (this.drag) this.applyDrag(); }
+  private bypassKey = false;
+  private bypassFinger = false;
+
+  private applyDrag() {
+    const d = this.drag; if (!d || !this.rawAt) return;
+    this.bypass = this.bypassKey || this.bypassFinger;
+    this.dragAt = this.resolve(this.rawAt, d.type === 'corner' ? d : undefined);
+    if (d.type === 'corner') this.outlines[d.kind]!.pts[d.i] = this.host.toPage(this.dragAt);
+    this.showMagnifier();
     this.render();
+  }
+
+  /** Where a point placed at screen position `raw` lands: own corners first, then the drawing, else free. */
+  private resolve(raw: Point, exclude?: { kind: OutlineKind; i: number }): Point {
+    this.snapped = null;
+    if (!this.snapOn || this.bypass) return raw;
+    let best: Point | null = null, bd = OWN_SNAP;
+    for (const o of Object.values(this.outlines)) {
+      o?.pts.forEach((pt, i) => {
+        if (exclude && exclude.kind === o.kind && exclude.i === i) return;
+        const s = this.host.toScreen(pt), d = dist(s, raw);
+        if (d < bd) { bd = d; best = s; }
+      });
+    }
+    if (best) { this.snapped = 'own'; return best; }
+    const n = SNAP_WINDOW, g = this.host.sampleLuminance(raw, n);
+    const hit = g && findImageSnap(g, { x: n / 2, y: n / 2 });
+    if (!hit) return raw;
+    this.snapped = hit.kind;
+    return { x: raw.x - n / 2 + hit.x, y: raw.y - n / 2 + hit.y };
+  }
+
+  nudge(dx: number, dy: number) {
+    const c = this.selectedCorner, o = c && this.outlines[c.kind]; if (!c || !o?.pts[c.i]) return;
+    const k = 1 / this.host.pxPerPt(), p = o.pts[c.i];
+    o.pts[c.i] = { x: p.x + dx * k, y: p.y + dy * k };
+    this.update();
   }
 
   pointerUp() {
@@ -130,15 +179,16 @@ export class OutlineTool {
       if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS))) {
         this.lastTap = null; this.dragAt = null; this.close(); return;
       }
-      this.dragAt = null; this.update(); return;
+      this.dragAt = null; this.snapped = null; this.update(); return;
     }
     const o = this.current(); if (!o || !this.dragAt) return;
     const now = performance.now();
     const isDouble = this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS && dist(this.lastTap.finger, d.finger) < 30;
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
     o.pts.push(this.host.toPage(this.dragAt));
+    this.selectedCorner = { kind: o.kind, i: o.pts.length - 1 };
     this.lastTap = { t: now, finger: d.finger };
-    this.dragAt = null;
+    this.dragAt = null; this.snapped = null;
     this.update();
   }
 
@@ -215,13 +265,60 @@ export class OutlineTool {
         svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? 7 : 6}" class="corner" style="--c:${COLORS[o.kind]}"/>`;
       });
     }
+    if (this.dragAt) svg += this.renderGuides(this.dragAt);
+    else if (this.drawing && this.hoverAt) svg += this.renderGuides(this.hoverAt);
+    const sel = this.selectedCorner && !this.dragAt ? this.outlines[this.selectedCorner.kind]?.pts[this.selectedCorner.i] : null;
+    if (sel) { const s = h.toScreen(sel); svg += `<circle cx="${s.x}" cy="${s.y}" r="11" class="selected-corner"/>`; }
     if (this.dragAt) {
       const { x, y } = this.dragAt;
+      if (this.snapped) {
+        const label = { corner: 'Corner', line: 'On line', own: 'Corner' }[this.snapped];
+        svg += this.snapped === 'line'
+          ? `<path d="M${x} ${y - 9}L${x + 9} ${y}L${x} ${y + 9}L${x - 9} ${y}Z" class="snap-mark"/>`
+          : `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" class="snap-mark"/>`;
+        svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${label}</text>`;
+      }
       svg += `<circle cx="${x}" cy="${y}" r="11" class="placing"/><path d="M${x - 18} ${y}H${x - 5}M${x + 5} ${y}H${x + 18}M${x} ${y - 18}V${y - 5}M${x} ${y + 5}V${y + 18}" class="crosshair"/>`;
     }
     this.svg.innerHTML = svg;
     this.positionPopover();
     if (this.dragAt && !this.magnifier.hidden) this.drawMagnifier();
+  }
+
+  /** Hints for the point being placed or moved: right angle, straight on, and alignment with other corners. */
+  private renderGuides(at: Point): string {
+    const h = this.host, d = this.drag;
+    let out = '', prev: Point | null = null, prevprev: Point | null = null, next: Point | null = null, nextnext: Point | null = null;
+    let skip: { kind: OutlineKind; i: number } | null = null;
+    if ((!d || d.type === 'place') && this.drawing) {
+      const pts = this.outlines[this.drawing]!.pts.map(p => h.toScreen(p));
+      prev = pts.at(-1) ?? null; prevprev = pts.at(-2) ?? null;
+    } else if (d?.type === 'corner') {
+      const o = this.outlines[d.kind]!, n = o.pts.length, at2 = (k: number) => (o.closed || (k >= 0 && k < n)) ? h.toScreen(o.pts[(k + n) % n]) : null;
+      prev = at2(d.i - 1); prevprev = at2(d.i - 2); next = at2(d.i + 1); nextnext = at2(d.i + 2);
+      skip = d;
+    }
+    const others: Point[] = [];
+    for (const o of Object.values(this.outlines)) o?.pts.forEach((p, i) => {
+      if (skip && skip.kind === o.kind && skip.i === i) return;
+      const s = h.toScreen(p);
+      if ((prev && dist(s, prev) < 0.5) || (next && dist(s, next) < 0.5)) return; // the edge itself already shows that line
+      others.push(s);
+    });
+    const marks = (pp: Point | null, p: Point | null) => {
+      if (!pp || !p) return;
+      const g = guides(pp, p, at, [], 0);
+      if (g.rightAngle) {
+        const u1 = unit(pp, p), u2 = unit(p, at), s = 12;
+        const a = { x: p.x - u1.x * s, y: p.y - u1.y * s }, c = { x: p.x + u2.x * s, y: p.y + u2.y * s };
+        out += `<path d="M${a.x} ${a.y}L${a.x + u2.x * s} ${a.y + u2.y * s}L${c.x} ${c.y}" class="guide-angle"/><text x="${p.x + 10}" y="${p.y + 24}" class="guide-label">90°</text>`;
+      } else if (g.straight) out += `<text x="${p.x + 10}" y="${p.y + 24}" class="guide-label">Straight</text>`;
+    };
+    marks(prevprev, prev); marks(nextnext, next);
+    const g = guides(null, null, at, others, 2.5);
+    if (g.alignX) out += `<line x1="${g.alignX.x}" y1="${g.alignX.y}" x2="${g.alignX.x}" y2="${at.y}" class="guide-line"/>`;
+    if (g.alignY) out += `<line x1="${g.alignY.x}" y1="${g.alignY.y}" x2="${at.x}" y2="${g.alignY.y}" class="guide-line"/>`;
+    return out;
   }
 
   private showMagnifier() { this.magnifier.hidden = false; }
@@ -287,6 +384,8 @@ export class OutlineTool {
     if (o) {
       p.innerHTML = `
         <p class="panel-text">Tap each corner of the <b>${OUTLINE_LABEL[o.kind].toLowerCase()}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
+        <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. Hold Option (Alt) or a second finger to place freely.' : 'Snapping is off.'}</p>
+        ${this.nudgePad()}
         <div class="row"><button type="button" data-act="undo" ${o.pts.length ? '' : 'disabled'}>Undo corner</button>
         <button type="button" data-act="close" class="primary" ${o.pts.length >= 3 ? '' : 'disabled'}>Close shape</button>
         <button type="button" data-act="cancel">Cancel</button></div>`;
@@ -302,6 +401,7 @@ export class OutlineTool {
         ${area ? `<div class="area-row"><span>Plot area <b>${formatArea(area)}</b></span>
           <label for="lot-size">Printed lot size</label><input id="lot-size" inputmode="numeric" placeholder="13,504" value="${this.printedLotSqft ?? ''}" />
           ${off !== null ? `<span class="${Math.abs(off) <= 1 ? 'ok' : 'warn'}">${Math.abs(off) < 0.05 ? 'matches' : `${Math.abs(off).toFixed(1)}% ${off > 0 ? 'over' : 'under'}`}</span>` : ''}</div>` : ''}
+        ${this.nudgePad()}
         <div class="row">${closed.map(c => `<button type="button" data-redo="${c.kind}">Redo ${OUTLINE_LABEL[c.kind].toLowerCase()}</button>`).join('')}</div>`;
       p.hidden = false;
       const lot = p.querySelector<HTMLInputElement>('#lot-size');
@@ -310,11 +410,23 @@ export class OutlineTool {
     p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => {
       btn.onclick = () => ({ undo: () => this.undoPoint(), close: () => this.close(), cancel: () => this.cancel() } as Record<string, () => void>)[btn.dataset.act!]();
     });
+    p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
+      btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
+    });
     p.querySelectorAll<HTMLButtonElement>('[data-redo]').forEach(btn => { btn.onclick = () => this.start(btn.dataset.redo as OutlineKind); });
+  }
+
+  private nudgePad(): string {
+    if (!this.selectedCorner || !this.outlines[this.selectedCorner.kind]?.pts[this.selectedCorner.i]) return '';
+    return `<div class="nudge"><span class="panel-hint">Nudge the selected corner</span>
+      <button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="0,-1" aria-label="Nudge up">↑</button>
+      <button type="button" data-nudge="0,1" aria-label="Nudge down">↓</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button></div>`;
   }
 
   private onKey(e: KeyboardEvent) {
     if ((e.target as HTMLElement).tagName === 'INPUT') return;
+    const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (arrows[e.key] && this.selectedCorner) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudge(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
     if (this.drawing) {
       if (e.key === 'Enter') { e.preventDefault(); this.close(); }
       else if (e.key === 'Escape') this.cancel();
@@ -322,3 +434,5 @@ export class OutlineTool {
     } else if (e.key === 'Escape') this.tapEmpty();
   }
 }
+
+function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; }

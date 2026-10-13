@@ -66,3 +66,15 @@ input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 .menu-wrap { position: relative; pointer-events: auto; }
 .menu { position: absolute; right: 0; top: calc(100% + 8px); display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 0.2); min-width: 190px; }
 .menu button { text-align: left; box-shadow: none; }
+
+.toggle[aria-pressed="false"] { color: var(--muted); }
+.toggle[aria-pressed="true"] { border-color: var(--accent); }
+.overlay .snap-mark { fill: none; stroke: #d0349a; stroke-width: 2.5; }
+.overlay .snap-label, .overlay .guide-label { font: 600 13px var(--font); fill: #d0349a; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
+.overlay .guide-angle { fill: none; stroke: #0b8f6a; stroke-width: 2; }
+.overlay .guide-label { fill: #0b8f6a; }
+.overlay .guide-line { stroke: #0b8f6a; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.overlay .selected-corner { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.panel .panel-hint { margin: 0; font-size: 14px; color: var(--muted); }
+.nudge { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nudge button { min-width: 48px; padding: 0; font-size: 20px; }

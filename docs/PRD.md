@@ -375,3 +375,11 @@
 - Plot area shown once scaled; type the printed lot size to see the % difference.
 - Panning is now free (no limit at the plan's edges).
 - Riesberg check (scale from the 116.45′ top edge): left edge **138.30′ vs printed 138.31′ (−0.01%)**; scale reads 1 in = 30.0 ft. Area 13,738 vs printed 13,504 sq ft (+1.7%) because the curved street edge is still drawn straight — expected until 2c.
+
+### Step 2b — built (2026-10-12)
+- **Snapping to the plan's pixels** (works for vector PDFs and scans alike): finds long drawn lines near the point and snaps to where two meet (corner) or onto the nearest line. Prefers heavy lines (outlines) over thin dimension/hatch lines; ignores lettering. Own corners snap first.
+- Shows what it snapped to ("Corner" / "On line") at the point.
+- **Off switch:** toolbar **Snap on/off**; **hold Option/Alt or a second finger** while placing/dragging to place freely. (A second finger during a placement now means "place freely", not pinch — lift and pinch to zoom.)
+- **Hints, never locked:** "90°" mark when an edge is square to the previous one, "Straight" when it continues it, dashed line when the point lines up with another corner. Shown while dragging, and on mouse hover while drawing.
+- **Nudge:** arrow buttons in the panel and arrow keys (Shift = 10 px) move the selected corner.
+- Riesberg check (tap ~9 px off): all three test corners snapped onto the drawn corner (0.4–1.8 px). On 24 captured real windows across two zoom levels, ~79% land within 2.5 px of the corner; misses are in dense spots (bottom-left corner with hatch dots and double lines) — nudge or bypass there.
