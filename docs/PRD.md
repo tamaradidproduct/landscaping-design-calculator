@@ -313,3 +313,9 @@
   - Pinch-zoom and pan feel smooth, like a photo viewer.
   - Works offline once the app is loaded.
 - **Test file:** a real plot plan PDF supplied by the stakeholder (path TBD).
+
+### Step 1 — build notes (2026-10-12)
+- Built in `plan-builder/` (branch `feat/step1-open-plot-plan`).
+- PDF.js was too slow on real plot plans: the Riesberg plan draws its text as ~12k vector shapes → ~12 s to first paint. Switched to **PDFium (WebAssembly)** in a background worker: ~0.7 s to open once the engine has warmed up (~3 s after app launch), ~1.5–2 s if opened immediately.
+- Measured in headless Chrome on a Mac (820×1180, 2x); **not yet measured on a real iPad**.
+- ⚠️ Later steps: this plan's scale label (`1" = 30'`) disagrees with its title block (`1"=20'`), and its text is drawn as shapes (no extractable text) → auto-detecting scale would need OCR.
