@@ -147,45 +147,6 @@ export function constrain45(anchor: Point, p: Point): { point: Point; angle: num
   return { point: { x: anchor.x + ux * len, y: anchor.y + uy * len }, angle: ((Math.round(ang / step) * 45) % 360 + 360) % 360 };
 }
 
-/**
- * Snap a point (screen px) to guides: a square or straight continuation of the previous edge
- * (within tolDeg), and/or the column/row of another corner (within tolPx). Guides win over the
- * drawing underneath. When both apply, the point lands where the square/straight edge meets the
- * aligned column or row.
- */
-export function snapToGuides(p: Point, prevprev: Point | null, prev: Point | null, others: Point[], tolPx: number, tolDeg = 3): { point: Point; label: string } | null {
-  let ray: { o: Point; u: Point; label: string } | null = null;
-  if (prevprev && prev) {
-    const el = dist(prevprev, prev), vx = p.x - prev.x, vy = p.y - prev.y, vl = Math.hypot(vx, vy);
-    if (el > 0 && vl > 8) {
-      const e = { x: (prev.x - prevprev.x) / el, y: (prev.y - prevprev.y) / el };
-      const dirs: [Point, string][] = [[e, 'Straight'], [{ x: -e.y, y: e.x }, '90°'], [{ x: e.y, y: -e.x }, '90°']];
-      for (const [u, label] of dirs) {
-        const cos = (vx * u.x + vy * u.y) / vl;
-        if (cos >= Math.cos(tolDeg * Math.PI / 180)) { ray = { o: prev, u, label }; break; }
-      }
-    }
-  }
-  const near = (f: (o: Point) => number) => others.reduce<Point | null>((b, o) => (Math.abs(f(o)) <= tolPx && (!b || Math.abs(f(o)) < Math.abs(f(b))) ? o : b), null);
-  const ax = near(o => o.x - p.x), ay = near(o => o.y - p.y);
-  if (ray) {
-    const t = (p.x - ray.o.x) * ray.u.x + (p.y - ray.o.y) * ray.u.y;
-    let q = { x: ray.o.x + t * ray.u.x, y: ray.o.y + t * ray.u.y };
-    const along = [
-      ax && Math.abs(ray.u.x) > 0.2 ? (ax.x - ray.o.x) / ray.u.x : null,
-      ay && Math.abs(ray.u.y) > 0.2 ? (ay.y - ray.o.y) / ray.u.y : null,
-    ];
-    for (const s of along) {
-      if (s === null || s <= 0) continue;
-      const c = { x: ray.o.x + s * ray.u.x, y: ray.o.y + s * ray.u.y };
-      if (dist(c, q) <= tolPx * 1.5) { q = c; break; }
-    }
-    return { point: q, label: ray.label };
-  }
-  if (ax || ay) return { point: { x: ax ? ax.x : p.x, y: ay ? ay.y : p.y }, label: 'Aligned' };
-  return null;
-}
-
 /** Even-odd test: is p inside the polygon through pts? */
 export function insidePolygon(pts: Point[], p: Point): boolean {
   let inside = false;

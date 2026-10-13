@@ -56,7 +56,7 @@
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
 - **Touch navigation while outlining:** one finger places and drags points; **two fingers always pan and zoom** (a second finger cancels whatever the first started, so nothing gets placed or moved by accident).
 - **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, **hold Option/Alt** (keyboard), or on touch **press and hold still (~½ s) before moving** to place that point freely ("Free" label).
-- **Guides snap first** (within ~6 px / 3°, bypassable like all snapping): square (90°) or straight continuation of the previous edge, and alignment with another corner's column or row; when both apply, the point lands where they meet. Guides take priority over lines in the image underneath (own corners still come first).
+- **Guides are hints only** (90°, straight, aligned with another corner): shown, never pulled into place. Straight lines and 45° steps come only from holding **Shift**, which still snaps along the ray. Snapping without Shift = the outlines' own corners, then lines/corners in the drawing.
 - **Snap gravity:** corners pull from ~26 px (outline corners from ~22 px); once snapped, the point **stays put** until the pointer moves ~34 px away or a closer target appears; with a mouse, the **snap preview shows before clicking** (halo + label).
 - **Shift** (while placing or dragging a corner) locks the edge from the previous corner to **45° steps** (0°, 45°, 90°… on screen) and shows the angle. **Snapping still works with Shift**: the point stays on the 45° line but stops at a drawn corner on it or where it crosses a drawn line.
 - Snapping recognises **dashed lines** (property lines are often dashed) and lines with labels written alongside them.
@@ -467,3 +467,7 @@
 ### Round 33 — Step 3 built: existing features (2026-10-13)
 - ✅ House folded into "Existing feature…"; name first (quick picks or typed); grey fill + name label; tap inside to rename / redo outline / delete; overlaps allowed.
 - ❌→✅ Found on Riesberg: drawing the driveway from the garage's corners grabbed and moved the house's corners. Other outlines' corners now only snap while drawing.
+
+### Round 34 — no angle pull without Shift (2026-10-13)
+- ❌ Lines kept locking to straight/90° without Shift — guide snapping (and a Shift state that could stick after a missed keyup) felt like stuck 45° steps.
+- 🔄 Reverses Round 30: guides go back to **hints only**. Angle/straight constraints only while Shift is held. Shift/Option state now comes from every input event and clears when the window loses focus.
