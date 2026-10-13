@@ -1,15 +1,17 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
 
-export type OutlineKind = 'boundary' | 'house';
-export const OUTLINE_LABEL: Record<OutlineKind, string> = { boundary: 'Plot boundary', house: 'House' };
+/** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
+export type OutlineKind = 'boundary' | 'feature';
+/** Quick-pick names for existing features; the contractor can type any name. */
+export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Walk', 'Deck'];
 
 /**
  * pts are corners; edge i runs from pts[i] to pts[i+1] (wrapping when closed).
  * bulges[i] bends edge i into a circular arc: the arc's midpoint sits bulges[i] PDF points off the
  * chord's midpoint, along the chord's left normal. 0 or missing = straight.
  */
-export interface Outline { kind: OutlineKind; pts: Point[]; closed: boolean; bulges?: number[]; }
+export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; }
 
 /** Feet from text like 116.45, 116.45', 116' 6", 116 ft 6 in, 6". Null if unreadable or not positive. */
 export function parseFeet(input: string): number | null {
@@ -145,41 +147,32 @@ export function constrain45(anchor: Point, p: Point): { point: Point; angle: num
   return { point: { x: anchor.x + ux * len, y: anchor.y + uy * len }, angle: ((Math.round(ang / step) * 45) % 360 + 360) % 360 };
 }
 
-/**
- * Snap a point (screen px) to guides: a square or straight continuation of the previous edge
- * (within tolDeg), and/or the column/row of another corner (within tolPx). Guides win over the
- * drawing underneath. When both apply, the point lands where the square/straight edge meets the
- * aligned column or row.
- */
-export function snapToGuides(p: Point, prevprev: Point | null, prev: Point | null, others: Point[], tolPx: number, tolDeg = 3): { point: Point; label: string } | null {
-  let ray: { o: Point; u: Point; label: string } | null = null;
-  if (prevprev && prev) {
-    const el = dist(prevprev, prev), vx = p.x - prev.x, vy = p.y - prev.y, vl = Math.hypot(vx, vy);
-    if (el > 0 && vl > 8) {
-      const e = { x: (prev.x - prevprev.x) / el, y: (prev.y - prevprev.y) / el };
-      const dirs: [Point, string][] = [[e, 'Straight'], [{ x: -e.y, y: e.x }, '90°'], [{ x: e.y, y: -e.x }, '90°']];
-      for (const [u, label] of dirs) {
-        const cos = (vx * u.x + vy * u.y) / vl;
-        if (cos >= Math.cos(tolDeg * Math.PI / 180)) { ray = { o: prev, u, label }; break; }
-      }
-    }
+/** Even-odd test: is p inside the polygon through pts? */
+export function insidePolygon(pts: Point[], p: Point): boolean {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < a.x + (p.y - a.y) * (b.x - a.x) / (b.y - a.y)) inside = !inside;
   }
-  const near = (f: (o: Point) => number) => others.reduce<Point | null>((b, o) => (Math.abs(f(o)) <= tolPx && (!b || Math.abs(f(o)) < Math.abs(f(b))) ? o : b), null);
-  const ax = near(o => o.x - p.x), ay = near(o => o.y - p.y);
-  if (ray) {
-    const t = (p.x - ray.o.x) * ray.u.x + (p.y - ray.o.y) * ray.u.y;
-    let q = { x: ray.o.x + t * ray.u.x, y: ray.o.y + t * ray.u.y };
-    const along = [
-      ax && Math.abs(ray.u.x) > 0.2 ? (ax.x - ray.o.x) / ray.u.x : null,
-      ay && Math.abs(ray.u.y) > 0.2 ? (ay.y - ray.o.y) / ray.u.y : null,
-    ];
-    for (const s of along) {
-      if (s === null || s <= 0) continue;
-      const c = { x: ray.o.x + s * ray.u.x, y: ray.o.y + s * ray.u.y };
-      if (dist(c, q) <= tolPx * 1.5) { q = c; break; }
-    }
-    return { point: q, label: ray.label };
+  return inside;
+}
+
+/** Where to put a shape's name: its centroid, or — when that falls outside (L-shapes) — the middle of the widest span across the shape at that height. */
+export function labelPoint(pts: Point[]): Point {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length], k = p.x * q.y - q.x * p.y;
+    a += k; cx += (p.x + q.x) * k; cy += (p.y + q.y) * k;
   }
-  if (ax || ay) return { point: { x: ax ? ax.x : p.x, y: ay ? ay.y : p.y }, label: 'Aligned' };
-  return null;
+  const c = a ? { x: cx / (3 * a), y: cy / (3 * a) } : pts[0];
+  if (!c || insidePolygon(pts, c)) return c;
+  const xs: number[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], q = pts[(i + 1) % pts.length];
+    if ((p.y > c.y) !== (q.y > c.y)) xs.push(p.x + (c.y - p.y) * (q.x - p.x) / (q.y - p.y));
+  }
+  xs.sort((m, n) => m - n);
+  let best = c, w = -1;
+  for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > w) { w = xs[i + 1] - xs[i]; best = { x: (xs[i] + xs[i + 1]) / 2, y: c.y }; }
+  return best;
 }

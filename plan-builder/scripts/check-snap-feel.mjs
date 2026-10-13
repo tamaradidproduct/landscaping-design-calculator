@@ -37,7 +37,7 @@ results.push(['Shift held, pointer ~43° down-right', sp2 ? `angle label ${sp2.l
 // property line from a point right of it: the ray should stop exactly where it crosses that line.
 await page.keyboard.up('Shift'); await page.waitForTimeout(80);
 const bl = await toScreen([253.21, 545.22]), left = await toScreen([253.18, 380]);
-await page.keyboard.press('Escape'); await page.click('#outline'); await page.click('[data-outline=house]');
+await page.keyboard.press('Escape'); await page.click('#outline'); await page.click('[data-outline=feature]'); await page.click('#feature-presets button:first-child');
 await page.click('#snap'); await page.mouse.click(left[0] + 120, left[1]); await page.waitForTimeout(400); await page.click('#snap');
 await page.keyboard.down('Shift');
 await page.mouse.move(left[0] + 6, left[1] + 4); await page.waitForTimeout(80);

@@ -36,7 +36,7 @@
 | 2b | Snapping to the plan's lines/corners; 90°/straight/alignment hints (never locked); snap toggle + Option/second-finger bypass; nudge | 🔨 done | `feat/plan-builder` |
 | — | Undo/redo (⌘Z / ⇧⌘Z, toolbar buttons), including dots of an unfinished outline | 🔨 done | `feat/plan-builder` |
 | 2c | Curved edges: drag an edge's middle handle to bend it into an arc; "Make straight"; lengths and area follow the curve | 🔨 done, in review | `feat/plan-builder-2c-curves` |
-| 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | ✅ defined, not built | — |
+| 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
 | 4+ | Material zones, plant symbols, edging/walls… | ❓ | — |
 
 ## 6. Current requirements, by area
@@ -56,7 +56,7 @@
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
 - **Touch navigation while outlining:** one finger places and drags points; **two fingers always pan and zoom** (a second finger cancels whatever the first started, so nothing gets placed or moved by accident).
 - **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, **hold Option/Alt** (keyboard), or on touch **press and hold still (~½ s) before moving** to place that point freely ("Free" label).
-- **Guides snap first** (within ~6 px / 3°, bypassable like all snapping): square (90°) or straight continuation of the previous edge, and alignment with another corner's column or row; when both apply, the point lands where they meet. Guides take priority over lines in the image underneath (own corners still come first).
+- **Guides are hints only** (90°, straight, aligned with another corner): shown, never pulled into place. Straight lines and 45° steps come only from holding **Shift**, which still snaps along the ray. Snapping without Shift = the outlines' own corners, then lines/corners in the drawing.
 - **Snap gravity:** corners pull from ~26 px (outline corners from ~22 px); once snapped, the point **stays put** until the pointer moves ~34 px away or a closer target appears; with a mouse, the **snap preview shows before clicking** (halo + label).
 - **Shift** (while placing or dragging a corner) locks the edge from the previous corner to **45° steps** (0°, 45°, 90°… on screen) and shows the angle. **Snapping still works with Shift**: the point stays on the 45° line but stops at a drawn corner on it or where it crosses a drawn line.
 - Snapping recognises **dashed lines** (property lines are often dashed) and lines with labels written alongside them.
@@ -80,18 +80,25 @@
 - Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
 - Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
 
-### 6.7 Existing features (Step 3) ✅
+### 6.7 Existing features (Step 3) ✅🔨
 - After outlining and scaling, the contractor marks **existing features** — anything already on the lot that isn't new work.
 - **Any number** of features; each gets a **name the contractor types** (e.g. "Driveway", "AC pad", "Window well"). The **house is just one of them** (no separate house tool); the plot boundary stays special.
 - Drawn with the same outline tool (snapping, guides, curves, undo/redo).
 - Shown as **grey fill + its name**, like the house on the Servin plan sheet.
 - Result of Step 3 is **visual only** — no quantities or totals yet.
+- 🔨 **Outline** menu = **Plot boundary** · **Existing feature…**. A feature is named first: quick picks (House, Driveway, Patio, Walk, Deck) or any typed name.
+- 🔨 **Tap inside** a feature to select it → **Rename**, **Redo outline** (Cancel puts the old one back), **Delete**. Overlapping features: the tap picks the smallest one under the finger (a porch inside the house).
+- 🔨 Features may overlap each other and the boundary; nothing is clipped. Any feature edge can still set the scale.
+- 🔨 While drawing, other outlines' corners are snap targets, not handles — tapping a shared corner (driveway meeting the garage) places a new point there instead of dragging the house's corner.
+- 🔨 Undo/redo covers naming, renaming, deleting and redrawing.
+- 📝 Small features: at low zoom the edge-bend handles can cover the middle, so a tap bends/opens an edge instead of selecting — zoom in, or revisit hit priority later.
 
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')
 - Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
 - Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
 - Lot area with the curve → **13,597 sq ft** vs printed 13,504 (+0.7%).
 - Snapping: taps ~9 px off the three test corners landed 0.4–1.8 px from the drawn corner; ~79% of 24 real-pixel samples land within 2.5 px (misses in dense hatching).
+- Step 3: house (10 corners), driveway and porch marked; porch inside the house selects on tap; rename, delete, undo/redo and redraw-then-cancel all behave (`scripts/check-step3.mjs`).
 - Not yet tested with real touch on a tablet.
 
 ## 8. Open questions
@@ -456,3 +463,11 @@
 ### Round 32 — touch placement offset (2026-10-13)
 - ❌ On iPad, taps placed the point ~64 px above the finger (the always-on offset cursor) — felt like a misplaced cursor.
 - ✅ A tap now places right where the finger touches; the offset only appears (gradually) while dragging to fine-tune.
+
+### Round 33 — Step 3 built: existing features (2026-10-13)
+- ✅ House folded into "Existing feature…"; name first (quick picks or typed); grey fill + name label; tap inside to rename / redo outline / delete; overlaps allowed.
+- ❌→✅ Found on Riesberg: drawing the driveway from the garage's corners grabbed and moved the house's corners. Other outlines' corners now only snap while drawing.
+
+### Round 34 — no angle pull without Shift (2026-10-13)
+- ❌ Lines kept locking to straight/90° without Shift — guide snapping (and a Shift state that could stick after a missed keyup) felt like stuck 45° steps.
+- 🔄 Reverses Round 30: guides go back to **hints only**. Angle/straight constraints only while Shift is held. Shift/Option state now comes from every input event and clears when the window loses focus.

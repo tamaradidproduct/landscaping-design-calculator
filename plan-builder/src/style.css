@@ -7,13 +7,16 @@
   --accent: #245e4f;
   --accent-ink: #ffffff;
   --outline-boundary: #c2318f;
-  --outline-house: #1f6fd1;
+  --outline-feature: #3d4a45;
+  --feature-fill: #a6aba8;
+  --feature-stroke: #6b726f;
+  --feature-ink: #1e2422;
   --ok: #1d7a4f;
   --warn: #a34b00;
   --font: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1f2523; --surface: #2a312e; --ink: #e5ece8; --muted: #9eaba5; --line: #3a4440; --accent: #7fc4ab; --accent-ink: #10201b; --outline-boundary: #f06ac0; --outline-house: #6aa8ff; --ok: #6fd3a2; --warn: #f2a65a; color-scheme: dark; }
+  :root { --bg: #1f2523; --surface: #2a312e; --ink: #e5ece8; --muted: #9eaba5; --line: #3a4440; --accent: #7fc4ab; --accent-ink: #10201b; --outline-boundary: #f06ac0; --outline-feature: #d6ddd9; --feature-fill: #5d6461; --feature-stroke: #8a928e; --feature-ink: #f0f3f1; --ok: #6fd3a2; --warn: #f2a65a; color-scheme: dark; }
 }
 [hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; touch-action: none; } /* no browser pinch/double-tap zoom anywhere: only the plan zooms */
@@ -86,3 +89,19 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 .overlay .snap-halo { fill: color-mix(in srgb, #d0349a 18%, transparent); stroke: #d0349a; stroke-width: 1.5; }
 .overlay .hover-dot { fill: #d0349a; }
+
+/* Step 3: existing features — grey fill + name */
+.overlay .shape.feature.closed { fill: var(--feature-fill); fill-opacity: 0.55; stroke: var(--feature-stroke); stroke-width: 1.5; }
+.overlay .shape.feature.selected { stroke: var(--outline-feature); stroke-width: 3; fill-opacity: 0.7; }
+.overlay .feature-label { font: 600 14px var(--font); fill: var(--feature-ink); text-anchor: middle; dominant-baseline: middle; paint-order: stroke; stroke: var(--feature-fill); stroke-width: 4px; stroke-linejoin: round; }
+.overlay .feature-label.selected { fill: var(--outline-feature); }
+.feature-menu { min-width: 280px; gap: 10px; }
+.feature-menu .menu-title { margin: 2px 4px; font-weight: 600; }
+.feature-menu label { font-size: 14px; color: var(--muted); margin: 0 4px; }
+.feature-menu .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.feature-menu .chips button { text-align: center; }
+.feature-menu input { flex: 1; min-width: 0; }
+.panel .rename-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.panel .rename-row label { font-size: 14px; color: var(--muted); }
+.panel .rename-row input { flex: 1; min-width: 140px; }
+button.danger { color: var(--warn); }

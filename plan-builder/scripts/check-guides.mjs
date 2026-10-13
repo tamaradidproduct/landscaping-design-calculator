@@ -1,4 +1,5 @@
-// Guide snapping + deselect check. Draws in empty space beside the page so only guides can pull.
+// Guides are hints only without Shift: a corner ~2° off square or near an alignment lands exactly where clicked.
+// Also checks deselect. Draws in empty space beside the page so nothing on the plan can pull.
 // Usage: node scripts/check-guides.mjs <plot-plan.pdf> [url]
 import { chromium } from 'playwright-core';
 const [pdf, url = 'http://localhost:5180/'] = process.argv.slice(2);
@@ -17,11 +18,11 @@ await page.mouse.click(200, 200); await page.waitForTimeout(400);
 await page.mouse.move(204, 320); await page.waitForTimeout(80);           // ~1.9° off square
 results.push(['3rd corner ~2° off square (hover)', await label()]);
 await page.mouse.click(204, 320); await page.waitForTimeout(400);
-results.push(['→ placed', JSON.stringify((await corners())[2]) + ' (x 200 = square)']);
+results.push(['→ placed', JSON.stringify((await corners())[2]) + ' (expect 204,320: no pull)']);
 await page.mouse.move(63, 318); await page.waitForTimeout(80);             // near column of corner 1 and row of corner 3
 results.push(['4th corner near column of #1 and row of #3', await label()]);
 await page.mouse.click(63, 318); await page.waitForTimeout(400);
-results.push(['→ placed', JSON.stringify((await corners())[3]) + ' (60, 320 = aligned with both)']);
+results.push(['→ placed', JSON.stringify((await corners())[3]) + ' (expect 63,318: no pull)']);
 await page.click('#panel [data-act=close]'); await page.waitForTimeout(200);
 // select a corner, then click empty space
 await page.mouse.click(200, 200); await page.waitForTimeout(200);

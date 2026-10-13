@@ -2,7 +2,7 @@ import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
-import type { OutlineKind } from './outline';
+import { FEATURE_PRESETS } from './outline';
 import { fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
 
 registerSW({ immediate: true });
@@ -77,8 +77,10 @@ const tool = new OutlineTool({
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
 
-window.addEventListener('keydown', e => { if (e.key === 'Shift') tool.setShift(true); });
-window.addEventListener('keyup', e => { if (e.key === 'Shift') tool.setShift(false); });
+// Shift / Option state comes from every input event (not just Shift's own keydown/keyup), so it can't stick.
+window.addEventListener('keydown', e => tool.setModifiers(e.shiftKey, e.altKey));
+window.addEventListener('keyup', e => tool.setModifiers(e.shiftKey, e.altKey));
+window.addEventListener('blur', () => tool.setModifiers(false, false));
 
 $('undo').onclick = () => tool.undo();
 $('redo').onclick = () => tool.redo();
@@ -90,10 +92,18 @@ $('snap').onclick = () => {
   tool.update();
 };
 
-$('outline').onclick = () => { $('outline-menu').hidden = !$('outline-menu').hidden; };
-document.querySelectorAll<HTMLButtonElement>('[data-outline]').forEach(b => {
-  b.onclick = () => { $('outline-menu').hidden = true; tool.start(b.dataset.outline as OutlineKind); };
-});
+// Outline menu: the plot boundary, or an existing feature (named first: a quick pick or any typed name).
+const closeMenus = () => { $('outline-menu').hidden = true; $('feature-menu').hidden = true; };
+$('outline').onclick = () => { const open = !$('outline-menu').hidden || !$('feature-menu').hidden; closeMenus(); $('outline-menu').hidden = open; };
+document.querySelector<HTMLButtonElement>('[data-outline=boundary]')!.onclick = () => { closeMenus(); tool.startBoundary(); };
+document.querySelector<HTMLButtonElement>('[data-outline=feature]')!.onclick = () => {
+  closeMenus(); $('feature-menu').hidden = false; $<HTMLInputElement>('feature-name').value = '';
+};
+const startFeature = (name: string) => { if (!name.trim()) return; closeMenus(); tool.startFeature(name); };
+$('feature-presets').append(...FEATURE_PRESETS.map(name => Object.assign(document.createElement('button'), {
+  type: 'button', textContent: name, onclick: () => startFeature(name),
+})));
+$<HTMLFormElement>('feature-menu').onsubmit = e => { e.preventDefault(); startFeature($<HTMLInputElement>('feature-name').value); };
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 
 // ---------- Opening a file ----------
@@ -208,6 +218,7 @@ stage.addEventListener('pointerdown', e => {
   if (!page) return;
   if ((e.target as Element).closest('.popover')) return; // let the edge popover's own controls work
   stage.setPointerCapture(e.pointerId);
+  tool.setModifiers(e.shiftKey, e.altKey);
   pointers.set(e.pointerId, local(e));
   // Two fingers always move the plan: a second finger cancels whatever the first one started.
   if (pointers.size === 2 && toolDrag) { tool.cancelPointer(); toolDrag = false; }
@@ -215,10 +226,11 @@ stage.addEventListener('pointerdown', e => {
   if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = tool.pointerDown(local(e), e.pointerType); }
 });
 stage.addEventListener('pointermove', e => {
-  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e), e.shiftKey); return; }
+  if (e.pointerId === toolPointer || !pointers.size) tool.setModifiers(e.shiftKey, e.altKey);
+  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e)); return; }
   const prev = pointers.get(e.pointerId)!, p = local(e);
   pointers.set(e.pointerId, p);
-  if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p, e.altKey, e.shiftKey); return; }
+  if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p); return; }
   if (pinch && pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
     const m = mid(a, b);
@@ -239,7 +251,7 @@ function endPointer(e: PointerEvent) {
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
   pinch = null;
-  if (!moved) tool.tapEmpty();
+  if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
     if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30) {

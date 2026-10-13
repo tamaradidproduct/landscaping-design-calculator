@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, snapToGuides, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff, labelPoint, insidePolygon } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -109,28 +109,18 @@ describe('constrain45 (Shift)', () => {
   });
 });
 
-describe('snapToGuides', () => {
-  test('pulls into line with another corner (same column or row)', () => {
-    const s = snapToGuides({ x: 104, y: 300 }, null, null, [{ x: 100, y: 10 }], 6)!;
-    expect(s.point).toEqual({ x: 100, y: 300 }); expect(s.label).toBe('Aligned');
+describe('labelPoint / insidePolygon', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  test('label sits at the centre of a convex shape', () => {
+    expect(labelPoint(sq)).toEqual({ x: 5, y: 5 });
   });
-  test('both directions at once lands on the crossing', () => {
-    const s = snapToGuides({ x: 104, y: 203 }, null, null, [{ x: 100, y: 10 }, { x: 400, y: 200 }], 6)!;
-    expect(s.point).toEqual({ x: 100, y: 200 });
+  test('label stays inside an L-shape even when the centroid falls outside', () => {
+    const L = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 2 }, { x: 2, y: 2 }, { x: 2, y: 10 }, { x: 0, y: 10 }];
+    expect(insidePolygon(L, labelPoint(L))).toBe(true);
   });
-  test('squares the corner when the edge is within 3° of 90°', () => {
-    const s = snapToGuides({ x: 104, y: 80 }, { x: 0, y: 0 }, { x: 100, y: 0 }, [], 6)!; // ~2.9°
-    expect(s.point.x).toBeCloseTo(100, 9); expect(s.point.y).toBeCloseTo(80, 0); expect(s.label).toBe('90°');
-  });
-  test('continues straight when within 3° of the previous edge', () => {
-    const s = snapToGuides({ x: 180, y: 3 }, { x: 0, y: 0 }, { x: 100, y: 0 }, [], 6)!;
-    expect(s.point.y).toBeCloseTo(0, 9); expect(s.label).toBe('Straight');
-  });
-  test('square corner + alignment: lands where the square edge meets the aligned row', () => {
-    const s = snapToGuides({ x: 103, y: 152 }, { x: 0, y: 0 }, { x: 100, y: 0 }, [{ x: 400, y: 150 }], 6)!;
-    expect(s.point.x).toBeCloseTo(100, 9); expect(s.point.y).toBeCloseTo(150, 9);
-  });
-  test('nothing nearby: no snap', () => {
-    expect(snapToGuides({ x: 130, y: 77 }, { x: 0, y: 0 }, { x: 100, y: 0 }, [{ x: 10, y: 10 }], 6)).toBeNull();
+  test('inside / outside', () => {
+    expect(insidePolygon(sq, { x: 3, y: 4 })).toBe(true);
+    expect(insidePolygon(sq, { x: 11, y: 4 })).toBe(false);
+    expect(insidePolygon(sq, { x: -1, y: -1 })).toBe(false);
   });
 });
