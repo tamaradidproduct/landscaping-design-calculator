@@ -1,7 +1,8 @@
 // Steps 2a–2b: outline the plot boundary or the house, then set the scale from one printed edge length.
 // 2b adds snapping to what's drawn on the plan, angle/alignment hints (shown, never locked) and nudging.
 import {
-  OUTLINE_LABEL, areaPt2, dist, edgeLengthPt, formatArea, formatFeet, formatScale, guides, nearestEdge, parseFeet, percentOff,
+  OUTLINE_LABEL, areaPt2, bulgeToward, dist, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
+  outlinePath, parseFeet, percentOff,
   type Outline, type OutlineKind,
 } from './outline';
 import { History } from './history';
@@ -26,12 +27,14 @@ const CORNER_HIT = 24;      // screen px
 const EDGE_HIT = 16;        // screen px
 const TOUCH_OFFSET = 64;    // the point being placed sits this far above the finger
 const DOUBLE_TAP_MS = 350;
+const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 14;        // screen px: snap to the outlines' own corners first
 const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', house: 'var(--outline-house)' };
 
 type Drag =
   | { type: 'place'; finger: Point; offsetY: number }
-  | { type: 'corner'; kind: OutlineKind; i: number; grab: Point; moved: boolean };
+  | { type: 'corner'; kind: OutlineKind; i: number; grab: Point; moved: boolean }
+  | { type: 'bend'; kind: OutlineKind; i: number; grab: Point; moved: boolean };
 
 export class OutlineTool {
   outlines: Partial<Record<OutlineKind, Outline>> = {};
@@ -103,6 +106,7 @@ export class OutlineTool {
     const o = this.current(); if (!o || o.pts.length < 3) return;
     this.record();
     o.closed = true; this.drawing = null;
+    o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
     this.host.toast(this.ftPerPt
       ? `${OUTLINE_LABEL[o.kind]} outlined. Tap an edge to see its length.`
       : `${OUTLINE_LABEL[o.kind]} outlined. Now tap an edge and type its printed length to set the scale.`);
@@ -122,6 +126,14 @@ export class OutlineTool {
       this.selectedCorner = { kind: hit.kind, i: hit.i };
       this.dragBefore = this.snapshot();
       this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
+      return true;
+    }
+    const bend = this.drawing ? null : this.bendHandleAt(p);
+    if (bend) {
+      const m = this.host.toScreen(edgeMid(this.outlines[bend.kind]!.pts, bend.i, this.outlines[bend.kind]!.bulges));
+      this.drag = { type: 'bend', kind: bend.kind, i: bend.i, grab: { x: m.x - p.x, y: m.y - p.y }, moved: false };
+      this.dragBefore = this.snapshot();
+      this.rawAt = m; this.dragAt = m; this.snapped = null; this.selectedEdge = null; this.update();
       return true;
     }
     if (this.drawing) {
@@ -154,16 +166,29 @@ export class OutlineTool {
   private applyDrag() {
     const d = this.drag; if (!d || !this.rawAt) return;
     this.bypass = this.bypassKey || this.bypassFinger;
-    this.dragAt = this.resolve(this.rawAt, d.type === 'corner' ? d : undefined);
+    this.dragAt = this.resolve(this.rawAt, d.type === 'corner' ? d : undefined, d.type === 'bend');
     if (d.type === 'corner') this.outlines[d.kind]!.pts[d.i] = this.host.toPage(this.dragAt);
+    if (d.type === 'bend') {
+      // Bend edge i so its arc passes through the handle. Within 2 px of straight, keep it straight.
+      const o = this.outlines[d.kind]!, a = o.pts[d.i], b = o.pts[(d.i + 1) % o.pts.length];
+      const hgt = bulgeToward(a, b, this.host.toPage(this.dragAt));
+      o.bulges![d.i] = Math.abs(hgt) * this.host.pxPerPt() < 2 ? 0 : hgt;
+    }
     this.showMagnifier();
     this.render();
   }
 
   /** Where a point placed at screen position `raw` lands: own corners first, then the drawing, else free. */
-  private resolve(raw: Point, exclude?: { kind: OutlineKind; i: number }): Point {
+  private resolve(raw: Point, exclude?: { kind: OutlineKind; i: number }, lineOnly = false): Point {
     this.snapped = null;
     if (!this.snapOn || this.bypass) return raw;
+    if (lineOnly) {
+      // Bending: follow the drawn curve, so snap onto lines only (never to corners).
+      const n = SNAP_WINDOW, g = this.host.sampleLuminance(raw, n), hit = g && findImageSnap(g, { x: n / 2, y: n / 2 });
+      if (hit?.kind !== 'line') return raw;
+      this.snapped = 'line';
+      return { x: raw.x - n / 2 + hit.x, y: raw.y - n / 2 + hit.y };
+    }
     let best: Point | null = null, bd = OWN_SNAP;
     for (const o of Object.values(this.outlines)) {
       o?.pts.forEach((pt, i) => {
@@ -195,6 +220,11 @@ export class OutlineTool {
     const d = this.drag; this.drag = null;
     this.magnifier.hidden = true;
     if (!d) return;
+    if (d.type === 'bend') {
+      if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
+      else this.selectedEdge = { kind: d.kind, i: d.i }; // a tap on the handle opens the edge
+      this.dragBefore = null; this.dragAt = null; this.snapped = null; this.update(); return;
+    }
     if (d.type === 'corner') {
       // A tap (no drag) on a corner while drawing: the first corner closes the shape.
       // A tap (no drag) while drawing: the first corner closes the shape; a quick second tap on the
@@ -222,7 +252,7 @@ export class OutlineTool {
 
   /** A second finger arrived: abandon the single-finger action. */
   cancelPointer() {
-    if (this.drag?.type === 'corner' && this.drag.moved && this.dragBefore) this.history.record(this.dragBefore);
+    if ((this.drag?.type === 'corner' || this.drag?.type === 'bend') && this.drag.moved && this.dragBefore) this.history.record(this.dragBefore);
     this.dragBefore = null;
     this.drag = null; this.magnifier.hidden = true; this.dragAt = null; // a moved corner keeps where it got to
     this.render();
@@ -239,6 +269,14 @@ export class OutlineTool {
     if (changed || this.drawing) this.render();
   }
 
+  private bendHandleAt(p: Point): { kind: OutlineKind; i: number } | null {
+    let best: { kind: OutlineKind; i: number } | null = null, bd = BEND_HIT;
+    for (const o of Object.values(this.outlines)) {
+      if (!o?.closed) continue;
+      o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { kind: o.kind, i }; } });
+    }
+    return best;
+  }
   private cornerAt(p: Point): { kind: OutlineKind; i: number } | null {
     let best: { kind: OutlineKind; i: number } | null = null, bd = CORNER_HIT;
     for (const o of Object.values(this.outlines)) {
@@ -251,7 +289,7 @@ export class OutlineTool {
     const tol = EDGE_HIT / this.host.pxPerPt(), pp = this.host.toPage(p);
     for (const o of Object.values(this.outlines)) {
       if (!o?.closed) continue;
-      const i = nearestEdge(o.pts, pp, tol);
+      const i = nearestEdge(o.pts, pp, tol, o.bulges);
       if (i !== null) return { kind: o.kind, i };
     }
     return null;
@@ -260,13 +298,13 @@ export class OutlineTool {
   // ---------- Scale ----------
   setScaleFromEdge(kind: OutlineKind, i: number, feet: number) {
     this.record();
-    this.ftPerPt = feet / edgeLengthPt(this.outlines[kind]!.pts, i);
+    this.ftPerPt = feet / edgeLengthPt(this.outlines[kind]!.pts, i, this.outlines[kind]!.bulges);
     this.host.toast(`Scale set: ${formatScale(this.ftPerPt)}.`);
     this.selectedEdge = null;
     this.update();
   }
   private edgeFeet(kind: OutlineKind, i: number) {
-    return this.ftPerPt ? edgeLengthPt(this.outlines[kind]!.pts, i) * this.ftPerPt : null;
+    return this.ftPerPt ? edgeLengthPt(this.outlines[kind]!.pts, i, this.outlines[kind]!.bulges) * this.ftPerPt : null;
   }
 
   // ---------- Rendering ----------
@@ -282,13 +320,19 @@ export class OutlineTool {
       const drawingThis = this.drawing === o.kind;
       if (drawingThis && this.dragAt) pts.push(this.dragAt);
       else if (drawingThis && this.hoverAt && !this.drag) pts.push(this.hoverAt);
-      const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed ? ' Z' : '');
+      const line = o.closed ? outlinePath(o.pts, o.bulges, true).map(p => h.toScreen(p)) : pts;
+      const d = line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed ? ' Z' : '');
       svg += `<path d="${d}" class="shape${o.closed ? ' closed' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.kind !== o.kind || !o.closed) continue;
-        const a = h.toScreen(o.pts[e.i]), b = h.toScreen(o.pts[(e.i + 1) % o.pts.length]);
-        svg += `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="edge-hi" style="--c:${COLORS[o.kind]}"/>`;
+        const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
+        svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${COLORS[o.kind]}"/>`;
       }
+      if (o.closed && !this.drawing) o.pts.forEach((_, i) => {
+        // Edge middle handles: drag to bend the edge into an arc.
+        const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
+        svg += `<rect x="${m.x - 5}" y="${m.y - 5}" width="10" height="10" rx="2" class="bend-handle${bent ? ' bent' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+      });
       o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
         const closeTarget = drawingThis && i === 0 && o.pts.length >= 3;
@@ -382,7 +426,8 @@ export class OutlineTool {
     const ft = this.edgeFeet(e.kind, e.i);
     this.popover.innerHTML = `
       <div class="pop-head"><strong>${OUTLINE_LABEL[e.kind]} edge</strong><button type="button" class="icon" data-act="close" aria-label="Close">×</button></div>
-      <div class="pop-measure">${ft ? `Measures <b>${formatFeet(ft)}</b>` : 'No scale yet'}</div>
+      <div class="pop-measure">${ft ? `Measures <b>${formatFeet(ft)}</b>${this.outlines[e.kind]!.bulges?.[e.i] ? ' along the curve' : ''}` : 'No scale yet'}</div>
+      ${this.outlines[e.kind]!.bulges?.[e.i] ? '<button type="button" data-act="straighten">Make straight</button>' : '<p class="pop-hint">Drag the square in the middle of the edge to curve it.</p>'}
       <form class="pop-form">
         <label for="edge-len">Printed length on the plan</label>
         <div class="row"><input id="edge-len" inputmode="decimal" autocomplete="off" placeholder="e.g. 116.45 or 116' 5&quot;" />
@@ -391,6 +436,8 @@ export class OutlineTool {
       </form>`;
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
+    const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
+    if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.kind]!.bulges![e.i] = 0; this.update(); };
     const form = this.popover.querySelector('form')!;
     form.onsubmit = ev => {
       ev.preventDefault();
@@ -425,7 +472,7 @@ export class OutlineTool {
       const closed = Object.values(this.outlines).filter(x => x?.closed) as Outline[];
       if (!closed.length) { p.hidden = true; return; }
       const b = this.outlines.boundary?.closed ? this.outlines.boundary : null;
-      const area = b && this.ftPerPt ? areaPt2(b.pts) * this.ftPerPt * this.ftPerPt : null;
+      const area = b && this.ftPerPt ? areaPt2(b.pts, b.bulges) * this.ftPerPt * this.ftPerPt : null;
       const off = area && this.printedLotSqft ? percentOff(area, this.printedLotSqft) : null;
       p.innerHTML = `
         <p class="panel-text">${this.ftPerPt ? `Scale: <b>${formatScale(this.ftPerPt)}</b>. Tap or hover an edge to see its length.` : 'Tap an edge and type its printed length to set the scale.'}</p>

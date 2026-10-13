@@ -1,126 +1,146 @@
 # PRD — Landscaping Plan Builder for Contractors (working name)
 
-> Status: **Draft v0.5 — direction reset 2026-10-12.** Sections 1–3 rewritten; everything from §4 down describes the **parked Figma-takeoff prototype** (branch `feat/figma-takeoff-hardening`) and is kept for reference only.
-> Legend: ✅ confirmed by stakeholder · 🔍 inferred · ❓ open question
+> Status: **v0.6 — 2026-10-12.** Sections 1–8 are the current requirements. Appendix A keeps the archived Figma-takeoff spec (code archived as git tag `archive/figma-takeoff-hardening`); Appendix B is the full decision log.
+> Legend: ✅ decided · 🔨 built · ❓ open · 📝 later
 
 ## 1. Problem & vision
-- ✅ Reset reason: the Figma-based takeoff was **too Figma-dependent** — a designer had to be in the loop.
-- ✅ Core pain: contractors **can't produce a plan at all** — they lack design tools/skills.
-- ✅ Vision: contractors build a scaled landscape plan themselves, **on site on a tablet**, starting from the homeowner's **plot plan PDF**, using a library of landscaping symbols; quantities come out of the drawing.
-- ✅ Not related to the Front Range Yards HOA-plan service.
+- Contractors **can't produce a landscape plan** — they lack design tools and skills — so they lose jobs, quote loosely and hand crews vague instructions.
+- Vision: on site, on a **tablet**, a contractor turns the homeowner's **plot plan PDF** into a scaled, professional plan by drawing over it with a built-in symbol library; quantities and a priced proposal fall out of the drawing.
+- Must not depend on Figma or a designer in the loop (reason for the reset). Not related to the Front Range Yards HOA-plan service.
 
-## 2. Users
-- ✅ **Primary:** landscaping contractors / installers.
-- ✅ Context: on site with the homeowner, on a tablet.
-- ❓ Homeowners (DIY) — still a future audience?
+## 2. Users & context
+- **Primary:** landscaping contractors / installers. ❓ Homeowners (DIY) as a later audience.
+- **Context:** on site with the homeowner, ~30–60 min, tablet (iPad or Android, any browser), often **offline**.
+- Plot plans arrive **mostly as vector PDFs** (builder/surveyor exports); scans/photos also exist.
+- ❓ No pilot contractor yet.
 
 ## 3. Jobs to be done
-- ✅ **Win the job** — show the homeowner a professional proposal.
-- ✅ **Accurate quoting** — quantities for their own bid.
-- ✅ **Crew instructions** — install guide for the field.
-- ✅ Starting input: the homeowner's plot plan PDF (closing documents).
-- ✅ HOA submission: nice to have, not a driver.
+- **Win the job** — show the homeowner a professional plan and proposal.
+- **Quote accurately** — quantities for their own bid.
+- **Instruct crews** — install guide for the field.
+- HOA submission: nice to have, not a driver.
 
-## 3b. Key flows (draft)
-### Scaled base from plot plan PDF ✅ (explore all three, in this order)
-1. **Trace the lot** — draw property lines / house by entering measurements.
-2. **Auto-detect scale** — read scale bar or dimensions from the PDF.
-3. **Fallback: known dimension** — tap two points on a printed dimension, enter its length.
-### Drawing ✅
-- Simple: draw zones and fill with a material; tap to drop plants/objects from the symbol library. No freeform vector editing.
-### Outputs ✅
-- **Plan sheet** in the style of the Servin example (branded header, drawing, annotation/plant list).
-- **Priced proposal** — quantities × contractor's prices. ⚠️ Pricing is now IN scope (the parked prototype excluded it).
-- HOA: nice to have — the plan sheet may double as an HOA submission; not a driver.
+## 4. Workflow
+1. **Open the plot plan** — contractor picks the PDF on site. 🔨 Step 1
+2. **Outline, then set the scale** — trace the plot boundary or a structure, type one printed edge length; other edges and the lot area confirm it. 🔨 Steps 2a–2c
+3. **Draw the design** — fill zones with materials (lot starts as one default material; zones carve into it), drop plants/objects from the library, mark existing features, edging/walls as lines, plant-spacing fill, dimension labels. ❓ to be defined step by step
+4. **Price** from the contractor's own price list. ⏸ deferred
+5. **Present** — plan sheet first, then the price. **Send a PDF.**
+- After the first proposal (versions, tiers, crew sheets): 📝 later.
 
-### Pricing ⏸ (deferred — focus is the editor)
-- Contractor maintains their **own price list** (unit price per sq ft / linear ft / each), reused across jobs.
-### Library ✅
-- **Built-in shared library** — the Landscaping symbols set ported into the app; contractors don't add their own items (for now).
-### Delivery ✅
-- Proposal delivered as a **PDF** (plan sheet + priced proposal).
-### Validation ❓
-- No pilot contractor yet — recruiting is an open task (Servin used only as a visual reference).
+## 5. Build steps
+| Step | What | Status | Branch |
+|---|---|---|---|
+| 1 | Open a plot plan PDF: fills the screen, pinch/zoom/pan, sharp when zoomed, offline | 🔨 done | `feat/plan-builder` |
+| 2a | Outline boundary or house; set scale from one edge; edge lengths on hover/tap; area vs printed lot size | 🔨 done | `feat/plan-builder` |
+| 2b | Snapping to the plan's lines/corners; 90°/straight/alignment hints (never locked); snap toggle + Option/second-finger bypass; nudge | 🔨 done | `feat/plan-builder` |
+| — | Undo/redo (⌘Z / ⇧⌘Z, toolbar buttons), including dots of an unfinished outline | 🔨 done | `feat/plan-builder` |
+| 2c | Curved edges: drag an edge's middle handle to bend it into an arc; "Make straight"; lengths and area follow the curve | 🔨 done, in review | `feat/plan-builder-2c-curves` |
+| 3 | Designing on the plan (zones, symbols, existing features…) | ❓ next to define | — |
 
-### End-to-end workflow ✅ (draft)
-1. **Create job on site** — contractor enters client name/address and uploads the plot plan PDF from the tablet.
-2. **Scale the base** (trace → auto-detect → known-dimension fallback).
-3. **Draw** zones + drop symbols — contractor drafts alone.
-4. **Price** from the contractor's price list.
-5. **Present at the end** — homeowner sees the finished plan + proposal (not co-designed live).
-6. **Send PDF.**
-- ✅ Whole session on site, ~30–60 min, with the homeowner present.
-- ✅ After the first proposal: nothing yet (no versions, tiers, or job conversion in scope).
+## 6. Current requirements, by area
+### 6.1 Viewing the plan ✅🔨
+- Pick the PDF from the tablet's file picker; it stays on the device. Page 1 only (multi-page: 📝 later).
+- Opens in about a second once the app has warmed up. Rendering uses **PDFium** (WebAssembly): PDF.js took ~12 s on a real plan whose text is drawn as shapes.
+- Pinch/scroll-pinch zooms; one finger or two-finger trackpad drag pans; **panning is free** (not limited to the page). Double-tap zooms in / back to fit.
+- Works **offline** after the first load.
+- 📝 Replace "Open another" with an **edit button next to the file name** (low priority; ❓ edit = rename or replace the file).
 
-### Step details ✅
-- **Trace:** contractor taps the property-line and house corners on the PDF image, then types each edge's length → this sets the scale.
-- **Draw** captures: zones with materials; symbols; **existing features** (house, driveway, patio — not billed); **edging & walls** as lines; **plant spacing fill** (fill a bed with a plant at a spacing, auto-count); **dimension labels**.
-- **Offline:** internet is often unavailable on site → the full on-site workflow must work **offline**, with sync later.
-- **Presenting:** show the plan sheet first, then the price.
+### 6.2 Outlining ✅🔨
+- **Pure drawing** — works the same for vector PDFs and scans; never relies on the PDF's vector data.
+- Outline kinds now: plot boundary, house. 📝 More kinds later: other existing structures and surfaces (driveway, patio, deck…).
+- Placing: tap corners. On touch the point sits **above the finger** with a **magnifier**.
+- Closing: **Close shape** button, **double-tap/double-click**, or tap the first corner.
+- Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
+- **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, or **hold Option/Alt or a second finger** to place freely.
+- **Guides are hints only, never locks**: 90°, straight-on, and alignment with other corners.
+- **Curves:** drag the square at an edge's middle to bend it into an arc (snaps onto the drawn curve); "Make straight" in the edge's popover.
+- **Undo/redo** for every step, including each dot of an unfinished outline.
 
-### Editor ✅
-- **Zone drawing input:** to be prototyped — likely a combination of tap corners, freehand trace (smoothed), tap-then-bend curves, and paint-bucket fill inside existing lines.
-- **Curves are essential** — natural bed and lawn edges.
-- **Zone model: default fill** — the whole lot starts as one material (e.g. rock); zones carve into it. (Matches the parked prototype's "visible area" math.)
-- **v1 editing must-haves:** undo/redo · move/reshape points · snap (lot lines, house edges, other zones) · copy/repeat symbols.
-- **Library picker:** search + category tabs (surfaces, plants, objects).
-- **Symbol size:** true mature size at plan scale (plant spread → symbol diameter). ❓ Requires mature-spread data per plant in the library.
-- **Quantities while drawing:** shown on selection (tap a zone/symbol to see its area/count); no always-on totals panel.
-- **Platform:** web app for any tablet browser (iPad + Android); offline-capable (PWA implied).
+### 6.3 Scale & checks ✅🔨
+- Tap an edge, type its printed length (`116.45`, `116' 5"`) → scale (shown as "1 in on paper = 30.0 ft").
+- Edge lengths appear only on **hover or tap**; curved edges measure along the curve.
+- Plot area is shown; type the printed lot size to see the % difference.
+- Accuracy target: **within 1%** of printed dimensions.
+- 📝 Later calibration methods: trace-the-lot with typed lengths for every edge; reading the printed scale (unreliable: Riesberg prints both 1"=30' and 1"=20'; only 1"=30' is right) — would need OCR, as plan text is often drawn as shapes.
 
-## 3a. Superseded by the reset
-- Figma as design source; designer-run takeoff; Figma token handling.
-- Everything below this line is the parked prototype's spec.
+### 6.4 Library ✅
+- Built-in shared library (the Landscaping symbols set). Plant symbols at **true mature size**. Picker: search + categories. ❓ Mature-spread data per plant.
+
+### 6.5 Outputs ✅ (not built)
+- Plan sheet in the style of the Servin example + priced proposal, as a **PDF**.
+
+### 6.6 Platform ✅
+- Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
+- Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
+
+## 7. Validation so far (Riesberg plot plan, 1" = 30')
+- Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
+- Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
+- Lot area with the curve → **13,597 sq ft** vs printed 13,504 (+0.7%).
+- Snapping: taps ~9 px off the three test corners landed 0.4–1.8 px from the drawn corner; ~79% of 24 real-pixel samples land within 2.5 px (misses in dense hatching).
+- Not yet tested with real touch on a tablet.
+
+## 8. Open questions
+- ❓ Step 3 scope: which design tools first (material zones, plant symbols, existing features)?
+- ❓ Homeowners (DIY) as a later audience?
+- ❓ Saving jobs: on-device only, or sync/accounts?
+- ❓ Multi-page plot plans; edit-name button meaning.
+- ❓ Pilot contractor recruitment; business model; success measure.
+- ❓ Mature-spread data for plant symbols.
 
 ---
 
-## 4. Current capabilities (as built) 🔍
-### 4.1 Connect design
+# Appendix A — Archived: Figma-takeoff spec (superseded 2026-10-12)
+> Kept for context only. Code: git tag `archive/figma-takeoff-hardening`.
+
+## A.4 Current capabilities (as built) 🔍
+### A.4.1 Connect design
 - Paste Figma Personal Access Token + frame URL (must include `node-id`).
 - Frame rendered as PNG at 1x; layer tree parsed via Figma REST API.
 - Layers starting with `.` skipped; hidden layers excluded; locked layers hidden by default (toggle).
 
-### 4.2 Measure
+### A.4.2 Measure
 - Per layer: **Area** (count opaque pixels of exported layer PNG) or **Length** (vector path length; fallback = half boundary pixels).
 - Custom polygon drawing on canvas → area or length.
 - Global scale input `pixels per foot` (default **12**).
 - Component/instance layers auto-counted as **Object Inventory** (by layer name).
 
-### 4.3 Classify
+### A.4.3 Classify
 - Hardcoded list of 11 generic materials (Decorative rock, Seating wall, Stamped/Brushed concrete, Artificial turf, Sod, Mulch, Pavers, Wood/Composite decking, Gravel).
 - Auto-suggest material from Figma fill/stroke **style name**; manual override via side sheet.
 
-### 4.4 Summarize & export
+### A.4.4 Summarize & export
 - Totals per material: sq ft, linear ft, counts.
 - Google sign-in → append `[material, value, unit]` rows to a user-supplied Sheet; Sheet ID saved per user in Firestore. ✅ **Sheets export to be removed; sign-in kept for sync.**
 - Copy-as-CSV exists but has no button; "Export Report" button is a placeholder.
 
-### 4.5 Not persisted
+### A.4.5 Not persisted
 - Measurements, material assignments, scale — lost on reload.
 
-## 5. Domain conventions
+## A.5 Domain conventions
 - ✅ Scale convention: **1 px = 1 inch** (= 12 px/ft; matches app default). Plot plans are calibrated to this before drafting (see `landscaping-plan-scale-calibration` skill).
 - 🔍 Symbol library ("Landscaping symbols", Servin; Figma `0B2UpvIGBFOE1ZEDx8rXPR`): ~47 plants, 44 surfaces, 17 objects. Each item has a **measurement class: count | area | linear**.
 - 🔍 Library names ≠ card titles, and some have typos (`Blue arrrow juniper`, `Perrenials`) — matching must use main-component names.
 - ✅ **Library is source of truth** for materials and measurement type; replaces the 11 hardcoded materials. Measurement class (count/area/linear) decides how each item is measured — no manual Area/Length choice for library items.
 
-## 6. Goals & success metrics
+## A.6 Goals & success metrics
 - ✅ Accuracy target: **±5%** vs. true quantity (overage covers the rest).
 - ✅ Success = **manual validation** by the stakeholder against known plans (Pennycress first).
 
-## 7. Scope
-### 7.1 In scope (now)
+## A.7 Scope
+### A.7.1 In scope (now)
 - ✅ Raw quantities only (sq ft, linear ft, counts).
-### 7.2 Explicitly out of scope (now)
+### A.7.2 Explicitly out of scope (now)
 - ✅ Waste/overage factors, unit conversions (cu yd, pallets, tons), pricing, labor estimates.
-### 7.3 Next milestone — ✅ "Harden the Figma prototype"
+### A.7.3 Next milestone — ✅ "Harden the Figma prototype"
 - Library-driven classification (count / area / linear from symbol library).
 - Accuracy fixes to hit ±5%.
 - PDF bid sheet output.
 - Remove Google Sheets export; keep Google sign-in + Firestore for profile/project sync.
 - ✅ Persistence: **local save** signed-out; **Firestore sync** when signed in with Google.
 
-## 7a. Output: PDF bid sheet ✅
+## A.7a Output: PDF bid sheet ✅
 - ✅ **App builds both pages** (not exported from Figma).
 - ✅ Structure: **page 1 = plan sheet, page 2 = bid table** (line item, qty, unit, blank unit price, blank total).
 - ✅ Header branding is **per contractor** (Servin Landscaping is an example customer).
@@ -134,7 +154,7 @@
 - 🔍 Example sheet structure: Header band (400px) → drawing (1775w) + Annotations column (1141w): Surfaces swatches, Plants cards (symbol, name, category, qty, water table, photo), Water consumption summary, Objects, Footer (scale bar 1"=12', version info).
 - 🔍 Gap in example: surfaces show swatches **without quantities** (only sod has 772 sq ft) — the bid sheet must add them.
 
-## 7b. Input: Figma source frame ✅
+## A.7b Input: Figma source frame ✅
 - Designer provides a link to a **drawing-only source frame** (long-term: equivalent drawn in-app).
 - Reference example: Figma `dInKvof2isrTso3C8gb4T5`, node `117:11887` (858×2148 px; house 60 ft = 722 px ✓ 1 px = 1 in).
 - ✅ Surfaces drawn as **vector shapes with image (texture) fills**.
@@ -151,8 +171,8 @@
   - Drafting aids (Outlines, Measurements, Corners, text) must be ignored.
   - Example plan sheet reports sod = 772 sq ft and plant counts → candidate ground truth.
 
-## 8. Requirements
-### 8.1 Functional
+## A.8 Requirements
+### A.8.1 Functional
 | ID | Requirement | Pri |
 |---|---|---|
 | F1 | Load a Figma source frame from a URL (+ PAT); ignore drafting aids (outlines, measurements, corners, text) | P0 |
@@ -175,24 +195,27 @@
 | F13 | Manual polygon plotting for items not in Figma (existing feature) | P2 |
 | F14 | Remove Google Sheets export and the `spreadsheets` OAuth scope | P0 |
 | F19 | Google sign-in syncs contractor profile + saved projects to Firestore; signed-out users keep local save | P0 |
-### 8.2 Accuracy
+### A.8.2 Accuracy
 - ✅ ±5% on area and length.
 - ✅ Acceptance test: Pennycress source (`117:11887`) must reproduce the example sheet — sod ≈ 772 sq ft; Blue Diamond Spruce 1, Eastern Redbud 1, Crabapple 1, Lilac 1, Hydrangea 5, Fernbush 8, Columbine 11, White Nugget 26; Sitting wall 1.
 - 🔍 Current gaps vs. target: curve lengths approximated as chords; raster boundary length overestimates diagonals; scale changes don't recompute.
-### 8.3 Non-functional
+### A.8.3 Non-functional
 - ✅ Desktop + tablet browsers; **full workflow on tablet** (touch-friendly canvas, controls ≥44px).
 - Google sign-in (Firebase Auth) for cloud sync; app fully usable signed-out with local save.
 - Figma token from build-time env var; no token entry UI.
 
-## 9. Known gaps / tech debt
+## A.9 Known gaps / tech debt
 - Code review 2026-10-12: scale=0 crash; scale change doesn't recompute; duplicate rows on re-export; PAT in localStorage; broad Sheets scope; Firestore test read always denied; placeholder UI (fake feed / memory / status bar); Length button no-op with 2 points; no double-click finish.
 
-## 10. Open questions
+## A.10 Open questions
 - ✅ Edging marking: to be explored in a prototype.
 - ❓ Edging material — one default or per marked edge?
 - ✅ Figma token: build-time variable for now (`VITE_FIGMA_PAT`); no token UI. Will go away with the in-app editor.
 
-## 11. Interview log
+
+---
+
+# Appendix B — Decision log
 ### Round 1 (2026-10-12)
 - ✅ Primary user: contractors / installers.
 - ✅ Output serves: estimate/quote, ordering, install planning, design iteration.
@@ -388,3 +411,7 @@
 - ✅ Parked Figma-takeoff code **archived** as git tag `archive/figma-takeoff-hardening` (branch removed); its requirements stay in this PRD for context.
 - ✅ Each build step now gets its own branch off `feat/plan-builder`.
 - ✅ **Undo/redo** (branch `feat/plan-builder-undo`): ⌘Z / Ctrl+Z undoes, ⇧⌘Z / Ctrl+Shift+Z (or Ctrl+Y) redoes; toolbar Undo/Redo buttons for touch. Works mid-outline (each placed dot is a step), and on close, corner drags, nudges (consecutive nudges of one corner = one step), starting/cancelling an outline and setting the scale. Text fields keep their own undo.
+
+### Step 2c — built (2026-10-12)
+- Drag the square at the middle of any edge of a closed outline to bend it into a circular arc through that point; the handle snaps onto drawn lines (never corners) so it follows the plan's curve. Tapping the handle opens the edge; "Make straight" undoes a bend. Corner drags keep the bend. Undo/redo cover bends.
+- Riesberg: street curve 62.03′ vs printed 62.02′; lot area 13,597 vs printed 13,504 sq ft (+0.7%, within the 1% target; was +1.7% with the edge straight).

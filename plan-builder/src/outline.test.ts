@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, edgeLengthPt, formatFeet, formatScale, guides, nearestEdge, parseFeet, percentOff } from './outline';
+import { areaPt2, bulgeToward, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -53,5 +53,44 @@ describe('guides', () => {
     const g = guides(null, null, { x: 51, y: 300 }, [{ x: 50, y: 10 }, { x: 400, y: 299 }], 2);
     expect(g.alignX).toEqual({ x: 50, y: 10 });
     expect(g.alignY).toEqual({ x: 400, y: 299 });
+  });
+});
+
+describe('curved edges (bend)', () => {
+  test('arc length through 3 points: a half circle', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 1, y: 5 }];
+    expect(edgeLengthPt(pts, 0, [1, 0, 0])).toBeCloseTo(Math.PI, 9);
+    expect(edgeLengthPt(pts, 0, [-1, 0, 0])).toBeCloseTo(Math.PI, 9);
+  });
+  test('a tiny bulge is nearly the chord', () => expect(edgeLengthPt([{ x: 0, y: 0 }, { x: 100, y: 0 }], 0, [0.001])).toBeCloseTo(100, 4));
+  test('bending an edge outward adds the circular segment to the area', () => {
+    const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+    // bottom edge (10,10)→(0,10) bulges down (away from the square) into a half circle of radius 5
+    const out = areaPt2(sq, [0, 0, bulgeToward(sq[2], sq[3], { x: 5, y: 15 }), 0]);
+    expect(out).toBeCloseTo(100 + Math.PI * 25 / 2, 1);
+    const inward = areaPt2(sq, [0, 0, bulgeToward(sq[2], sq[3], { x: 5, y: 5 }), 0]);
+    expect(inward).toBeCloseTo(100 - Math.PI * 25 / 2, 1);
+  });
+  test('bulgeToward measures how far a point sits off the chord, with side', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 };
+    expect(Math.abs(bulgeToward(a, b, { x: 5, y: 3 }))).toBeCloseTo(3, 9);
+    expect(Math.sign(bulgeToward(a, b, { x: 5, y: 3 }))).toBe(-Math.sign(bulgeToward(a, b, { x: 5, y: -3 })));
+  });
+  test('edge midpoint sits on the arc', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, h = bulgeToward(a, b, { x: 5, y: 4 });
+    const m = edgeMid([a, b], 0, [h]);
+    expect(m.x).toBeCloseTo(5, 9); expect(m.y).toBeCloseTo(4, 9);
+  });
+  test('nearest edge follows the curve', () => {
+    const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+    const b = [0, 0, bulgeToward(sq[2], sq[3], { x: 5, y: 15 }), 0];
+    expect(nearestEdge(sq, { x: 5, y: 14.8 }, 0.5, b)).toBe(2);
+    expect(nearestEdge(sq, { x: 5, y: 10 }, 0.5, b)).toBeNull();
+  });
+  test('sampled outline path includes the arc', () => {
+    const p = outlinePath([{ x: 0, y: 0 }, { x: 2, y: 0 }], [1], false);
+    expect(p[0].x).toBeCloseTo(0, 9); expect(p[0].y).toBeCloseTo(0, 9);
+    expect(p.at(-1)!.x).toBeCloseTo(2, 9);
+    expect(Math.max(...p.map(q => Math.abs(q.y)))).toBeCloseTo(1, 2);
   });
 });
