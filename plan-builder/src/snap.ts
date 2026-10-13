@@ -4,14 +4,14 @@
 // least-squares fit, then snap to their intersection (a corner) or onto the nearest line.
 import type { Point } from './view';
 
-export const SNAP_WINDOW = 48;      // window side, screen px
+export const SNAP_WINDOW = 64;      // window side, screen px (wide enough to pull from ~26 px away)
 const DARK = 140;                   // luminance below this counts as ink
-const MIN_VOTES = SNAP_WINDOW * 0.4; // a line must cover ~40% of the window: rejects letters and digits
-const CORNER_RADIUS = 18;           // screen px from the point
-const LINE_RADIUS = 11;
+const MIN_VOTES = 19;               // ink pixels a line needs: rejects letters and digits
+const CORNER_RADIUS = 26;           // screen px from the point: corners pull from this far
+const LINE_RADIUS = 14;
 const INLIER = 2.5;
 const MAX_GAP = 2.5;                // a drawn line is continuous: gaps longer than this end its stretch
-const MIN_RUN = SNAP_WINDOW * 0.3;  // and runs at least this far without a gap (rejects lettering that happens to line up)
+const MIN_RUN = 14.4;               // and runs at least this far (screen px) without a gap (rejects lettering that happens to line up)
 let PURITY = 0.7, LOOSE = 3.5;   // purity test for lettering vs. drawn lines (see strongestLine)
 /** For tuning only. */
 export function tuneSnap(purity: number, loose: number) { PURITY = purity; LOOSE = loose; }

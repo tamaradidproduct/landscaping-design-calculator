@@ -41,7 +41,7 @@ for (const k of ['TL', 'TR', 'BL']) {
 await page.screenshot({ path: `${outDir}/step2b.png` });
 
 // Option/Alt held: place freely.
-await page.click('#panel [data-act=undo]');
+await page.click('#undo');
 const bl = await toScreen(C.BL);
 await page.keyboard.down('Alt');
 await page.mouse.move(bl[0] + OFF[0], bl[1] + OFF[1]); await page.mouse.down();
@@ -56,7 +56,7 @@ const after = (await corners()).at(-1);
 results.push(['Arrow key nudges 1 px', `moved ${(before[0] - after[0]).toFixed(2)} px left`]);
 
 // Snap toggle off: place freely without a key.
-await page.click('#panel [data-act=undo]');
+await page.click('#undo');
 await page.click('#snap');
 await page.mouse.click(bl[0] + OFF[0], bl[1] + OFF[1]); await page.waitForTimeout(150);
 results.push(['Snap off: placed freely', `lands ${err((await corners()).at(-1), [bl[0] + OFF[0], bl[1] + OFF[1]])} px from the click · button says "${await page.textContent('#snap')}"`]);

@@ -83,3 +83,6 @@ button:disabled { opacity: 0.45; cursor: default; }
 .overlay .bend-handle { fill: var(--surface); stroke: var(--c); stroke-width: 1.5; opacity: 0.85; }
 .overlay .bend-handle.bent { fill: var(--c); }
 .popover .pop-hint { margin: 0; font-size: 14px; color: var(--muted); }
+
+.overlay .snap-halo { fill: color-mix(in srgb, #d0349a 18%, transparent); stroke: #d0349a; stroke-width: 1.5; }
+.overlay .hover-dot { fill: #d0349a; }

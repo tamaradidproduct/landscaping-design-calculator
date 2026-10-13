@@ -12,7 +12,7 @@ describe.skipIf(!has)('snapping on the Riesberg plot plan', () => {
   test('most taps 6–10 px off a property corner land on it (within 2.5 px)', () => {
     const windows: { name: string; corner: [number, number]; lum: number[] }[] = JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
     const hits = windows.filter(w => {
-      const s = findImageSnap(Float32Array.from(w.lum), { x: 24, y: 24 });
+      const s = findImageSnap(Float32Array.from(w.lum), { x: 24, y: 24 }, 48);
       return s?.kind === 'corner' && Math.hypot(s.x - w.corner[0], s.y - w.corner[1]) < 2.5;
     });
     expect(hits.length / windows.length).toBeGreaterThanOrEqual(0.75);

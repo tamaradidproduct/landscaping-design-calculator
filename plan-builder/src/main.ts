@@ -77,6 +77,9 @@ const tool = new OutlineTool({
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
 
+window.addEventListener('keydown', e => { if (e.key === 'Shift') tool.setShift(true); });
+window.addEventListener('keyup', e => { if (e.key === 'Shift') tool.setShift(false); });
+
 $('undo').onclick = () => tool.undo();
 $('redo').onclick = () => tool.redo();
 
@@ -211,10 +214,10 @@ stage.addEventListener('pointerdown', e => {
   if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = tool.pointerDown(local(e), e.pointerType); }
 });
 stage.addEventListener('pointermove', e => {
-  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e)); return; }
+  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e), e.shiftKey); return; }
   const prev = pointers.get(e.pointerId)!, p = local(e);
   pointers.set(e.pointerId, p);
-  if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p, e.altKey); return; }
+  if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p, e.altKey, e.shiftKey); return; }
   if (pinch && pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
     const m = mid(a, b);

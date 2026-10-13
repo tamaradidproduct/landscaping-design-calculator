@@ -55,6 +55,8 @@
 - Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
 - **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, or **hold Option/Alt or a second finger** to place freely.
 - **Guides are hints only, never locks**: 90°, straight-on, and alignment with other corners.
+- **Snap gravity:** corners pull from ~26 px (outline corners from ~22 px); once snapped, the point **stays put** until the pointer moves ~34 px away or a closer target appears; with a mouse, the **snap preview shows before clicking** (halo + label).
+- **Shift** (while placing or dragging a corner) locks the edge from the previous corner to **45° steps** (0°, 45°, 90°… on screen) and shows the angle.
 - **Curves:** drag the square at an edge's middle to bend it into an arc (snaps onto the drawn curve); "Make straight" in the edge's popover.
 - **Undo/redo** for every step, including each dot of an unfinished outline.
 
@@ -428,3 +430,8 @@
 - ✅ Feature names are typed by the contractor (custom); any number of features.
 - ✅ Look: grey fill + label.
 - ✅ House merges into existing features (a feature named "House").
+
+### Round 28 — snap feel & Shift (2026-10-13)
+- ✅ Snapping must feel stronger ("more gravity"): wider pull, sticky targets, snap preview on hover.
+- ✅ Hold **Shift** while outlining to draw at 45° increments.
+- Riesberg: approaching the top-left corner, the preview locks onto it from 12 px and holds; click lands 0.5 px from the drawn corner. Shift at ~10° → 0°; at ~43° → exact 45° diagonal.

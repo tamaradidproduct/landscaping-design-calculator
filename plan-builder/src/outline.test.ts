@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -92,5 +92,19 @@ describe('curved edges (bend)', () => {
     expect(p[0].x).toBeCloseTo(0, 9); expect(p[0].y).toBeCloseTo(0, 9);
     expect(p.at(-1)!.x).toBeCloseTo(2, 9);
     expect(Math.max(...p.map(q => Math.abs(q.y)))).toBeCloseTo(1, 2);
+  });
+});
+
+describe('constrain45 (Shift)', () => {
+  const a = { x: 100, y: 100 };
+  test('locks to the nearest of 0°, 45°, 90°… keeping the distance along that direction', () => {
+    const h = constrain45(a, { x: 200, y: 108 });
+    expect(h.point.y).toBeCloseTo(100, 9); expect(h.point.x).toBeCloseTo(200, 9); expect(h.angle).toBe(0);
+    const d = constrain45(a, { x: 160, y: 50 }); // up and to the right on screen
+    expect(d.point.x - a.x).toBeCloseTo(a.y - d.point.y, 9); expect(d.angle).toBe(45);
+    expect(constrain45(a, { x: 160, y: 150 }).angle).toBe(315); // down and to the right
+    const v = constrain45(a, { x: 96, y: 20 });
+    expect(v.point.x).toBeCloseTo(100, 9); expect(v.angle).toBe(90);
+    expect(constrain45(a, { x: 40, y: 103 }).angle).toBe(180);
   });
 });

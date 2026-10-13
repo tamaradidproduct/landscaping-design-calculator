@@ -133,3 +133,14 @@ export function guides(prevprev: Point | null, prev: Point | null, p: Point, oth
   const near = (f: (o: Point) => number) => others.reduce<Point | null>((best, o) => (Math.abs(f(o)) <= tolPx && (!best || Math.abs(f(o)) < Math.abs(f(best))) ? o : best), null);
   return { rightAngle, straight, alignX: near(o => o.x - p.x), alignY: near(o => o.y - p.y) };
 }
+
+/**
+ * Shift-drawing: the point constrained to the nearest 45° direction from the anchor (screen px,
+ * angles measured on screen, y up), keeping its distance along that direction.
+ */
+export function constrain45(anchor: Point, p: Point): { point: Point; angle: number } {
+  const dx = p.x - anchor.x, dy = p.y - anchor.y;
+  const step = Math.PI / 4, ang = Math.round(Math.atan2(-dy, dx) / step) * step;
+  const ux = Math.cos(ang), uy = -Math.sin(ang), len = Math.max(0, dx * ux + dy * uy);
+  return { point: { x: anchor.x + ux * len, y: anchor.y + uy * len }, angle: ((Math.round(ang / step) * 45) % 360 + 360) % 360 };
+}
