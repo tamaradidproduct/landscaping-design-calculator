@@ -304,3 +304,12 @@
 ### Round 20 — zone prototype feedback (2026-10-12)
 - ❌ Zone Drawing Lab prototype judged **unusable**: couldn't draw at all; too many modes at once; plan too small to see; wrong starting point (should start from the plot plan / lot setup).
 - ✅ Process change: go **slowly, one step at a time**, agreeing on each step before building it. Next step: the first screen of the workflow (job + plot plan → scaled base).
+
+### Step 1 — Open the plot plan (agreed 2026-10-12)
+- **Scope:** contractor picks the plot plan PDF from the tablet; it fills the screen; pinch to zoom and pan. Nothing else (no job info, no page picker, no drawing).
+- **Done when:**
+  - PDF opens in under a few seconds.
+  - Fills the screen and stays sharp when zoomed (printed dimensions readable).
+  - Pinch-zoom and pan feel smooth, like a photo viewer.
+  - Works offline once the app is loaded.
+- **Test file:** a real plot plan PDF supplied by the stakeholder (path TBD).
