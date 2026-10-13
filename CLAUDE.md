@@ -19,8 +19,12 @@ Read by the `dev-setup` skill. Unknown values are marked `TODO`.
   - **Test Runs:** `tblsa6DH6parJzkBR`
   - **Deployments:** `tblbkFgm1fExMEyc5`
   - **Requirements:** `tblh0hQyqs0SlpcCs`
-- **Deploy webhook:** `AIRTABLE_DEPLOY_WEBHOOK` secret — TODO (Airtable automation not created yet; the staging step skips until set)
-- **`qa-flagged` issue automation:** TODO (not created yet)
+- **Findings issue-number match:** `GitHub Issue # (text)` (text copy used by the deploy automation)
+- **Airtable automations** (created off; turn on in Airtable):
+  - `Record successful staging deployment` — webhook from `deploy-staging.yml` (`AIRTABLE_DEPLOY_WEBHOOK` secret); creates a Deployments record and moves Findings named in `issue_numbers` to `Ready to retest`. The workflow, not Airtable, extracts `#N` from behavior commits.
+  - `Flag open Findings to GitHub` / `Flag untyped Findings to GitHub` — daily 12:30 AM MT; open `qa-flagged` issues for New / Need clarification Findings
+  - `Close GitHub issue when Finding is Resolved`, `Reopen GitHub issue when Finding fails retest`
+- **Not ported from Designer:** GitHub issue close/reopen → Finding sync webhook, test-case retest matching, latest-run rollups
 - **Feedback intake:** none yet
 
 ## Docs
