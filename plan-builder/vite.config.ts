@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // GitHub Pages serves staging/production under a sub-path (set by the deploy workflows).
+  base: process.env.VITE_BASE ?? '/',
   worker: { format: 'es' },
   // Dev only: lets local testing load sample PDFs from ../samples (git-ignored client files).
   server: { fs: { allow: ['..'] } },

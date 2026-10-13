@@ -1,0 +1,71 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plan-builder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: plan-builder/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_BASE: /landscaping-design-calculator-staging/
+
+      - name: Publish to staging repo
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.STAGING_PAGES_TOKEN }}
+          external_repository: tamaradidproduct/landscaping-design-calculator-staging
+          publish_branch: gh-pages
+          publish_dir: plan-builder/dist
+
+      # Best-effort: an Airtable outage must not fail the deploy.
+      - name: Notify Airtable (moves referenced Findings to Ready to retest)
+        continue-on-error: true
+        env:
+          WEBHOOK: ${{ secrets.AIRTABLE_DEPLOY_WEBHOOK }}
+          COMMITS: ${{ toJson(github.event.commits.*.message) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOY_URL: https://tamaradidproduct.github.io/landscaping-design-calculator-staging/
+        run: |
+          # secrets can't be read in `if:`; skip here when the webhook isn't configured.
+          [ -n "$WEBHOOK" ] || { echo "No AIRTABLE_DEPLOY_WEBHOOK; skipping"; exit 0; }
+          # issue_numbers: #N refs from behavior commits only (docs/test/ci/chore/build/deps/Dependabot skipped).
+          # Airtable moves the matching open Findings to Ready to retest.
+          jq -n \
+            --argjson messages "${COMMITS:-null}" \
+            --arg sha "$GITHUB_SHA" --arg branch "$GITHUB_REF_NAME" \
+            --arg run_url "$RUN_URL" --arg run_id "$GITHUB_RUN_ID" --arg url "$DEPLOY_URL" \
+            --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+            ($messages // []) as $m
+            | def subject: (split("\n") | map(gsub("^\\s+|\\s+$"; ""))) as $l
+                | if ($l[0] | test("^merge pull request"; "i"))
+                  then ([$l[1:][] | select(length > 0)][0] // $l[0]) else $l[0] end;
+              def skip: test("dependabot"; "i")
+                or (subject | test("^(bump|chore|docs?|documentation|test|tests|ci|build|deps?|dependabot|style)\\b|^(chore|build|deps?|docs?|test|ci|style)(\\([^)]*\\))?!?:"; "i"));
+            {
+              deployment: "staging \($sha[0:7])",
+              commit_sha: $sha, branch: $branch, deployment_url: $url,
+              github_run_url: $run_url, workflow_run_id: $run_id, deployed_at: $at,
+              commit_messages: ($m | join("\n\n---\n\n")),
+              issue_numbers: ([$m[] | select(skip | not) | [scan("#([0-9]+)\\b")[0]][]] | unique)
+            }' \
+          | curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK"
