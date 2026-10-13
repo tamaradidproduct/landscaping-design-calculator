@@ -22,8 +22,16 @@
       <div class="bar" id="bar" hidden>
         <button type="button" id="open-again">Open another</button>
         <span class="spacer"></span><span class="name" id="name"></span><span class="spacer"></span>
+        <div class="menu-wrap">
+          <button type="button" id="outline">Outline</button>
+          <div class="menu" id="outline-menu" hidden>
+            <button type="button" data-outline="boundary">Plot boundary</button>
+            <button type="button" data-outline="house">House</button>
+          </div>
+        </div>
         <button type="button" id="fit">Fit page</button>
       </div>
+      <div class="panel" id="panel" hidden></div>
       <div class="toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf" hidden />
     </main>

@@ -28,14 +28,3 @@ export function zoomAt(v: View, factor: number, p: Point): View {
 export function panBy(v: View, dx: number, dy: number): View {
   return { scale: v.scale, x: v.x + dx, y: v.y + dy };
 }
-
-/** Center content smaller than the stage; otherwise keep the page covering the stage on that axis. */
-export function clampView(v: View, stage: Size, content: Size): View {
-  const axis = (pos: number, len: number, stageLen: number) =>
-    len <= stageLen ? (stageLen - len) / 2 : Math.min(0, Math.max(stageLen - len, pos));
-  return {
-    scale: v.scale,
-    x: axis(v.x, content.w * v.scale, stage.w),
-    y: axis(v.y, content.h * v.scale, stage.h),
-  };
-}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { clampView, fitPage, panBy, zoomAt, MIN_ZOOM, MAX_ZOOM } from './view';
+import { fitPage, panBy, zoomAt, MIN_ZOOM, MAX_ZOOM } from './view';
 
 const stage = { w: 800, h: 1000 };
 const page = { w: 612, h: 1008 }; // legal portrait, in PDF points
@@ -36,18 +36,5 @@ describe('zoomAt', () => {
 describe('panBy', () => {
   test('moves by the finger delta', () => {
     expect(panBy({ scale: 2, x: 10, y: 20 }, 5, -7)).toEqual({ scale: 2, x: 15, y: 13 });
-  });
-});
-
-describe('clampView', () => {
-  const content = { w: 588, h: 968 }; // page size at fit scale, CSS px
-  test('centers content that is smaller than the stage', () => {
-    const v = clampView({ scale: 1, x: -500, y: 0 }, stage, content);
-    expect(v.x).toBeCloseTo((800 - 588) / 2, 6);
-  });
-  test('stops a zoomed page from being dragged past its edges', () => {
-    const v = clampView({ scale: 3, x: 400, y: -5000 }, stage, content);
-    expect(v.x).toBe(0); // left edge can't move right of the stage edge
-    expect(v.y).toBe(1000 - 968 * 3); // bottom edge can't move above the stage bottom
   });
 });

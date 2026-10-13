@@ -340,7 +340,7 @@
   - ~95% of segments are under 5 pt (text drawn as shapes) → snapping must ignore tiny glyph strokes and favor long lines.
   - Property lines are **broken into several pieces** (e.g. the 155.55' line is 3–4 segments; the 116.45' line is one 207.8 pt segment) → snap to merged lines and their **intersections (corners)**, not just segment ends.
   - The boundary includes **curves** (top-right corner arc; front edge along Riesberg Lane, L=62.02', R=222.50') → tracing needs arc support.
-  - ⚠️ Actual drawing scale ≈ **1" = 40'**: 116.45' measures 207.8 pt → 0.560 ft/pt. Neither printed scale (1"=30', 1"=20') matches the PDF as delivered → calibration from a known dimension is essential.
+  - ~~Actual drawing scale ≈ 1" = 40'~~ **Corrected:** that 207.8 pt line was the retaining wall, not the property line. The top property line is 279.5 pt → **1" = 30.0'**, matching the drawing's scale label (the title block's 1"=20' is wrong).
   - Cross-check available: printed **lot size 13,504 sq ft** can validate a traced boundary's area.
 - Image (raster) plans: feasible without heavy libraries — find dark-line pixels near the tap, fit up to two lines, snap to their intersection (corner) or onto the line. Not yet tested (no raster sample).
 
@@ -368,3 +368,10 @@
 - 📝 Outlines will need more kinds than plot boundary and house — other **existing structures and surfaces** (driveway, patio, deck, etc.). 2a builds boundary + house only.
 - ✅ Guides (2b): **never lock** — only *show* when an angle is right (90°) or a point is aligned.
 - ✅ Go ahead with **Step 2a**.
+
+### Step 2a — built (2026-10-12)
+- Outline the plot boundary or house: tap corners (point sits above the finger on touch, with a magnifier); close with **Close shape**, **double-tap/double-click**, or a tap on the first corner; drag any corner freely; Undo corner / Cancel / Redo.
+- Tap an edge → popover: measured length + "Printed length" → **Set scale**. Hover an edge (mouse) → its length.
+- Plot area shown once scaled; type the printed lot size to see the % difference.
+- Panning is now free (no limit at the plan's edges).
+- Riesberg check (scale from the 116.45′ top edge): left edge **138.30′ vs printed 138.31′ (−0.01%)**; scale reads 1 in = 30.0 ft. Area 13,738 vs printed 13,504 sq ft (+1.7%) because the curved street edge is still drawn straight — expected until 2c.

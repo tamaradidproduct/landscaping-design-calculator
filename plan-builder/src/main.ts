@@ -1,7 +1,9 @@
 import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
-import { clampView, fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
+import { OutlineTool } from './outline-ui';
+import type { OutlineKind } from './outline';
+import { fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
 
 registerSW({ immediate: true });
 
@@ -21,6 +23,31 @@ let viewVersion = 0;
 let baseVersion = 0;
 
 const content = (): Size => ({ w: pageSize.w * fitScale, h: pageSize.h * fitScale });
+
+// ---------- Outline tool (Step 2a) ----------
+const tool = new OutlineTool({
+  toPage: s => ({ x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
+  toScreen: p => ({ x: p.x * fitScale * view.scale + view.x, y: p.y * fitScale * view.scale + view.y }),
+  pxPerPt: () => fitScale * view.scale,
+  drawMagnified(ctx, s, zoom, size) {
+    const span = size / zoom; // screen px shown in the magnifier
+    ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, size, size);
+    if (!sharp.hidden) {
+      const r = sharp.width / stageSize.w;
+      ctx.drawImage(sharp, (s.x - span / 2) * r, (s.y - span / 2) * r, span * r, span * r, 0, 0, size, size);
+    } else {
+      const k = base.width / pageSize.w / (fitScale * view.scale); // base px per screen px
+      const cx = (s.x - view.x) * k, cy = (s.y - view.y) * k;
+      ctx.drawImage(base, cx - span * k / 2, cy - span * k / 2, span * k, span * k, 0, 0, size, size);
+    }
+  },
+  toast: msg => toast(msg),
+}, stage, $('panel'));
+
+$('outline').onclick = () => { $('outline-menu').hidden = !$('outline-menu').hidden; };
+document.querySelectorAll<HTMLButtonElement>('[data-outline]').forEach(b => {
+  b.onclick = () => { $('outline-menu').hidden = true; tool.start(b.dataset.outline as OutlineKind); };
+});
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 
 // ---------- Opening a file ----------
@@ -90,10 +117,11 @@ async function renderSharp() {
 }
 
 function applyView(next: View, settle = true) {
-  view = clampView(next, stageSize, content());
+  view = next; // free panning: the plan can be moved anywhere, even off screen
   viewVersion++;
   sharp.hidden = true;
   pageEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  tool.render();
   if (settle) renderSharpSoon();
 }
 
@@ -118,6 +146,7 @@ const pointers = new Map<number, Point>();
 let pinch: { dist: number; mid: Point; view: View } | null = null;
 let lastTap = { t: 0, p: { x: 0, y: 0 } };
 let downAt: Point | null = null, moved = false;
+let toolDrag = false; // the current single-finger action belongs to the outline tool
 
 const local = (e: PointerEvent): Point => { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -130,15 +159,20 @@ function startPinch() {
 
 stage.addEventListener('pointerdown', e => {
   if (!page) return;
+  if ((e.target as Element).closest('.popover')) return; // let the edge popover's own controls work
   stage.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, local(e));
-  if (pointers.size === 2) { startPinch(); moved = true; }
-  if (pointers.size === 1) { downAt = local(e); moved = false; }
+  if (pointers.size === 2) {
+    if (toolDrag) { tool.cancelPointer(); toolDrag = false; }
+    startPinch(); moved = true;
+  }
+  if (pointers.size === 1) { downAt = local(e); moved = false; toolDrag = tool.pointerDown(local(e), e.pointerType); }
 });
 stage.addEventListener('pointermove', e => {
-  if (!pointers.has(e.pointerId)) return;
+  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e)); return; }
   const prev = pointers.get(e.pointerId)!, p = local(e);
   pointers.set(e.pointerId, p);
+  if (toolDrag) { tool.pointerMove(p); return; }
   if (pinch && pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
     const m = mid(a, b);
@@ -153,9 +187,11 @@ function endPointer(e: PointerEvent) {
   if (!pointers.has(e.pointerId)) return;
   const p = local(e);
   pointers.delete(e.pointerId);
+  if (toolDrag) { toolDrag = false; tool.pointerUp(); return; }
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
   pinch = null;
+  if (!moved) tool.tapEmpty();
   if (!moved) {
     const now = performance.now();
     if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30) {
@@ -169,6 +205,7 @@ function endPointer(e: PointerEvent) {
 }
 stage.addEventListener('pointerup', endPointer);
 stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') tool.hover(null); });
 // Trackpad: two-finger drag pans; pinch (reported as ctrl+wheel) zooms. Mouse wheel: ctrl+wheel zooms.
 stage.addEventListener('wheel', e => {
   if (!page) return;
