@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#1f2523" />
+    <!-- Browser chrome colour: literal copies of --color-bg (meta tags can't read CSS tokens). -->
+    <meta name="theme-color" content="#e7ebe9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1f2523" media="(prefers-color-scheme: dark)" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <title>Plan Builder</title>
   </head>
@@ -15,34 +17,34 @@
         <div class="empty" id="empty">
           <h1>Open the homeowner's plot plan</h1>
           <p>Pick the PDF from Files or Google Drive. It stays on this device.</p>
-          <button type="button" class="primary" id="open-empty">Open plot plan</button>
+          <button type="button" class="primary large" id="open-empty">Open plot plan</button>
         </div>
         <div class="loading" id="loading" hidden>Opening plot plan…</div>
       </div>
       <div class="bar" id="bar" hidden>
         <button type="button" id="open-again">Open another</button>
-        <span class="spacer"></span><span class="name" id="name"></span><span class="spacer"></span>
+        <span class="spacer"></span><span class="pill" id="name"></span><span class="spacer"></span>
         <button type="button" id="undo" disabled aria-label="Undo" title="Undo (⌘Z)">Undo</button>
         <button type="button" id="redo" disabled aria-label="Redo" title="Redo (⇧⌘Z)">Redo</button>
         <button type="button" id="snap" class="toggle" aria-pressed="true">Snap on</button>
         <div class="menu-wrap">
           <button type="button" id="outline">Outline</button>
-          <div class="menu" id="outline-menu" hidden>
-            <button type="button" data-outline="boundary">Plot boundary</button>
-            <button type="button" data-outline="feature">Existing feature…</button>
+          <div class="card menu" id="outline-menu" hidden>
+            <button type="button" class="menu-item" data-outline="boundary">Plot boundary</button>
+            <button type="button" class="menu-item" data-outline="feature">Existing feature…</button>
           </div>
-          <form class="menu feature-menu" id="feature-menu" hidden>
+          <form class="card menu wide" id="feature-menu" hidden>
             <p class="menu-title">What is it?</p>
             <div class="chips" id="feature-presets"></div>
-            <label for="feature-name">Or type a name</label>
+            <label class="text-label" for="feature-name">Or type a name</label>
             <div class="row"><input id="feature-name" autocomplete="off" placeholder="e.g. AC pad" />
             <button type="submit" class="primary">Outline it</button></div>
           </form>
         </div>
         <button type="button" id="fit">Fit page</button>
       </div>
-      <div class="panel" id="panel" hidden></div>
-      <div class="toast" id="toast" role="status" hidden></div>
+      <div class="card panel" id="panel" hidden></div>
+      <div class="bubble toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf" hidden />
     </main>
     <script type="module" src="/src/main.ts"></script>

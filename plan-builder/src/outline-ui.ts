@@ -6,6 +6,8 @@ import {
   type Outline, type OutlineKind,
 } from './outline';
 import { History } from './history';
+import { MAGNIFIER, MARK, POPOVER, TIP } from './overlay-tokens';
+import { body, button, cardHead, error, esc, hint, input, label, nudgePad, row, status, token } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -32,7 +34,7 @@ const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holdi
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
-const COLORS: Record<OutlineKind, string> = { boundary: 'var(--outline-boundary)', feature: 'var(--outline-feature)' };
+const COLORS: Record<OutlineKind, string> = { boundary: 'var(--color-boundary)', feature: 'var(--color-feature)' };
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
@@ -75,8 +77,8 @@ export class OutlineTool {
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.classList.add('overlay');
     this.magnifier = Object.assign(document.createElement('canvas'), { className: 'magnifier', hidden: true });
-    this.popover = Object.assign(document.createElement('div'), { className: 'popover', hidden: true });
-    this.tip = Object.assign(document.createElement('div'), { className: 'edge-tip', hidden: true });
+    this.popover = Object.assign(document.createElement('div'), { className: 'card popover', hidden: true });
+    this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
     stage.append(this.svg, this.magnifier, this.tip, this.popover);
     this.panel = panel;
     window.addEventListener('keydown', e => this.onKey(e));
@@ -488,40 +490,40 @@ export class OutlineTool {
       if (o.closed && !this.drawing) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
-        svg += `<rect x="${m.x - 5}" y="${m.y - 5}" width="10" height="10" rx="2" class="bend-handle${bent ? ' bent' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+        svg += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       });
       o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
         const closeTarget = drawingThis && i === 0 && o.pts.length >= 3;
-        if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="16" class="close-target" style="--c:${COLORS[o.kind]}"/>`;
-        svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? 7 : 6}" class="corner" style="--c:${COLORS[o.kind]}"/>`;
+        if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${COLORS[o.kind]}"/>`;
+        svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${COLORS[o.kind]}"/>`;
       });
     }
     for (const o of Object.values(this.outlines)) {
       // Names go on top of every shape so overlapping features stay readable.
       if (o.kind !== 'feature' || !o.closed) continue;
       const c = h.toScreen(labelPoint(outlinePath(o.pts, o.bulges, true)));
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="feature-label${this.selectedFeature === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selectedFeature === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);
     const sel = this.selectedCorner && !this.dragAt ? this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i] : null;
-    if (sel) { const s = h.toScreen(sel); svg += `<circle cx="${s.x}" cy="${s.y}" r="11" class="selected-corner"/>`; }
+    if (sel) { const s = h.toScreen(sel); svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.ring}" class="selected-corner"/>`; }
     const at = this.dragAt ?? (this.drawing && !this.drag ? this.hoverPlaced : null);
     if (at) {
       const { x, y } = at;
-      if (this.angle !== null) svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${this.angle}°</text>`;
-      if (this.dragAt && this.bypassHold) svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">Free</text>`;
+      if (this.angle !== null) svg += `<text x="${x + MARK.labelDx}" y="${y + MARK.labelDy}" class="label snap">${this.angle}°</text>`;
+      if (this.dragAt && this.bypassHold) svg += `<text x="${x + MARK.labelDx}" y="${y + MARK.labelDy}" class="label snap">Free</text>`;
       if (this.snapped) {
-        svg += `<circle cx="${x}" cy="${y}" r="16" class="snap-halo"/>`;
+        svg += `<circle cx="${x}" cy="${y}" r="${MARK.snapHalo}" class="snap-halo"/>`;
         const label = { corner: 'Corner', line: 'On line', own: 'Corner' }[this.snapped];
         svg += this.snapped === 'line'
-          ? `<path d="M${x} ${y - 9}L${x + 9} ${y}L${x} ${y + 9}L${x - 9} ${y}Z" class="snap-mark"/>`
-          : `<rect x="${x - 8}" y="${y - 8}" width="16" height="16" class="snap-mark"/>`;
-        svg += `<text x="${x + 16}" y="${y - 14}" class="snap-label">${label}</text>`;
+          ? `<path d="M${x} ${y - MARK.snapLine}L${x + MARK.snapLine} ${y}L${x} ${y + MARK.snapLine}L${x - MARK.snapLine} ${y}Z" class="snap-mark"/>`
+          : `<rect x="${x - MARK.snapCorner}" y="${y - MARK.snapCorner}" width="${2 * MARK.snapCorner}" height="${2 * MARK.snapCorner}" class="snap-mark"/>`;
+        svg += `<text x="${x + MARK.labelDx}" y="${y + MARK.labelDy}" class="label snap">${label}</text>`;
       }
-      if (this.dragAt) svg += `<circle cx="${x}" cy="${y}" r="11" class="placing"/><path d="M${x - 18} ${y}H${x - 5}M${x + 5} ${y}H${x + 18}M${x} ${y - 18}V${y - 5}M${x} ${y + 5}V${y + 18}" class="crosshair"/>`;
-      else svg += `<circle cx="${x}" cy="${y}" r="4" class="hover-dot"/>`;
+      if (this.dragAt) svg += `<circle cx="${x}" cy="${y}" r="${MARK.ring}" class="placing"/>${crosshair(x, y)}`;
+      else svg += `<circle cx="${x}" cy="${y}" r="${MARK.hoverDot}" class="hover-dot"/>`;
     }
     this.svg.innerHTML = svg;
     this.positionPopover();
@@ -552,10 +554,10 @@ export class OutlineTool {
       if (!pp || !p) return;
       const g = guides(pp, p, at, [], 0);
       if (g.rightAngle) {
-        const u1 = unit(pp, p), u2 = unit(p, at), s = 12;
+        const u1 = unit(pp, p), u2 = unit(p, at), s = MARK.guideArm;
         const a = { x: p.x - u1.x * s, y: p.y - u1.y * s }, c = { x: p.x + u2.x * s, y: p.y + u2.y * s };
-        out += `<path d="M${a.x} ${a.y}L${a.x + u2.x * s} ${a.y + u2.y * s}L${c.x} ${c.y}" class="guide-angle"/><text x="${p.x + 10}" y="${p.y + 24}" class="guide-label">90°</text>`;
-      } else if (g.straight) out += `<text x="${p.x + 10}" y="${p.y + 24}" class="guide-label">Straight</text>`;
+        out += `<path d="M${a.x} ${a.y}L${a.x + u2.x * s} ${a.y + u2.y * s}L${c.x} ${c.y}" class="guide-angle"/><text x="${p.x + MARK.guideLabelDx}" y="${p.y + MARK.guideLabelDy}" class="label guide">90°</text>`;
+      } else if (g.straight) out += `<text x="${p.x + MARK.guideLabelDx}" y="${p.y + MARK.guideLabelDy}" class="label guide">Straight</text>`;
     };
     marks(prevprev, prev); marks(nextnext, next);
     const g = guides(null, null, at, others, 2.5);
@@ -566,24 +568,25 @@ export class OutlineTool {
 
   private showMagnifier() { this.magnifier.hidden = false; }
   private drawMagnifier() {
-    const size = 132, r = Math.min(window.devicePixelRatio || 1, 3), m = this.magnifier, at = this.dragAt!;
+    const size = MAGNIFIER.size, r = Math.min(window.devicePixelRatio || 1, 3), m = this.magnifier, at = this.dragAt!;
     if (m.width !== size * r) { m.width = m.height = size * r; m.style.width = m.style.height = `${size}px`; }
     const ctx = m.getContext('2d')!;
     ctx.setTransform(r, 0, 0, r, 0, 0);
     ctx.clearRect(0, 0, size, size);
-    this.host.drawMagnified(ctx, at, 3, size);
-    ctx.strokeStyle = '#d0349a'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(size / 2 - 14, size / 2); ctx.lineTo(size / 2 + 14, size / 2); ctx.moveTo(size / 2, size / 2 - 14); ctx.lineTo(size / 2, size / 2 + 14); ctx.stroke();
+    this.host.drawMagnified(ctx, at, MAGNIFIER.zoom, size);
+    ctx.strokeStyle = token('--color-snap'); ctx.lineWidth = MAGNIFIER.crosshairWidth;
+    const c = size / 2, k = MAGNIFIER.crosshair;
+    ctx.beginPath(); ctx.moveTo(c - k, c); ctx.lineTo(c + k, c); ctx.moveTo(c, c - k); ctx.lineTo(c, c + k); ctx.stroke();
     // Sit above the point; flip below when there's no room.
-    const above = at.y - size - 40 > 0;
+    const above = at.y - size - MAGNIFIER.gap > 0;
     m.style.left = `${at.x - size / 2}px`;
-    m.style.top = `${above ? at.y - size - 40 : at.y + 40}px`;
+    m.style.top = `${above ? at.y - size - MAGNIFIER.gap : at.y + MAGNIFIER.gap}px`;
   }
 
   private showTip(e: { id: string; i: number }, p: Point) {
     const ft = this.edgeFeet(e.id, e.i);
     this.tip.textContent = ft ? formatFeet(ft) : 'Tap to set this edge’s length';
-    this.tip.style.left = `${p.x + 14}px`; this.tip.style.top = `${p.y + 14}px`;
+    this.tip.style.left = `${p.x + TIP.offset}px`; this.tip.style.top = `${p.y + TIP.offset}px`;
     this.tip.hidden = false;
   }
   private hideTip() { this.tip.hidden = true; }
@@ -592,15 +595,15 @@ export class OutlineTool {
     const e = this.selectedEdge;
     if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
     const ft = this.edgeFeet(e.id, e.i);
+    const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i];
     this.popover.innerHTML = `
-      <div class="pop-head"><strong>${esc(this.outlines[e.id]!.name)} edge</strong><button type="button" class="icon" data-act="close" aria-label="Close">×</button></div>
-      <div class="pop-measure">${ft ? `Measures <b>${formatFeet(ft)}</b>${this.outlines[e.id]!.bulges?.[e.i] ? ' along the curve' : ''}` : 'No scale yet'}</div>
-      ${this.outlines[e.id]!.bulges?.[e.i] ? '<button type="button" data-act="straighten">Make straight</button>' : '<p class="pop-hint">Drag the square in the middle of the edge to curve it.</p>'}
-      <form class="pop-form">
-        <label for="edge-len">Printed length on the plan</label>
-        <div class="row"><input id="edge-len" inputmode="decimal" autocomplete="off" placeholder="e.g. 116.45 or 116' 5&quot;" />
-        <button type="submit" class="primary">${this.ftPerPt ? 'Reset scale' : 'Set scale'}</button></div>
-        <p class="pop-error" hidden>Type a length in feet, like 116.45 or 116' 5".</p>
+      ${cardHead(`${esc(o.name)} edge`)}
+      <div class="text-figure">${ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet'}</div>
+      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it.')}
+      <form class="stack">
+        <div class="field">${label('edge-len', 'Printed length on the plan')}
+        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"` }), button(this.ftPerPt ? 'Reset scale' : 'Set scale', { variant: 'primary', type: 'submit' }))}</div>
+        ${error(`Type a length in feet, like 116.45 or 116' 5".`)}
       </form>`;
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
@@ -610,7 +613,7 @@ export class OutlineTool {
     form.onsubmit = ev => {
       ev.preventDefault();
       const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
-      if (!feet) { this.popover.querySelector<HTMLElement>('.pop-error')!.hidden = false; return; }
+      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
       this.setScaleFromEdge(e.id, e.i, feet);
     };
     this.positionPopover();
@@ -619,22 +622,21 @@ export class OutlineTool {
     const e = this.selectedEdge; if (!e || this.popover.hidden) return;
     const o = this.outlines[e.id]; if (!o) return;
     const a = this.host.toScreen(o.pts[e.i]), b = this.host.toScreen(o.pts[(e.i + 1) % o.pts.length]);
-    const stage = this.svg.getBoundingClientRect(), w = this.popover.offsetWidth || 300, hgt = this.popover.offsetHeight || 170;
+    const stage = this.svg.getBoundingClientRect(), w = this.popover.offsetWidth || POPOVER.fallbackWidth, hgt = this.popover.offsetHeight || POPOVER.fallbackHeight, mg = POPOVER.margin;
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    this.popover.style.left = `${Math.max(8, Math.min(stage.width - w - 8, mx - w / 2))}px`;
-    this.popover.style.top = `${Math.max(8, Math.min(stage.height - hgt - 8, my + 24))}px`;
+    this.popover.style.left = `${Math.max(mg, Math.min(stage.width - w - mg, mx - w / 2))}px`;
+    this.popover.style.top = `${Math.max(mg, Math.min(stage.height - hgt - mg, my + POPOVER.below))}px`;
   }
 
   private renderPanel() {
     const p = this.panel, o = this.current();
     if (o) {
+      const n = o.pts.length;
       p.innerHTML = `
-        <p class="panel-text">Tap each corner of the <b>${esc(o.kind === 'boundary' ? 'plot boundary' : o.name)}</b>. ${o.pts.length >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${o.pts.length} of at least 3 corners placed.`}</p>
-        <p class="panel-hint">${this.snapOn ? 'Points snap to lines and corners on the plan. To place one freely, hold Option (Alt) — on touch, press and hold before moving. Two fingers move and zoom.' : 'Snapping is off.'}</p>
-        ${this.nudgePad()}
-        <div class="row">
-        <button type="button" data-act="close" class="primary" ${o.pts.length >= 3 ? '' : 'disabled'}>Close shape</button>
-        <button type="button" data-act="cancel">Cancel</button></div>`;
+        ${body(`Tap each corner of the <b>${esc(o.kind === 'boundary' ? 'plot boundary' : o.name)}</b>. ${n >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${n} of at least 3 corners placed.`}`)}
+        ${hint(this.snapOn ? 'Points snap to lines and corners on the plan. Hold Shift for straight lines in 45° steps. To place one freely, hold Option (Alt) — on touch, press and hold before moving. Two fingers move and zoom.' : 'Snapping is off.')}
+        ${this.nudge_()}
+        ${row(button('Close shape', { variant: 'primary', disabled: n < 3, data: { act: 'close' } }), button('Cancel', { data: { act: 'cancel' } }))}`;
       p.hidden = false;
     } else {
       const closed = Object.values(this.outlines).filter(x => x.closed);
@@ -645,13 +647,13 @@ export class OutlineTool {
       const area = b && this.ftPerPt ? areaPt2(b.pts, b.bulges) * this.ftPerPt * this.ftPerPt : null;
       const off = area && this.printedLotSqft ? percentOff(area, this.printedLotSqft) : null;
       p.innerHTML = `
-        <p class="panel-text">${this.ftPerPt ? `Scale: <b>${formatScale(this.ftPerPt)}</b>. Tap or hover an edge to see its length.` : 'Tap an edge and type its printed length to set the scale.'}</p>
-        ${area ? `<div class="area-row"><span>Plot area <b>${formatArea(area)}</b></span>
-          <label for="lot-size">Printed lot size</label><input id="lot-size" inputmode="numeric" placeholder="13,504" value="${this.printedLotSqft ?? ''}" />
-          ${off !== null ? `<span class="${Math.abs(off) <= 1 ? 'ok' : 'warn'}">${Math.abs(off) < 0.05 ? 'matches' : `${Math.abs(off).toFixed(1)}% ${off > 0 ? 'over' : 'under'}`}</span>` : ''}</div>` : ''}
-        ${this.nudgePad()}
-        ${closed.some(c => c.kind === 'feature') ? '<p class="panel-hint">Tap inside an existing feature to rename, delete or redraw it.</p>' : ''}
-        ${b ? '<div class="row"><button type="button" data-redo="boundary">Redo plot boundary</button></div>' : ''}`;
+        ${body(this.ftPerPt ? `Scale: <b>${formatScale(this.ftPerPt)}</b>. Tap or hover an edge to see its length.` : 'Tap an edge and type its printed length to set the scale.')}
+        ${area ? `<div class="field-row"><span>Plot area <b>${formatArea(area)}</b></span>
+          ${label('lot-size', 'Printed lot size')}${input('lot-size', { inputmode: 'numeric', placeholder: '13,504', value: this.printedLotSqft ? String(this.printedLotSqft) : '', short: true })}
+          ${off !== null ? status(Math.abs(off) <= 1, Math.abs(off) < 0.05 ? 'matches' : `${Math.abs(off).toFixed(1)}% ${off > 0 ? 'over' : 'under'}`) : ''}</div>` : ''}
+        ${this.nudge_()}
+        ${closed.some(c => c.kind === 'feature') ? hint('Tap inside an existing feature to rename, delete or redraw it.') : ''}
+        ${b ? row(button('Redo plot boundary', { data: { redo: 'boundary' } })) : ''}`;
       p.hidden = false;
       const lot = p.querySelector<HTMLInputElement>('#lot-size');
       if (lot) lot.onchange = () => { const v = Number(lot.value.replace(/[^\d.]/g, '')); this.printedLotSqft = v > 0 ? v : null; this.renderPanel(); };
@@ -669,20 +671,14 @@ export class OutlineTool {
   private renderFeaturePanel(f: Outline) {
     const p = this.panel;
     p.innerHTML = `
-      <form class="rename-row">
-        <label for="feature-name-edit">Existing feature</label>
-        <input id="feature-name-edit" autocomplete="off" value="${esc(f.name)}" />
-        <button type="submit">Rename</button>
+      <form class="field-row">
+        ${label('feature-name-edit', 'Existing feature')}${input('feature-name-edit', { value: f.name })}${button('Rename', { type: 'submit' })}
       </form>
-      ${this.nudgePad()}
-      <div class="row">
-        <button type="button" data-act="redraw">Redo outline</button>
-        <button type="button" data-act="delete" class="danger">Delete</button>
-        <button type="button" data-act="done">Done</button>
-      </div>`;
+      ${this.nudge_()}
+      ${row(button('Redo outline', { data: { act: 'redraw' } }), button('Delete', { variant: 'danger', data: { act: 'delete' } }), button('Done', { data: { act: 'done' } }))}`;
     p.hidden = false;
-    const input = p.querySelector<HTMLInputElement>('#feature-name-edit')!;
-    p.querySelector('form')!.onsubmit = ev => { ev.preventDefault(); this.renameFeature(f.id, input.value); input.blur(); };
+    const field = p.querySelector<HTMLInputElement>('#feature-name-edit')!;
+    p.querySelector('form')!.onsubmit = ev => { ev.preventDefault(); this.renameFeature(f.id, field.value); field.blur(); };
     const act: Record<string, () => void> = {
       redraw: () => this.redraw(f.id), delete: () => this.deleteFeature(f.id), done: () => this.deselect(),
     };
@@ -692,12 +688,11 @@ export class OutlineTool {
     });
   }
 
-  private nudgePad(): string {
-    if (!this.selectedCorner || !this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i]) return '';
-    return `<div class="nudge"><span class="panel-hint">Nudge the selected corner</span>
-      <button type="button" data-nudge="-1,0" aria-label="Nudge left">←</button><button type="button" data-nudge="0,-1" aria-label="Nudge up">↑</button>
-      <button type="button" data-nudge="0,1" aria-label="Nudge down">↓</button><button type="button" data-nudge="1,0" aria-label="Nudge right">→</button></div>`;
+  /** The nudge pad, when a corner is selected. */
+  private nudge_(): string {
+    return this.selectedCorner && this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i] ? nudgePad() : '';
   }
+
 
   /**
    * The modifier keys as the latest input event reports them (Shift = 45° steps, Option/Alt = place
@@ -725,8 +720,9 @@ export class OutlineTool {
   }
 }
 
-function esc(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+function crosshair(x: number, y: number): string {
+  const o = MARK.crosshairOuter, g = MARK.crosshairGap;
+  return `<path d="M${x - o} ${y}H${x - g}M${x + g} ${y}H${x + o}M${x} ${y - o}V${y - g}M${x} ${y + g}V${y + o}" class="crosshair"/>`;
 }
 function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; }
 

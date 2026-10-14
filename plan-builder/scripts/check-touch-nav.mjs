@@ -41,7 +41,7 @@ results.push(['Pinch out', `${await corners()} corner(s) · zoom ${sc(s0).toFixe
 // 4) press and hold, then drag: places freely, shows "Free"
 await touch('touchStart', [[250, 260]]); await wait(600);
 await touch('touchMove', [[254, 262]]); await wait(50);
-const label = await page.$$eval('.overlay .snap-label', ls => ls.map(l => l.textContent).join(' + '));
+const label = await page.$$eval('.overlay .label.snap', ls => ls.map(l => l.textContent).join(' + '));
 await touch('touchEnd', []); await wait(300);
 results.push(['Press-and-hold then move', `label "${label}" · ${await corners()} corner(s)`]);
 

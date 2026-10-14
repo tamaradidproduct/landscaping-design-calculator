@@ -32,7 +32,7 @@ for (const k of ['TL', 'TR', 'BL']) {
   await page.mouse.move(t[0] + OFF[0], t[1] + OFF[1]);
   await page.mouse.down();
   await page.mouse.move(t[0] + OFF[0] + 0.5, t[1] + OFF[1], { steps: 2 });
-  const label = await page.$eval('.overlay .snap-label', el => el.textContent).catch(() => '(none)');
+  const label = await page.$eval('.overlay .label.snap', el => el.textContent).catch(() => '(none)');
   await page.mouse.up(); await page.waitForTimeout(150);
   const placed = (await corners()).at(-1);
   const ppt = await page.evaluate(() => document.getElementById('page').getBoundingClientRect().width / 612);

@@ -41,11 +41,11 @@ results.push(['Closes with the Close button', String(await page.evaluate(() => d
 await page.mouse.click(...await toScreen(mid(C.TL, C.TR)));
 await page.fill('#edge-len', '116.45');
 await page.click('.popover button[type=submit]');
-results.push(['Scale', await page.evaluate(() => document.querySelector('#panel .panel-text b')?.textContent ?? '(none)')]);
+results.push(['Scale', await page.evaluate(() => document.querySelector('#panel .text-body b')?.textContent ?? '(none)')]);
 
 async function hoverLength(a, b) {
   await page.mouse.move(...await toScreen(mid(a, b))); await page.waitForTimeout(100);
-  return page.evaluate(() => document.querySelector('.edge-tip').textContent);
+  return page.evaluate(() => document.querySelector('.tip').textContent);
 }
 const pct = (txt, printed) => `${txt} (printed ${printed}′, ${(((parseFloat(txt) - printed) / printed) * 100).toFixed(2)}%)`;
 results.push(['Left edge (independent check)', pct(await hoverLength(C.TL, C.BL), 138.31)]);

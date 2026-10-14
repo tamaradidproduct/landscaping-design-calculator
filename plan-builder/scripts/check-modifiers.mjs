@@ -11,7 +11,7 @@ await page.goto(url); await page.waitForTimeout(3500);
 await page.setInputFiles('#file', pdf);
 await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
 
-const label = () => page.$$eval('.overlay .snap-label', ts => ts.map(t => t.textContent).join(' ') || '(none)');
+const label = () => page.$$eval('.overlay .label.snap', ts => ts.map(t => t.textContent).join(' ') || '(none)');
 const check = async (name, fn) => { await fn(); await page.waitForTimeout(120); results.push([name, await label()]); };
 
 await page.click('#outline'); await page.click('[data-outline=boundary]');
