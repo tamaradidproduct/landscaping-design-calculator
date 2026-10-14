@@ -1,160 +1,130 @@
 /*
- * Design tokens — the only place raw values live. Everything else uses var(--…).
- * Two layers: primitives (the palette, never used directly by components) and semantic tokens
- * (what components use). Dark mode only remaps semantic colour tokens.
+ * Design tokens — GENERATED from design-system/tokens.json by `npm run tokens`. Do not edit by hand:
+ * change the Plan Builder design system (or design-system/tokens.json), then re-run the script.
+ * Everything else in the app uses var(--…); no raw values outside this file.
  */
 :root {
-  /* ---------- Primitives: palette ---------- */
-  --sage-50: #f0f3f1;
-  --sage-100: #e7ebe9;
-  --sage-200: #ccd5d1;
-  --sage-300: #a6aba8;
-  --sage-400: #8a928e;
-  --sage-500: #6b726f;
-  --sage-600: #5b6863;
-  --sage-650: #5d6461;
-  --sage-700: #3d4a45;
-  --sage-750: #3a4440;
-  --sage-800: #2a312e;
-  --sage-850: #1f2523;
-  --sage-900: #1e2422;
-  --sage-950: #18201d;
-  --sage-text-dark: #e5ece8;
-  --sage-muted-dark: #9eaba5;
-  --sage-feature-dark: #d6ddd9;
-  --white: #ffffff;
-  --black: #000000;
-  --pine-700: #245e4f;
-  --pine-300: #7fc4ab;
-  --pine-950: #10201b;
-  --magenta-600: #c2318f;
-  --magenta-500: #d0349a;
-  --magenta-300: #f06ac0;
-  --green-600: #1d7a4f;
-  --green-300: #6fd3a2;
-  --teal-600: #0b8f6a;
-  --amber-700: #a34b00;
-  --amber-300: #f2a65a;
+  /* ---------- Colour ---------- */
+  --color-bg: #e7ebe9; /* Canvas behind the plan page and the well of text fields. */
+  --color-surface: #ffffff; /* Cards (panel, popover, menus), buttons, the file-name pill, and the halo behind on-plan… */
+  --color-paper: #ffffff; /* The plot plan page and the fill of corner dots. */
+  --color-ink: #18201d; /* Body text and button labels on color-surface (16.6:1 light, 11.1:1 dark) and color-bg. */
+  --color-muted: #5b6863; /* Hints, field labels, the file name, the Snap toggle when off. */
+  --color-line: #ccd5d1; /* Hairline borders on buttons, inputs and cards. */
+  --color-accent: #245e4f; /* The one primary action per card, focus rings, the pressed Snap toggle border, the selec… */
+  --color-on-accent: #ffffff; /* Label on a color-accent fill (7.5:1 light, 8.4:1 dark). */
+  --color-ok: #1d7a4f; /* Measured area within 1% of the printed lot size ("matches", "0.4% over"). */
+  --color-warn: #a34b00; /* Out of tolerance, form errors, and the Delete button's label. */
+  --color-shadow: #000000; /* Base of every shadow token (used at 12–30% alpha). */
+  --color-inverse-bg: var(--color-ink); /* Toast and edge-length tip background: an inverse bubble so it reads over any part of th… */
+  --color-inverse-ink: var(--color-bg); /* Text on color-inverse-bg (13.8:1 / 13.0:1). */
+  --color-boundary: #c2318f; /* The plot boundary outline, its corners, bend handles and the selected-edge highlight. */
+  --color-feature: #3d4a45; /* An existing feature while it is being drawn, and its stroke and label when selected. */
+  --color-feature-fill: #a6aba8; /* Grey fill of a closed existing feature (house, driveway…), drawn at opacity-feature-fill. */
+  --color-feature-stroke: #6b726f; /* Thin outline of an unselected existing feature. */
+  --color-feature-ink: #1e2422; /* Feature name on its fill (6.8:1 light, 5.4:1 dark). */
+  --color-snap: #d0349a; /* The point being placed: ring, crosshair, magnifier crosshair, snap marks and their labe… */
+  --color-guide: #0b8f6a; /* Hints that never snap: 90° corner mark, "Straight", dashed alignment lines. */
 
-  /* ---------- Semantic: app colours ---------- */
-  --color-bg: var(--sage-100);           /* canvas behind the plan, input wells */
-  --color-surface: var(--white);         /* cards, buttons, menus */
-  --color-paper: var(--white);           /* the plot plan page */
-  --color-ink: var(--sage-950);          /* body text */
-  --color-muted: var(--sage-600);        /* hints, labels, secondary text */
-  --color-line: var(--sage-200);         /* borders, dividers */
-  --color-accent: var(--pine-700);       /* primary action, focus, selection */
-  --color-on-accent: var(--white);
-  --color-ok: var(--green-600);          /* within tolerance */
-  --color-warn: var(--amber-700);        /* out of tolerance, errors, destructive */
-  --color-shadow: var(--black);
-  --color-inverse-bg: var(--color-ink);  /* toast, edge tip */
-  --color-inverse-ink: var(--color-bg);
-
-  /* ---------- Semantic: plan drawing ---------- */
-  --color-boundary: var(--magenta-600);          /* plot boundary outline */
-  --color-feature: var(--sage-700);              /* existing feature: drawing / selected */
-  --color-feature-fill: var(--sage-300);         /* existing feature: grey fill */
-  --color-feature-stroke: var(--sage-500);
-  --color-feature-ink: var(--sage-900);          /* existing feature name */
-  --color-snap: var(--magenta-500);              /* point being placed, snap marks, magnifier crosshair */
-  --color-guide: var(--teal-600);                /* 90° / straight / alignment hints */
-
-  /* ---------- Typography ---------- */
+  /* ---------- Type scale ---------- */
   --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --text-xs: 13px;       /* on-plan labels */
-  --text-sm: 14px;       /* hints, field labels, errors */
-  --text-md: 15px;       /* file name pill, edge tip */
-  --text-base: 16px;     /* toast, figures row */
-  --text-lg: 17px;       /* body, buttons, inputs */
-  --text-xl: 18px;       /* loading */
-  --text-2xl: 20px;      /* arrow glyphs */
-  --text-3xl: 22px;      /* close glyph */
-  --text-display: 26px;  /* empty-state heading */
-  --weight-regular: 400;
-  --weight-strong: 600;
-  --leading-tight: 1;
-  --leading-body: 1.4;
-  --measure-body: 36ch;
-  --measure-toast: 44ch;
+  --text-xs: 13px; /* On-plan labels. */
+  --text-sm: 14px; /* Hints, field labels, errors, feature names. */
+  --text-md: 15px; /* File-name pill, edge tip. */
+  --text-base: 16px; /* Toast, figures row. */
+  --text-lg: 17px; /* Body, buttons, inputs. */
+  --text-xl: 18px; /* Loading message. */
+  --text-2xl: 20px; /* Arrow glyphs. */
+  --text-3xl: 22px; /* Close glyph. */
+  --text-display: 26px; /* Empty-state heading. */
+  --weight-regular: 400; /* Running text. */
+  --weight-strong: 600; /* Primary buttons, headings, on-plan labels, status words. */
+  --leading-tight: 1; /* Glyph buttons. */
+  --leading-body: 1.4; /* Running text. */
+  --measure-body: 36ch; /* Empty-state paragraph width. */
+  --measure-toast: 44ch; /* Toast width. */
 
-  /* ---------- Space (4 px grid, with 2/6/10/14 half steps for tight controls) ---------- */
-  --space-1: 2px;
-  --space-2: 4px;
-  --space-3: 6px;
-  --space-4: 8px;
-  --space-5: 10px;
-  --space-6: 12px;
-  --space-7: 14px;
-  --space-8: 16px;
-  --space-9: 20px;
-  --space-10: 24px;
-  --space-11: 32px;
+  /* ---------- Space ---------- */
+  --space-1: 2px; /* Focus-ring offset; menu title inset. */
+  --space-2: 4px; /* Menu label inset. */
+  --space-3: 6px; /* Chip and nudge gaps; label-to-field gap; tip vertical padding. */
+  --space-4: 8px; /* Default row gap; menu padding; menu offset below its button. */
+  --space-5: 10px; /* Card inner gap; toolbar vertical padding; tip horizontal padding. */
+  --space-6: 12px; /* Toolbar gap; panel gap; input side padding; toast vertical padding. */
+  --space-7: 14px; /* Card padding; pill horizontal padding. */
+  --space-8: 16px; /* Screen gutter; panel side padding; panel distance from the bottom edge. */
+  --space-9: 20px; /* Button side padding; toast side padding. */
+  --space-10: 24px; /* Empty-state padding. */
+  --space-11: 32px; /* Hero button side padding. */
 
   /* ---------- Radius ---------- */
-  --radius-xs: 2px;      /* bend handle */
-  --radius-sm: 8px;      /* tip */
-  --radius-md: 12px;     /* buttons, inputs, toast */
-  --radius-lg: 14px;     /* menus, popover */
-  --radius-xl: 16px;     /* panel */
-  --radius-pill: 999px;
+  --radius-xs: 2px; /* Bend handle on an edge. */
+  --radius-sm: 8px; /* Edge-length tip. */
+  --radius-md: 12px; /* Buttons, inputs, toast. */
+  --radius-lg: 14px; /* Cards: popover and menus. */
+  --radius-xl: 16px; /* The docked panel. */
+  --radius-pill: 999px; /* File-name pill. */
 
   /* ---------- Elevation ---------- */
-  --shadow-sm: 0 2px 10px rgb(0 0 0 / 0.12);   /* floating toolbar controls */
-  --shadow-page: 0 2px 18px rgb(0 0 0 / 0.18); /* the plan page */
-  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.3);    /* magnifier */
-  --shadow-lg: 0 8px 28px rgb(0 0 0 / 0.2);    /* cards: panel, popover, menus */
-  --z-toast: 5;
-  --offset-toast: 76px;                         /* below the toolbar */
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.12); /* Floating toolbar controls and the pill, over the plan. */
+  --shadow-page: 0 2px 18px rgba(0,0,0,0.18); /* The plot plan page on the canvas. */
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.3); /* The magnifier loupe. */
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.2); /* Cards: panel, popover, menus. */
 
-  /* ---------- Controls (touch first: nothing tappable under 40 px) ---------- */
-  --control-sm: 40px;    /* icon button in a card header */
-  --control-md: 48px;    /* inputs, nudge arrows */
-  --control-lg: 52px;    /* default button */
-  --control-xl: 60px;    /* hero button (empty state) */
-  --border-width: 1px;
-  --focus-ring: 3px;
-  --opacity-disabled: 0.45;
-  --width-card: 320px;
-  --width-panel: 640px;
-  --width-menu: 190px;
-  --width-menu-wide: 280px;
-  --width-field-short: 140px;
+  /* ---------- Controls ---------- */
+  --control-sm: 40px; /* Small icon button (card-header close). */
+  --control-md: 48px; /* Inputs and nudge arrows. */
+  --control-lg: 52px; /* Default button height. */
+  --control-xl: 60px; /* Hero button (empty state). */
+  --border-width: 1px; /* Every control and card border. */
+  --focus-ring: 3px; /* Focus outline width, in color-accent. */
+  --width-card: 320px; /* Popover width (capped to the screen). */
+  --width-panel: 640px; /* Docked panel width (capped to the screen). */
+  --width-menu: 190px; /* Toolbar menu minimum width. */
+  --width-menu-wide: 280px; /* Menu that holds a form (name a feature). */
+  --width-field-short: 140px; /* Short numeric field (printed lot size). */
 
-  /* ---------- Plan overlay ---------- */
-  --stroke-hairline: 1.5px;
-  --stroke-regular: 2px;
-  --stroke-bold: 2.5px;
-  --stroke-heavy: 3px;
-  --stroke-label-halo: 4px;
-  --stroke-highlight: 6px;
-  --opacity-feature-fill: 0.55;
-  --opacity-feature-fill-selected: 0.7;
-  --opacity-edge-highlight: 0.55;
-  --opacity-handle: 0.85;
-  --mix-shape-fill: 10%;
-  --mix-snap-halo: 18%;
-  --magnifier-ring: 3px;
-  --dash-close-target: 4 3;
-  --dash-guide: 5 4;
+  /* ---------- Plan overlay: strokes ---------- */
+  --stroke-hairline: 1.5px; /* Feature outline, crosshair, guide lines, bend-handle border. */
+  --stroke-regular: 2px; /* Placing ring, close-target ring, right-angle mark. */
+  --stroke-bold: 2.5px; /* Outline being drawn, corner dots, snap marks, selected-corner ring. */
+  --stroke-heavy: 3px; /* Selected existing feature. */
+  --stroke-label-halo: 4px; /* Halo behind on-plan labels. */
+  --stroke-highlight: 6px; /* Hovered or selected edge. */
+
+  /* ---------- Plan overlay: opacity and tints ---------- */
+  --opacity-disabled: 0.45; /* Disabled buttons. */
+  --opacity-feature-fill: 0.55; /* Grey fill of an existing feature, so the plan shows through. */
+  --opacity-feature-fill-selected: 0.7; /* Selected existing feature. */
+  --opacity-edge-highlight: 0.55; /* Edge highlight. */
+  --opacity-handle: 0.85; /* Bend handles. */
+  --mix-shape-fill: 10%; /* Tint inside a closed boundary (its colour mixed with transparent). */
+  --mix-snap-halo: 18%; /* Disc behind a snapped point. */
+
+  /* ---------- Layout and misc ---------- */
+  --z-toast: 5; /* Toast above everything. */
+  --offset-toast: 76px; /* Toast distance from the top, below the toolbar. */
+  --magnifier-ring: 3px; /* Loupe border. */
+  --dash-close-target: 4 3; /* Dashed ring on the first corner while it can close the shape. */
+  --dash-guide: 5 4; /* Dashed alignment line. */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: var(--sage-850);
-    --color-surface: var(--sage-800);
-    --color-ink: var(--sage-text-dark);
-    --color-muted: var(--sage-muted-dark);
-    --color-line: var(--sage-750);
-    --color-accent: var(--pine-300);
-    --color-on-accent: var(--pine-950);
-    --color-ok: var(--green-300);
-    --color-warn: var(--amber-300);
-    --color-boundary: var(--magenta-300);
-    --color-feature: var(--sage-feature-dark);
-    --color-feature-fill: var(--sage-650);
-    --color-feature-stroke: var(--sage-400);
-    --color-feature-ink: var(--sage-50);
+    --color-bg: #1f2523;
+    --color-surface: #2a312e;
+    --color-ink: #e5ece8;
+    --color-muted: #9eaba5;
+    --color-line: #3a4440;
+    --color-accent: #7fc4ab;
+    --color-on-accent: #10201b;
+    --color-ok: #6fd3a2;
+    --color-warn: #f2a65a;
+    --color-boundary: #f06ac0;
+    --color-feature: #d6ddd9;
+    --color-feature-fill: #5d6461;
+    --color-feature-stroke: #8a928e;
+    --color-feature-ink: #f0f3f1;
     color-scheme: dark;
   }
 }

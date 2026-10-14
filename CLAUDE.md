@@ -28,6 +28,11 @@ Read by the `dev-setup` skill. Unknown values are marked `TODO`.
 - **Not ported from Designer:** GitHub issue close/reopen → Finding sync webhook, test-case retest matching, latest-run rollups
 - **Feedback intake:** none yet
 
+## Design system
+
+- Tokens come from the **Plan Builder** design-system artifact (https://claude.ai/artifact/JKnSFiSuXHsQ977zniZkYo). `plan-builder/design-system/tokens.json` is its copy; `npm run tokens` regenerates `plan-builder/src/styles/tokens.css` (never edit that by hand). Steps: `plan-builder/design-system/README.md`.
+- After a sync, run the check commands and the Riesberg Playwright checks; when the app's tokens change in code, update the artifact too.
+
 ## Docs
 
 - Product requirements: `docs/PRD.md`
