@@ -25,6 +25,17 @@
   --color-feature-ink: #1e2422; /* Feature name on its fill (6.8:1 light, 5.4:1 dark). */
   --color-snap: #d0349a; /* The point being placed: ring, crosshair, magnifier crosshair, snap marks and their labe… */
   --color-guide: #0b8f6a; /* Hints that never snap: 90° corner mark, "Straight", dashed alignment lines. */
+  --color-material-sod: #7fae5b; /* Sod surface fill (with its pattern). */
+  --color-material-turf: #4fae3e; /* Artificial turf surface fill (with its pattern). */
+  --color-material-mulch: #8a5a3b; /* Mulch surface fill (with its pattern). */
+  --color-material-river-rock: #8d9ba8; /* River rock surface fill (with its pattern). */
+  --color-material-decorative-rock: #c7b28b; /* Decorative rock surface fill (with its pattern). */
+  --color-material-gravel: #bcb9b1; /* Gravel surface fill (with its pattern). */
+  --color-material-pavers: #a68d7b; /* Pavers surface fill (with its pattern). */
+  --color-material-flagstone: #c9a676; /* Flagstone surface fill (with its pattern). */
+  --color-material-concrete-brushed: #d4d4cf; /* Brushed concrete surface fill (with its pattern). */
+  --color-material-concrete-stamped: #cdbfa8; /* Stamped concrete surface fill (with its pattern). */
+  --color-material-decking: #9a6a44; /* Decking surface fill (with its pattern). */
 
   /* ---------- Type scale ---------- */
   --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -99,6 +110,7 @@
   --opacity-handle: 0.85; /* Bend handles. */
   --mix-shape-fill: 10%; /* Tint inside a closed boundary (its colour mixed with transparent). */
   --mix-snap-halo: 18%; /* Disc behind a snapped point. */
+  --opacity-surface-editing: 0.5; /* Fill of the selected surface or the one being drawn, so the plan shows through. */
 
   /* ---------- Layout and misc ---------- */
   --z-toast: 5; /* Toast: above the plan, the panel and popovers (it never takes taps). */
