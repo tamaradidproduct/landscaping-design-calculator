@@ -25,14 +25,15 @@ const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
 await page.mouse.move(...await toScreen([390, 380]));
 await page.keyboard.down('Control'); for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(800);
-await page.click('#snap'); // exact placement from the known coordinates
+await page.$eval('#snap', b => b.click()); // shown only while drawing; exact placement from the known coordinates
 
 const labels = () => page.$$eval('.overlay .label.feature', ts => ts.map(t => t.textContent).join(', ') || '(none)');
 const step = async (label, fn) => { await fn(); await page.waitForTimeout(150); results.push([label, await labels()]); };
 const outline = async name => {
-  await page.click('#outline'); await page.click('[data-outline=feature]');
-  const chip = page.locator('#feature-presets button', { hasText: name });
-  if (await chip.count()) await chip.click(); else { await page.fill('#feature-name', name); await page.press('#feature-name', 'Enter'); }
+  // Layers panel: a suggestion row or quick pick named `name`, else type it into the custom-outline form.
+  if (!(await page.$(`#outlines [data-feature="${name}"]`))) await page.click('#outlines [data-act=name]');
+  const pick = await page.$(`#outlines [data-feature="${name}"]`);
+  if (pick) await pick.click(); else { await page.fill('#outline-name', name); await page.press('#outline-name', 'Enter'); }
   for (const p of F[name]) { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(380); }
   await page.click('#panel [data-act=close]');
 };

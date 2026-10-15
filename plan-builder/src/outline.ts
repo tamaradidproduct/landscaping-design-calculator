@@ -3,8 +3,10 @@ import type { Point } from './view';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature';
-/** Quick-pick names for existing features; the contractor can type any name. */
-export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Walk', 'Deck'];
+/** Common existing features, offered as one-tap names; the contractor can type any name. */
+export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Porch', 'Walk', 'Deck', 'Garage', 'Shed', 'Pool'];
+/** Presets suggested on their own row in the Layers panel (the rest are quick picks behind "Custom outline…"). */
+const SUGGESTED_FEATURES = ['House'];
 
 /**
  * pts are corners; edge i runs from pts[i] to pts[i+1] (wrapping when closed).
@@ -12,6 +14,18 @@ export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Walk', 'Deck'];
  * chord's midpoint, along the chord's left normal. 0 or missing = straight.
  */
 export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; }
+
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,
+ * and quick-pick names not used yet. */
+export function outlineSuggestions(outlines: Outline[]): { boundary: boolean; features: string[]; picks: string[] } {
+  const used = (name: string) => outlines.some(o => o.kind === 'feature' && sameName(o.name, name));
+  return {
+    boundary: !outlines.some(o => o.kind === 'boundary'),
+    features: SUGGESTED_FEATURES.filter(n => !used(n)),
+    picks: FEATURE_PRESETS.filter(n => !SUGGESTED_FEATURES.includes(n) && !used(n)),
+  };
+}
 
 /** Feet from text like 116.45, 116.45', 116' 6", 116 ft 6 in, 6". Null if unreadable or not positive. */
 export function parseFeet(input: string): number | null {
@@ -112,8 +126,6 @@ export const formatFeet = (ft: number) => `${ft.toFixed(2)}′`;
 export const formatArea = (sqft: number) => `${Math.round(sqft).toLocaleString('en-US')} sq ft`;
 /** ftPerPt → "1 in on paper = 40.3 ft". */
 export const formatScale = (ftPerPt: number) => `1 in on paper = ${(ftPerPt * 72).toFixed(1)} ft`;
-/** Signed % difference of measured vs printed. */
-export const percentOff = (measured: number, printed: number) => (measured - printed) / printed * 100;
 
 export interface Guides { rightAngle: boolean; straight: boolean; alignX: Point | null; alignY: Point | null; }
 /**

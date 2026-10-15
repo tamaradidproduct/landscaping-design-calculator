@@ -1,5 +1,5 @@
 // Promise wrapper around the PDF worker.
-import type { WorkerRequest, WorkerResponse } from './pdf-protocol';
+import type { Matrix, WorkerRequest, WorkerResponse } from './pdf-protocol';
 
 type Pending = { resolve: (r: WorkerResponse) => void; reject: (e: Error) => void };
 type Distribute<T> = T extends unknown ? Omit<T, 'id'> : never;
@@ -39,9 +39,9 @@ export class PdfClient {
     return { pageCount: r.pageCount, pageSize: r.pageSize };
   }
 
-  /** RGBA pixels of page 1: page point p lands at (p * scale + tx, p * scale + ty). */
-  async render(width: number, height: number, scale: number, tx: number, ty: number): Promise<ImageData> {
-    const r = await this.send({ type: 'render', width, height, scale, tx, ty });
+  /** RGBA pixels of page 1: page point (x, y) lands at (a·x + c·y + e, b·x + d·y + f). */
+  async render(width: number, height: number, matrix: Matrix): Promise<ImageData> {
+    const r = await this.send({ type: 'render', width, height, matrix });
     if (r.type !== 'rendered') throw new Error('Unexpected reply');
     return new ImageData(r.pixels, r.width, r.height);
   }

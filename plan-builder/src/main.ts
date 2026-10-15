@@ -2,9 +2,9 @@ import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
-import { FEATURE_PRESETS } from './outline';
-import { button, esc } from './ui';
-import { fitPage, panBy, zoomAt, type Point, type Size, type View } from './view';
+import { OutlinesSection } from './layers-ui';
+import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
+import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 
 registerSW({ immediate: true });
 
@@ -23,31 +23,49 @@ let sharpTimer = 0;
 let viewVersion = 0;
 let baseVersion = 0;
 
-const content = (): Size => ({ w: pageSize.w * fitScale, h: pageSize.h * fitScale });
+let correction: Correction = IDENTITY;   // page points → true-shape points (a stretched plan, once corrected)
+/** The page in true-shape points (only stretches for now, so the sheet's corner stays at the origin). */
+const shown = (): Size => ({ w: pageSize.w * correction.a, h: pageSize.h * correction.d });
+const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale });
 
 // ---------- Outline tool (Step 2a) ----------
+let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const tool = new OutlineTool({
-  toPage: s => ({ x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
-  toScreen: p => ({ x: p.x * fitScale * view.scale + view.x, y: p.y * fitScale * view.scale + view.y }),
-  pxPerPt: () => fitScale * view.scale,
+  toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
+  toScreen: p => { const q = applyCorrection(correction, p); return { x: q.x * fitScale * view.scale + view.x, y: q.y * fitScale * view.scale + view.y }; },
+  pxPerPt: () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c),
   drawMagnified(ctx, s, zoom, size) {
     const span = size / zoom; // screen px shown in the magnifier
-    ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, size, size);
+    ctx.globalAlpha = 1; ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, size, size);
+    if (!planVisible) return;
+    ctx.globalAlpha = planOpacity;
     if (!sharp.hidden) {
       const r = sharp.width / stageSize.w;
       ctx.drawImage(sharp, (s.x - span / 2) * r, (s.y - span / 2) * r, span * r, span * r, 0, 0, size, size);
     } else {
-      const k = base.width / pageSize.w / (fitScale * view.scale); // base px per screen px
+      const k = base.width / shown().w / (fitScale * view.scale); // base px per screen px
       const cx = (s.x - view.x) * k, cy = (s.y - view.y) * k;
       ctx.drawImage(base, cx - span * k / 2, cy - span * k / 2, span * k, span * k, 0, 0, size, size);
     }
   },
   toast: msg => toast(msg),
+  correctionChanged(c) {
+    // The plan stretches to its true shape around the sheet's top-left corner; Fit page re-centres it.
+    correction = c;
+    if (!page) return;
+    const size = content(); pageEl.style.width = `${size.w}px`; pageEl.style.height = `${size.h}px`;
+    applyView(view, false); void renderBase().then(() => renderSharpSoon(0));
+  },
   historyChanged(canUndo, canRedo) {
     ($('undo') as HTMLButtonElement).disabled = !canUndo;
     ($('redo') as HTMLButtonElement).disabled = !canRedo;
   },
+  changed() {
+    outlines?.render();
+    $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
+  },
   sampleLuminance(c, n) {
+    if (!planVisible) return null; // a hidden plan has no lines to snap to
     // Read what's on screen (sharp layer when ready, else the base layer) at 1 sample per screen px.
     const out = new Float32Array(n * n).fill(255), x0 = Math.round(c.x - n / 2), y0 = Math.round(c.y - n / 2);
     if (!sharp.hidden) {
@@ -65,7 +83,7 @@ const tool = new OutlineTool({
       }
       return out;
     }
-    const k = base.width / pageSize.w / (fitScale * view.scale); // base px per screen px
+    const k = base.width / shown().w / (fitScale * view.scale); // base px per screen px
     const tmp = document.createElement('canvas'); tmp.width = tmp.height = n;
     const ctx = tmp.getContext('2d', { willReadFrequently: true })!;
     ctx.drawImage(base, (x0 - view.x) * k, (y0 - view.y) * k, n * k, n * k, 0, 0, n, n);
@@ -74,6 +92,8 @@ const tool = new OutlineTool({
     return out;
   },
 }, stage, $('panel'));
+outlines = new OutlinesSection($('outlines'), tool);
+outlines.render();
 
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
@@ -93,23 +113,29 @@ $('snap').onclick = () => {
   tool.update();
 };
 
-// Outline menu: the plot boundary, or an existing feature (named first: a quick pick or any typed name).
-const closeMenus = () => { $('outline-menu').hidden = true; $('feature-menu').hidden = true; };
-$('outline').onclick = () => { const open = !$('outline-menu').hidden || !$('feature-menu').hidden; closeMenus(); $('outline-menu').hidden = open; };
-document.querySelector<HTMLButtonElement>('[data-outline=boundary]')!.onclick = () => { closeMenus(); tool.startBoundary(); };
-document.querySelector<HTMLButtonElement>('[data-outline=feature]')!.onclick = () => {
-  closeMenus(); $('feature-menu').hidden = false; $<HTMLInputElement>('feature-name').value = '';
-};
-const startFeature = (name: string) => { if (!name.trim()) return; closeMenus(); tool.startFeature(name); };
-$('feature-presets').innerHTML = FEATURE_PRESETS.map(name => button(esc(name), { mods: ['chip'], data: { preset: name } })).join('');
-$('feature-presets').querySelectorAll<HTMLButtonElement>('[data-preset]').forEach(b => { b.onclick = () => startFeature(b.dataset.preset!); });
-$<HTMLFormElement>('feature-menu').onsubmit = e => { e.preventDefault(); startFeature($<HTMLInputElement>('feature-name').value); };
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
+
+// ---------- Plot plan layer: show/hide and opacity ----------
+let planVisible = true, planOpacity = 1;
+function applyPlanLook() {
+  for (const el of [pageEl, sharp]) { el.style.visibility = planVisible ? '' : 'hidden'; el.style.opacity = String(planOpacity); }
+  const eye = $('plan-visible'), opacity = $<HTMLInputElement>('plan-opacity');
+  eye.setAttribute('aria-pressed', String(planVisible));
+  eye.setAttribute('aria-label', planVisible ? 'Hide the plot plan' : 'Show the plot plan'); eye.title = eye.getAttribute('aria-label')!;
+  opacity.disabled = !planVisible;
+  $('plan-opacity-value').textContent = `${Math.round(planOpacity * 100)}%`;
+}
+$('plan-visible').onclick = () => { planVisible = !planVisible; applyPlanLook(); };
+$<HTMLInputElement>('plan-opacity').oninput = e => { planOpacity = Number((e.target as HTMLInputElement).value) / 100; applyPlanLook(); };
 
 // ---------- Opening a file ----------
 $('open-empty').onclick = () => fileInput.click();
-$('open-again').onclick = () => fileInput.click();
+$('file-button').onclick = () => fileInput.click();
 $('fit').onclick = () => { fitToStage(); };
+const ZOOM_STEP = 1.25; // − / + buttons, around the middle of the plan
+const zoomBy = (k: number) => { if (page) applyView(zoomAt(view, k, { x: stageSize.w / 2, y: stageSize.h / 2 })); };
+$('zoom-in').onclick = () => zoomBy(ZOOM_STEP);
+$('zoom-out').onclick = () => zoomBy(1 / ZOOM_STEP);
 fileInput.onchange = () => { const f = fileInput.files?.[0]; fileInput.value = ''; if (f) void openFile(f); };
 
 async function openFile(file: File) {
@@ -127,15 +153,16 @@ async function openFile(file: File) {
     fitToStage(false);
     await renderBase();
     mark('page drawn');
-    $('loading').hidden = true; pageEl.hidden = false; $('bar').hidden = false;
+    $('loading').hidden = true; pageEl.hidden = false; $('sidebar').hidden = false;
     $('name').textContent = file.name;
+    planVisible = true; planOpacity = 1; $<HTMLInputElement>('plan-opacity').value = '100'; applyPlanLook();
     renderSharpSoon(0);
     const pages = opened.pageCount > 1 ? ` Showing page 1 of ${opened.pageCount}.` : '';
     toast(`Opened in ${((performance.now() - t0) / 1000).toFixed(1)} s.${pages}`);
   } catch (err) {
     console.error(err);
     page = false; $('loading').hidden = true; pageEl.hidden = true; sharp.hidden = true;
-    $('empty').hidden = false; $('bar').hidden = true;
+    $('empty').hidden = false; $('sidebar').hidden = true;
     toast('That file could not be opened as a PDF. Pick the plot plan PDF from the closing documents.');
   }
 }
@@ -146,9 +173,10 @@ async function openFile(file: File) {
 async function renderBase() {
   const version = ++baseVersion;
   const c = content();
-  const scale = Math.min(fitScale * dpr() * 2, 4096 / Math.max(pageSize.w, pageSize.h));
-  const w = Math.floor(pageSize.w * scale), h = Math.floor(pageSize.h * scale);
-  const img = await pdf.render(w, h, scale, 0, 0);
+  const t = shown(), m = correction;
+  const scale = Math.min(fitScale * dpr() * 2, 4096 / Math.max(t.w, t.h));
+  const w = Math.floor(t.w * scale), h = Math.floor(t.h * scale);
+  const img = await pdf.render(w, h, [m.a * scale, m.c * scale, m.b * scale, m.d * scale, 0, 0]);
   if (version !== baseVersion) return;
   pageEl.style.width = `${c.w}px`; pageEl.style.height = `${c.h}px`;
   base.width = w; base.height = h;
@@ -165,7 +193,8 @@ async function renderSharp() {
   if (!page) return;
   const version = viewVersion, r = dpr();
   const w = Math.round(stageSize.w * r), h = Math.round(stageSize.h * r);
-  const img = await pdf.render(w, h, fitScale * view.scale * r, view.x * r, view.y * r).catch(() => null);
+  const k = fitScale * view.scale * r, m = correction;
+  const img = await pdf.render(w, h, [m.a * k, m.c * k, m.b * k, m.d * k, view.x * r, view.y * r]).catch(() => null);
   if (!img || version !== viewVersion) return; // a newer gesture moved the view
   sharp.width = w; sharp.height = h;
   sharp.getContext('2d')!.putImageData(img, 0, 0);
@@ -177,6 +206,8 @@ function applyView(next: View, settle = true) {
   viewVersion++;
   sharp.hidden = true;
   pageEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  $<HTMLButtonElement>('zoom-out').disabled = view.scale <= MIN_ZOOM;
+  $<HTMLButtonElement>('zoom-in').disabled = view.scale >= MAX_ZOOM;
   tool.render();
   if (settle) renderSharpSoon();
 }
@@ -186,7 +217,7 @@ function measureStage() {
   stageSize = { w: r.width, h: r.height };
 }
 function fitToStage(settle = true) {
-  const f = fitPage(stageSize, pageSize);
+  const f = fitPage(stageSize, shown());
   fitScale = f.fitScale;
   applyView(f.view, settle);
 }
@@ -216,7 +247,7 @@ function startPinch() {
 
 stage.addEventListener('pointerdown', e => {
   if (!page) return;
-  if ((e.target as Element).closest('.popover')) return; // let the edge popover's own controls work
+  if ((e.target as Element).closest('.popover, .square-chip')) return; // let the edge popover's and Square chip's own controls work
   stage.setPointerCapture(e.pointerId);
   tool.setModifiers(e.shiftKey, e.altKey);
   pointers.set(e.pointerId, local(e));

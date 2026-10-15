@@ -26,7 +26,7 @@ await page.waitForTimeout(800); // sharp layer drawn
 const corners = () => page.$$eval('.overlay circle.corner', cs => cs.map(c => [+c.getAttribute('cx'), +c.getAttribute('cy')]));
 const err = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]).toFixed(2);
 
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BL']) {
   const t = await toScreen(C[k]);
   await page.mouse.move(t[0] + OFF[0], t[1] + OFF[1]);

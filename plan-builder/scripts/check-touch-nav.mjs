@@ -15,7 +15,7 @@ const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchP
 const wait = ms => page.waitForTimeout(ms);
 const corners = () => page.$$eval('.overlay circle.corner', cs => cs.length);
 const view = () => page.evaluate(() => document.getElementById('page').style.transform);
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 
 // 1) one-finger tap places a corner
 await touch('touchStart', [[300, 400]]); await wait(60); await touch('touchEnd', []); await wait(400);
