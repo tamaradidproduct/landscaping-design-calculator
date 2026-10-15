@@ -3,7 +3,7 @@
 // ~0.1 s where PDF.js needed 10 s+.
 import { PDFiumLibrary } from '@hyzyla/pdfium';
 import wasmUrl from '@hyzyla/pdfium/pdfium.wasm?url';
-import type { WorkerRequest, WorkerResponse } from './pdf-protocol';
+import type { Matrix, WorkerRequest, WorkerResponse } from './pdf-protocol';
 import { WARMUP_PDF_BASE64 } from './warmup-pdf';
 
 type Lib = Awaited<ReturnType<typeof PDFiumLibrary.init>>;
@@ -26,7 +26,7 @@ async function warm(l: Lib): Promise<Lib> {
   const bytes = Uint8Array.from(atob(WARMUP_PDF_BASE64), c => c.charCodeAt(0));
   lib = l; doc = await l.loadDocument(bytes);
   // Several passes: the browser optimizes WebAssembly code only after it has run for a while.
-  for (let i = 0; i < 12; i++) render(1200, 1500, 2, 0, 0);
+  for (let i = 0; i < 12; i++) render(1200, 1500, [2, 0, 0, 2, 0, 0]);
   doc.destroy(); doc = null;
   return l;
 }
@@ -49,7 +49,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       post({ type: 'opened', id: req.id, pageCount: doc.getPageCount(), pageSize: size });
     } else if (req.type === 'render') {
       if (!doc) throw new Error('No document open');
-      const pixels = render(req.width, req.height, req.scale, req.tx, req.ty);
+      const pixels = render(req.width, req.height, req.matrix);
       post({ type: 'rendered', id: req.id, width: req.width, height: req.height, pixels }, [pixels.buffer]);
     }
   } catch (err) {
@@ -58,22 +58,24 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 };
 
 /**
- * Render page 1 into a width x height RGBA buffer. Page point (px, py) lands at device
- * (px * scale + tx, py * scale + ty). The page sheet is white; everything outside it is transparent.
+ * Render page 1 into a width x height RGBA buffer. Page point (x, y) lands at device
+ * (a·x + c·y + e, b·x + d·y + f). The page sheet is white; everything outside it is transparent.
  */
-function render(width: number, height: number, scale: number, tx: number, ty: number): Uint8ClampedArray {
+function render(width: number, height: number, [a, b, c, d, e, f]: Matrix): Uint8ClampedArray {
   const m = raw();
   const page = m._FPDF_LoadPage(docIdx(), 0);
-  const pw = m._FPDF_GetPageWidthF(page) * scale, ph = m._FPDF_GetPageHeightF(page) * scale;
+  const W = m._FPDF_GetPageWidthF(page) as number, H = m._FPDF_GetPageHeightF(page) as number;
+  // The sheet's bounding box on the device (exact while the matrix has no skew or rotation).
+  const xs = [0, a * W, c * H, a * W + c * H].map(v => v + e), ys = [0, b * W, d * H, b * W + d * H].map(v => v + f);
   const stride = width * 4, bytes = stride * height;
   const buf = m._malloc(bytes), matrix = m._malloc(24), clip = m._malloc(16);
   const bitmap = m._FPDFBitmap_CreateEx(width, height, 4 /* BGRA */, buf, stride);
   try {
     m._FPDFBitmap_FillRect(bitmap, 0, 0, width, height, 0x00000000);
-    const left = Math.max(0, Math.floor(tx)), top = Math.max(0, Math.floor(ty));
-    const right = Math.min(width, Math.ceil(tx + pw)), bottom = Math.min(height, Math.ceil(ty + ph));
+    const left = Math.max(0, Math.floor(Math.min(...xs))), top = Math.max(0, Math.floor(Math.min(...ys)));
+    const right = Math.min(width, Math.ceil(Math.max(...xs))), bottom = Math.min(height, Math.ceil(Math.max(...ys)));
     if (right > left && bottom > top) m._FPDFBitmap_FillRect(bitmap, left, top, right - left, bottom - top, 0xffffffff);
-    m.HEAPF32.set([scale, 0, 0, scale, tx, ty], matrix >> 2);
+    m.HEAPF32.set([a, b, c, d, e, f], matrix >> 2);
     m.HEAPF32.set([0, 0, width, height], clip >> 2);
     m._FPDF_RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, 0);
     const out = new Uint8ClampedArray(m.HEAPU8.buffer.slice(buf, buf + bytes));

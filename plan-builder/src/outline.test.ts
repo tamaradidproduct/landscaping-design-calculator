@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, percentOff, labelPoint, insidePolygon } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -33,9 +33,6 @@ describe('geometry', () => {
 describe('formatting', () => {
   test('feet with two decimals', () => expect(formatFeet(138.314)).toBe("138.31′"));
   test('scale as feet per paper inch', () => expect(formatScale(116.45 / 207.8)).toBe('1 in on paper = 40.3 ft'));
-  test('percent difference vs printed value', () => {
-    expect(percentOff(13490, 13504)).toBeCloseTo(-0.1037, 3);
-  });
 });
 
 describe('guides', () => {
@@ -122,5 +119,27 @@ describe('labelPoint / insidePolygon', () => {
     expect(insidePolygon(sq, { x: 3, y: 4 })).toBe(true);
     expect(insidePolygon(sq, { x: 11, y: 4 })).toBe(false);
     expect(insidePolygon(sq, { x: -1, y: -1 })).toBe(false);
+  });
+});
+
+describe('outlineSuggestions', () => {
+  const o = (id: string, kind: Outline['kind'], name: string): Outline => ({ id, kind, name, pts: [], closed: true });
+  test('empty plan: suggest the boundary and House; every other preset is a quick pick', () => {
+    const s = outlineSuggestions([]);
+    expect(s.boundary).toBe(true);
+    expect(s.features).toEqual(['House']);
+    expect(s.picks).toContain('Driveway');
+    expect(s.picks).not.toContain('House');
+  });
+  test('boundary drawn (or being drawn): no boundary suggestion', () => {
+    expect(outlineSuggestions([{ ...o('boundary', 'boundary', 'Plot boundary'), closed: false }]).boundary).toBe(false);
+  });
+  test('a feature named house (any case or spacing) removes the House suggestion', () => {
+    expect(outlineSuggestions([o('f1', 'feature', '  house ')]).features).toEqual([]);
+  });
+  test('names already used drop out of the quick picks', () => {
+    const s = outlineSuggestions([o('f1', 'feature', 'Driveway')]);
+    expect(s.picks).not.toContain('Driveway');
+    expect(s.picks).toContain('Patio');
   });
 });

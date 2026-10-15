@@ -32,7 +32,7 @@ for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -12); await page.waitFor
 await page.keyboard.up('Control');
 await page.waitForTimeout(600);
 
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'BL']) { const s = await toScreen(C[k]); await page.mouse.click(...s); await page.waitForTimeout(150); }
 await page.click('#panel [data-act=close]');
 results.push(['Closes with the Close button', String(await page.evaluate(() => document.querySelector('.overlay .shape.closed') !== null))]);
@@ -41,7 +41,7 @@ results.push(['Closes with the Close button', String(await page.evaluate(() => d
 await page.mouse.click(...await toScreen(mid(C.TL, C.TR)));
 await page.fill('#edge-len', '116.45');
 await page.click('.popover button[type=submit]');
-results.push(['Scale', await page.evaluate(() => document.querySelector('#panel .text-body b')?.textContent ?? '(none)')]);
+results.push(['Scale', await page.textContent('#toast')]); // the toast after typing a length names the scale
 
 async function hoverLength(a, b) {
   await page.mouse.move(...await toScreen(mid(a, b))); await page.waitForTimeout(100);

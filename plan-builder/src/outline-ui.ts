@@ -1,13 +1,15 @@
 // Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  areaPt2, bulgeToward, constrain45, dist, edgeLengthPt, edgeMid, edgePoints, formatArea, formatFeet, formatScale, guides, nearestEdge,
-  insidePolygon, labelPoint, outlinePath, parseFeet, percentOff,
+  areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
+  insidePolygon, labelPoint, outlinePath, parseFeet,
   type Outline, type OutlineKind,
 } from './outline';
 import { History } from './history';
-import { MAGNIFIER, MARK, POPOVER, TIP } from './overlay-tokens';
-import { body, button, cardHead, error, esc, hint, input, label, nudgePad, row, status, token } from './ui';
+import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
+import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
+import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
+import { body, button, cardHead, error, esc, figure, hint, input, label, nudgePad, row, token } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -21,6 +23,10 @@ export interface ToolHost {
   toast(msg: string): void;
   /** Called whenever what can be undone/redone changes. */
   historyChanged(canUndo: boolean, canRedo: boolean): void;
+  /** Called after every change to the outlines, what is being drawn, or the selection. */
+  changed(): void;
+  /** The plan's stretch correction changed: redraw the page (and everything on it) in the new true shape. */
+  correctionChanged(c: Correction): void;
   /** Luminance (0–255) of the plan as shown, n×n samples at 1 per screen px, centred on screen point c. */
   sampleLuminance(c: Point, n: number): Float32Array | null;
 }
@@ -45,8 +51,11 @@ type Drag =
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
   drawing: string | null = null;
-  ftPerPt: number | null = null;
-  printedLotSqft: number | null = null;
+  /** Printed lengths typed for outline edges; the scale (and any stretch correction) is fitted to them. */
+  refs: Reference[] = [];
+  /** The fit of refs, recomputed on every update; null until a length is typed. */
+  cal: Calibration | null = null;
+  private shownCorrection: Correction = IDENTITY;
   private drag: Drag | null = null;
   private dragAt: Point | null = null;        // screen position of the point being placed or moved
   private hoverAt: Point | null = null;       // mouse position, for the rubber-band line
@@ -61,7 +70,8 @@ export class OutlineTool {
   private angle: number | null = null;        // Shift-constrained direction, degrees
   private hoverPlaced: Point | null = null;   // where a click would place the next corner (mouse)
   selectedCorner: { id: string; i: number } | null = null;
-  selectedFeature: string | null = null;
+  /** The outline being edited (boundary or feature): only it shows corners and bend handles, and only its can be dragged. */
+  selected: string | null = null;
   private replaced: Outline | null = null;     // the outline being redrawn, put back on Cancel
   private history = new History<Snapshot>();
   private dragBefore: Snapshot | null = null;
@@ -71,6 +81,7 @@ export class OutlineTool {
   private magnifier: HTMLCanvasElement;
   private popover: HTMLElement;
   private tip: HTMLElement;
+  private squareChip: HTMLElement;
   private panel: HTMLElement;
 
   constructor(private host: ToolHost, stage: HTMLElement, panel: HTMLElement) {
@@ -79,7 +90,10 @@ export class OutlineTool {
     this.magnifier = Object.assign(document.createElement('canvas'), { className: 'magnifier', hidden: true });
     this.popover = Object.assign(document.createElement('div'), { className: 'card popover', hidden: true });
     this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
-    stage.append(this.svg, this.magnifier, this.tip, this.popover);
+    this.squareChip = Object.assign(document.createElement('div'), { className: 'card square-chip', hidden: true });
+    this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } });
+    this.squareChip.querySelector<HTMLButtonElement>('[data-act=square]')!.onclick = () => this.squareSelectedCorner();
+    stage.append(this.svg, this.magnifier, this.tip, this.popover, this.squareChip);
     this.panel = panel;
     window.addEventListener('keydown', e => this.onKey(e));
   }
@@ -87,15 +101,15 @@ export class OutlineTool {
   // ---------- Undo / redo ----------
   private snapshot(): Snapshot {
     return {
-      outlines: structuredClone(this.outlines), drawing: this.drawing, ftPerPt: this.ftPerPt, selectedCorner: this.selectedCorner,
-      selectedFeature: this.selectedFeature, replaced: structuredClone(this.replaced),
+      outlines: structuredClone(this.outlines), drawing: this.drawing, refs: structuredClone(this.refs), selectedCorner: this.selectedCorner,
+      selected: this.selected, replaced: structuredClone(this.replaced),
     };
   }
   /** Call right before every change the user may want to undo. */
   private record() { this.history.record(this.snapshot()); this.lastNudge = null; }
   private restore(s: Snapshot) {
-    this.outlines = s.outlines; this.drawing = s.drawing; this.ftPerPt = s.ftPerPt; this.selectedCorner = s.selectedCorner;
-    this.selectedFeature = s.selectedFeature; this.replaced = s.replaced;
+    this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
+    this.selected = s.selected; this.replaced = s.replaced;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
@@ -122,7 +136,7 @@ export class OutlineTool {
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false };
     this.drawing = id;
-    this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selectedFeature = null;
+    this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selected = null;
     this.update();
   }
   cancel() {
@@ -139,7 +153,8 @@ export class OutlineTool {
     const o = this.outlines[id]; if (!o || o.kind !== 'feature') return;
     this.record();
     delete this.outlines[id];
-    if (this.selectedFeature === id) this.selectedFeature = null;
+    this.refs = this.refs.filter(r => r.id !== id);
+    if (this.selected === id) this.selected = null;
     if (this.selectedCorner?.id === id) this.selectedCorner = null;
     if (this.selectedEdge?.id === id) this.selectedEdge = null;
     this.host.toast(`${o.name} deleted.`);
@@ -148,9 +163,11 @@ export class OutlineTool {
   close() {
     const o = this.current(); if (!o || o.pts.length < 3) return;
     this.record();
-    o.closed = true; this.drawing = null; this.replaced = null;
+    // A redrawn outline's edges are new: lengths typed for the old ones no longer apply.
+    if (this.replaced) this.refs = this.refs.filter(r => r.id !== o.id);
+    o.closed = true; this.drawing = null; this.replaced = null; this.selected = o.id; // stays selected for adjusting
     o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
-    this.host.toast(this.ftPerPt
+    this.host.toast(this.cal
       ? `${o.name} outlined. Tap an edge to see its length.`
       : `${o.name} outlined. Now tap an edge and type its printed length to set the scale.`);
     this.update();
@@ -177,7 +194,7 @@ export class OutlineTool {
       const s = this.host.toScreen(this.outlines[hit.id]!.pts[hit.i]);
       this.drag = { type: 'corner', id: hit.id, i: hit.i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false };
       this.selectedCorner = { id: hit.id, i: hit.i };
-      if (!this.drawing) this.selectedFeature = this.outlines[hit.id]!.kind === 'feature' ? hit.id : null;
+      if (!this.drawing) this.selected = hit.id;
       this.dragBefore = this.snapshot();
       this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
       return true;
@@ -202,7 +219,7 @@ export class OutlineTool {
       return true;
     }
     const edge = this.edgeAt(p);
-    if (edge) { this.selectedEdge = edge; this.selectedFeature = null; this.update(); return true; }
+    if (edge) { this.selectedEdge = edge; this.selected = edge.id; this.update(); return true; }
     return false;
   }
 
@@ -329,8 +346,8 @@ export class OutlineTool {
     const now = performance.now(), ln = this.lastNudge;
     if (!(ln && ln.id === c.id && ln.i === c.i && now - ln.t < 1500)) this.record();
     this.lastNudge = { t: now, id: c.id, i: c.i };
-    const k = 1 / this.host.pxPerPt(), p = o.pts[c.i];
-    o.pts[c.i] = { x: p.x + dx * k, y: p.y + dy * k };
+    const s = this.host.toScreen(o.pts[c.i]); // one screen px, whatever the plan's stretch
+    o.pts[c.i] = this.host.toPage({ x: s.x + dx, y: s.y + dy });
     this.update();
   }
 
@@ -376,7 +393,7 @@ export class OutlineTool {
     if ((this.drag?.type === 'corner' || this.drag?.type === 'bend') && this.drag.moved && this.dragBefore) {
       // Put a corner or bend back where it was before the accidental drag.
       const before = this.dragBefore;
-      this.outlines = before.outlines; this.ftPerPt = before.ftPerPt;
+      this.outlines = before.outlines; this.refs = before.refs;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
     this.drag = null; this.magnifier.hidden = true; this.dragAt = null;
@@ -385,19 +402,27 @@ export class OutlineTool {
 
   /**
    * A tap or click no corner, edge or handle took: select the existing feature under it (the smallest,
-   * where features overlap), or drop the selection when it's outside every feature.
+   * where features overlap), or drop the selection when it's outside every feature. (The boundary covers
+   * the whole lot, so it's selected from its edges or its Layers row instead.)
    */
   tap(p: Point) {
     if (this.drawing) return;
     const hit = this.featureAt(p);
-    if (hit === this.selectedFeature && !this.selectedEdge && !this.selectedCorner) return;
-    this.selectedEdge = null; this.selectedCorner = null; this.selectedFeature = hit;
+    if (hit === this.selected && !this.selectedEdge && !this.selectedCorner) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selected = hit;
     this.update();
   }
+  /** Select an outline from the Layers panel (null: drop the selection). */
+  selectOutline(id: string | null) {
+    if (this.drawing || (id && !this.outlines[id]?.closed)) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
+  }
+  /** True while a finished outline has a corner, edge or feature selected. */
+  get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
   deselect() {
-    if (!this.selectedEdge && !this.selectedCorner && !this.selectedFeature) return;
-    this.selectedEdge = null; this.selectedCorner = null; this.selectedFeature = null; this.update();
+    if (!this.selectedEdge && !this.selectedCorner && !this.selected) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.update();
   }
   private featureAt(p: Point): string | null {
     const pp = this.host.toPage(p);
@@ -428,7 +453,7 @@ export class OutlineTool {
   private bendHandleAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd = BEND_HIT;
     for (const o of Object.values(this.outlines)) {
-      if (!o?.closed) continue;
+      if (!o?.closed || o.id !== this.selected) continue; // only the selected outline can be bent
       o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
@@ -439,6 +464,8 @@ export class OutlineTool {
       // While drawing, other outlines' corners are snap targets (a shared corner places a new point
       // there), not handles to drag.
       if (this.drawing && o.id !== this.drawing) continue;
+      // Otherwise only the selected outline's corners can be dragged: select first, then edit.
+      if (!this.drawing && o.id !== this.selected) continue;
       o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
@@ -454,20 +481,78 @@ export class OutlineTool {
   }
 
   // ---------- Scale ----------
-  setScaleFromEdge(id: string, i: number, feet: number) {
+  /** The contractor typed edge i's printed length: keep it as a reference and refit the scale. */
+  setEdgeLength(id: string, i: number, feet: number) {
     this.record();
-    this.ftPerPt = feet / edgeLengthPt(this.outlines[id]!.pts, i, this.outlines[id]!.bulges);
-    this.host.toast(`Scale set: ${formatScale(this.ftPerPt)}.`);
+    this.refs = [...this.refs.filter(r => r.id !== id || r.i !== i), { id, i, feet }];
     this.selectedEdge = null;
     this.update();
+    const c = this.cal!;
+    this.host.toast(c.stretched ? `Plan stretch corrected. ${formatCalibration(c)}.`
+      : c.needsOtherDirection ? 'These lengths all run the same way. Type one on an edge running the other way to correct a stretched plan.'
+      : this.refs.length > 1 ? `Scale refitted: ${formatScale(c.ftPerPt)}.` : `Scale set: ${formatScale(c.ftPerPt)}.`);
   }
-  private edgeFeet(id: string, i: number) {
-    return this.ftPerPt ? edgeLengthPt(this.outlines[id]!.pts, i, this.outlines[id]!.bulges) * this.ftPerPt : null;
+  removeReference(k: number) {
+    if (!this.refs[k]) return;
+    this.record(); this.refs = this.refs.filter((_, j) => j !== k); this.update();
+  }
+  /** Square: line the selected corner (only it) up with its neighbours (see square.ts). */
+  squareSelectedCorner() {
+    const c = this.selectedCorner, o = c && this.outlines[c.id];
+    if (!c || !o?.closed || this.drawing) return;
+    this.applyTidy(o, alignCorner(o.pts, o.bulges, c.i, this.shownCorrection));
+  }
+  /** Square all corners: line every corner of an outline up with the others at once. */
+  squareAll(id: string) {
+    const o = this.outlines[id]; if (!o?.closed || this.drawing) return;
+    this.applyTidy(o, alignAll(o.pts, o.bulges, this.shownCorrection));
+  }
+  /** True when tidying would move some corner by more than a hair (0.05 screen px). */
+  private moves(o: Outline, t: Tidied) { return t.pts.some((p, k) => dist(p, o.pts[k]) * this.host.pxPerPt() > 0.05); }
+  private applyTidy(o: Outline, t: Tidied) {
+    if (!this.moves(o, t)) return;
+    this.record();
+    o.pts = t.pts; if (t.bulges) o.bulges = t.bulges;
+    this.update();
+  }
+  /** "87.4° · Square" beside a selected corner of a finished outline that isn't square yet. */
+  private renderSquareChip() {
+    const chip = this.squareChip, c = this.selectedCorner, o = c && this.outlines[c.id];
+    // Shown while Square would still move the corner (lined up already, or no edge near across/down: hidden).
+    const show = c && o?.closed && !this.drawing && !this.drag && this.moves(o, alignCorner(o.pts, o.bulges, c.i, this.shownCorrection));
+    if (!show) { chip.hidden = true; return; }
+    const angle = cornerAngle(o!.pts, o!.bulges, c!.i, this.shownCorrection);
+    chip.querySelector('.text-figure')!.textContent = `${angle.toFixed(1)}°`;
+    chip.hidden = false;
+    const s = this.host.toScreen(o!.pts[c!.i]), stage = this.svg.getBoundingClientRect(), m = SQUARE_CHIP.margin;
+    chip.style.left = `${Math.max(m, Math.min(stage.width - chip.offsetWidth - m, s.x + SQUARE_CHIP.dx))}px`;
+    chip.style.top = `${Math.max(m, Math.min(stage.height - chip.offsetHeight - m, s.y + SQUARE_CHIP.dy))}px`;
+  }
+  /** Edge i as page points (arcs sampled), end included. */
+  edgeLine(id: string, i: number) {
+    const o = this.outlines[id]!, b = o.pts[(i + 1) % o.pts.length];
+    return [...edgePoints(o.pts[i], b, o.bulges?.[i] ?? 0), b];
+  }
+  edgeFeet(id: string, i: number) {
+    return this.cal && this.outlines[id]?.pts[i] ? lineFeet(this.edgeLine(id, i), this.cal) : null;
+  }
+  /** Area of a closed outline in square feet (null before the scale is set). */
+  areaSqft(o: Outline) {
+    const c = this.cal; if (!c) return null;
+    const m = c.correction;
+    return areaPt2(o.pts, o.bulges) * Math.abs(m.a * m.d - m.b * m.c) * c.ftPerPt * c.ftPerPt;
+  }
+  /** Refit the scale to the typed lengths; tell the host when the plan's stretch correction changes. */
+  private recalibrate() {
+    const valid = this.refs.filter(r => this.outlines[r.id]?.closed && r.i < this.outlines[r.id]!.pts.length);
+    this.cal = calibrate(valid.map(r => ({ line: this.edgeLine(r.id, r.i), feet: r.feet })));
+    const c = this.cal?.correction ?? IDENTITY;
+    if (!sameCorrection(c, this.shownCorrection)) { this.shownCorrection = c; this.host.correctionChanged(c); }
   }
 
   // ---------- Rendering ----------
   /** Redraw overlay, popover and panel. */
-  update() { this.render(); this.renderPopover(); this.renderPanel(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); }
+  update() { this.recalibrate(); this.render(); this.renderPopover(); this.renderPanel(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); this.host.changed(); }
 
   render() {
     const h = this.host;
@@ -480,19 +565,21 @@ export class OutlineTool {
       else if (drawingThis && this.hoverPlaced && !this.drag) pts.push(this.hoverPlaced);
       const line = o.closed ? outlinePath(o.pts, o.bulges, true).map(p => h.toScreen(p)) : pts;
       const d = line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed ? ' Z' : '');
-      const sel = this.selectedFeature === o.id;
+      const sel = this.selected === o.id;
       svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
         svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${COLORS[o.kind]}"/>`;
       }
-      if (o.closed && !this.drawing) o.pts.forEach((_, i) => {
+      // Only the outline being drawn or edited shows its handles; the rest are just shape and name.
+      const handles = drawingThis || (!this.drawing && this.selected === o.id);
+      if (o.closed && handles) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
         svg += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       });
-      o.pts.forEach((p, i) => {
+      if (handles) o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
         const closeTarget = drawingThis && i === 0 && o.pts.length >= 3;
         if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${COLORS[o.kind]}"/>`;
@@ -503,7 +590,7 @@ export class OutlineTool {
       // Names go on top of every shape so overlapping features stay readable.
       if (o.kind !== 'feature' || !o.closed) continue;
       const c = h.toScreen(labelPoint(outlinePath(o.pts, o.bulges, true)));
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selectedFeature === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);
@@ -527,6 +614,7 @@ export class OutlineTool {
     }
     this.svg.innerHTML = svg;
     this.positionPopover();
+    this.renderSquareChip();
     if (this.dragAt && !this.magnifier.hidden) this.drawMagnifier();
   }
 
@@ -595,26 +683,30 @@ export class OutlineTool {
     const e = this.selectedEdge;
     if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
     const ft = this.edgeFeet(e.id, e.i);
-    const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i];
+    const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i], ref = this.refs.find(r => r.id === e.id && r.i === e.i);
     this.popover.innerHTML = `
       ${cardHead(`${esc(o.name)} edge`)}
-      <div class="text-figure">${ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet'}</div>
+      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
       ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it.')}
       <form class="stack">
         <div class="field">${label('edge-len', 'Printed length on the plan')}
-        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"` }), button(this.ftPerPt ? 'Reset scale' : 'Set scale', { variant: 'primary', type: 'submit' }))}</div>
+        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' }))}</div>
+        ${ref ? button('Remove this length', { variant: 'danger', data: { act: 'unref' } })
+          : this.cal ? hint('Lengths on edges running across and down also correct a stretched plan.') : ''}
         ${error(`Type a length in feet, like 116.45 or 116' 5".`)}
       </form>`;
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
     if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.id]!.bulges![e.i] = 0; this.update(); };
+    const unref = this.popover.querySelector<HTMLButtonElement>('[data-act=unref]');
+    if (unref) unref.onclick = () => { this.selectedEdge = null; this.removeReference(this.refs.indexOf(ref!)); };
     const form = this.popover.querySelector('form')!;
     form.onsubmit = ev => {
       ev.preventDefault();
       const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
       if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
-      this.setScaleFromEdge(e.id, e.i, feet);
+      this.setEdgeLength(e.id, e.i, feet);
     };
     this.positionPopover();
   }
@@ -641,30 +733,22 @@ export class OutlineTool {
     } else {
       const closed = Object.values(this.outlines).filter(x => x.closed);
       if (!closed.length) { p.hidden = true; return; }
-      const f = this.selectedFeature ? this.outlines[this.selectedFeature] : null;
-      if (f) { this.renderFeaturePanel(f); return; }
-      const b = this.outlines.boundary?.closed ? this.outlines.boundary : null;
-      const area = b && this.ftPerPt ? areaPt2(b.pts, b.bulges) * this.ftPerPt * this.ftPerPt : null;
-      const off = area && this.printedLotSqft ? percentOff(area, this.printedLotSqft) : null;
+      const f = this.selected ? this.outlines[this.selected] : null;
+      if (f?.kind === 'feature') { this.renderFeaturePanel(f); return; }
       p.innerHTML = `
-        ${body(this.ftPerPt ? `Scale: <b>${formatScale(this.ftPerPt)}</b>. Tap or hover an edge to see its length.` : 'Tap an edge and type its printed length to set the scale.')}
-        ${area ? `<div class="field-row"><span>Plot area <b>${formatArea(area)}</b></span>
-          ${label('lot-size', 'Printed lot size')}${input('lot-size', { inputmode: 'numeric', placeholder: '13,504', value: this.printedLotSqft ? String(this.printedLotSqft) : '', short: true })}
-          ${off !== null ? status(Math.abs(off) <= 1, Math.abs(off) < 0.05 ? 'matches' : `${Math.abs(off).toFixed(1)}% ${off > 0 ? 'over' : 'under'}`) : ''}</div>` : ''}
+        ${body(this.cal ? 'Tap or hover an edge to see its length.' : 'Tap an edge and type its printed length to set the scale.')}
         ${this.nudge_()}
         ${closed.some(c => c.kind === 'feature') ? hint('Tap inside an existing feature to rename, delete or redraw it.') : ''}
-        ${b ? row(button('Redo plot boundary', { data: { redo: 'boundary' } })) : ''}`;
+        ${f?.kind === 'boundary' ? row(button('Square all corners', { data: { act: 'square-all' } })) : ''}
+`;
       p.hidden = false;
-      const lot = p.querySelector<HTMLInputElement>('#lot-size');
-      if (lot) lot.onchange = () => { const v = Number(lot.value.replace(/[^\d.]/g, '')); this.printedLotSqft = v > 0 ? v : null; this.renderPanel(); };
     }
     p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => {
-      btn.onclick = () => ({ close: () => this.close(), cancel: () => this.cancel() } as Record<string, () => void>)[btn.dataset.act!]();
+      btn.onclick = () => ({ close: () => this.close(), cancel: () => this.cancel(), 'square-all': () => this.squareAll(BOUNDARY) } as Record<string, () => void>)[btn.dataset.act!]();
     });
     p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
       btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
     });
-    p.querySelectorAll<HTMLButtonElement>('[data-redo]').forEach(btn => { btn.onclick = () => this.redraw(btn.dataset.redo!); });
   }
 
   /** Panel for a selected existing feature: rename, redraw, delete. */
@@ -675,12 +759,12 @@ export class OutlineTool {
         ${label('feature-name-edit', 'Existing feature')}${input('feature-name-edit', { value: f.name })}${button('Rename', { type: 'submit' })}
       </form>
       ${this.nudge_()}
-      ${row(button('Redo outline', { data: { act: 'redraw' } }), button('Delete', { variant: 'danger', data: { act: 'delete' } }), button('Done', { data: { act: 'done' } }))}`;
+      ${row(button('Square all corners', { data: { act: 'square-all' } }), button('Redo outline', { data: { act: 'redraw' } }), button('Delete', { variant: 'danger', data: { act: 'delete' } }), button('Done', { data: { act: 'done' } }))}`;
     p.hidden = false;
     const field = p.querySelector<HTMLInputElement>('#feature-name-edit')!;
     p.querySelector('form')!.onsubmit = ev => { ev.preventDefault(); this.renameFeature(f.id, field.value); field.blur(); };
     const act: Record<string, () => void> = {
-      redraw: () => this.redraw(f.id), delete: () => this.deleteFeature(f.id), done: () => this.deselect(),
+      redraw: () => this.redraw(f.id), delete: () => this.deleteFeature(f.id), done: () => this.deselect(), 'square-all': () => this.squareAll(f.id),
     };
     p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => { btn.onclick = act[btn.dataset.act!]; });
     p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
@@ -720,6 +804,12 @@ export class OutlineTool {
   }
 }
 
+/** "Across 1 in = 30.0 ft · Down 1 in = 29.6 ft" (or one scale when not stretched). */
+function formatCalibration(c: Calibration): string {
+  if (!c.stretched) return formatScale(c.ftPerPt);
+  return `Across 1 in = ${(c.ftPerPt * c.correction.a * 72).toFixed(1)} ft · Down 1 in = ${(c.ftPerPt * c.correction.d * 72).toFixed(1)} ft`;
+}
+
 function crosshair(x: number, y: number): string {
   const o = MARK.crosshairOuter, g = MARK.crosshairGap;
   return `<path d="M${x - o} ${y}H${x - g}M${x + g} ${y}H${x + o}M${x} ${y - o}V${y - g}M${x} ${y + g}V${y + o}" class="crosshair"/>`;
@@ -729,8 +819,8 @@ function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y -
 interface Snapshot {
   outlines: Record<string, Outline>;
   drawing: string | null;
-  ftPerPt: number | null;
+  refs: Reference[];
   selectedCorner: { id: string; i: number } | null;
-  selectedFeature: string | null;
+  selected: string | null;
   replaced: Outline | null;
 }

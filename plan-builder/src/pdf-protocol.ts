@@ -2,7 +2,10 @@
 export type WorkerRequest =
   | { type: 'warmup'; id: number }
   | { type: 'open'; id: number; bytes: ArrayBuffer }
-  | { type: 'render'; id: number; width: number; height: number; scale: number; tx: number; ty: number };
+  /** matrix [a, b, c, d, e, f]: page point (x, y) lands at device (a·x + c·y + e, b·x + d·y + f). */
+  | { type: 'render'; id: number; width: number; height: number; matrix: Matrix };
+
+export type Matrix = [number, number, number, number, number, number];
 
 export type WorkerResponse =
   | { type: 'ready'; id: number }

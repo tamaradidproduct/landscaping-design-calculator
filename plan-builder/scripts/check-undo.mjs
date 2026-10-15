@@ -9,13 +9,13 @@ const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
 await page.setInputFiles('#file', pdf);
 await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
-await page.click('#snap'); // exact clicks
+await page.$eval('#snap', b => b.click()); // shown only while drawing; exact clicks
 
 const dots = () => page.$$eval('.overlay circle.corner', cs => cs.map(c => `${Math.round(+c.getAttribute('cx'))},${Math.round(+c.getAttribute('cy'))}`).join(' '));
 const state = async () => `${(await dots()) || '(none)'}${await page.evaluate(() => document.querySelector('.overlay .shape.closed') ? ' [closed]' : '')}`;
 const step = async (label, fn) => { await fn(); await page.waitForTimeout(120); results.push([label, await state()]); };
 
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 await step('place dots 1-3', async () => { for (const [x, y] of [[400, 300], [600, 300], [600, 500]]) { await page.mouse.click(x, y); await page.waitForTimeout(400); } });
 await step('⌘Z (undo dot 3)', () => page.keyboard.press('Meta+z'));
 await step('⌘Z (undo dot 2)', () => page.keyboard.press('Meta+z'));

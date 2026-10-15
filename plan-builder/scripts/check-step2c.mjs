@@ -22,15 +22,15 @@ const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
 await page.mouse.move(...await toScreen([390, 380]));
 await page.keyboard.down('Control'); for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(800);
-await page.click('#snap'); // exact placement from the known coordinates
+await page.$eval('#snap', b => b.click()); // shown only while drawing; exact placement from the known coordinates
 
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'P', 'BL']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
 await page.click('#panel [data-act=close]');
 await page.mouse.click(...await toScreen([(C.TL[0] + C.TR[0]) / 2, (C.TL[1] + C.TR[1]) / 2]));
 await page.fill('#edge-len', '116.45');
 await page.click('.popover button[type=submit]');
-const area = async () => page.$eval('#panel .field-row b', b => b.textContent);
+const area = async () => page.$eval('#outlines [data-layer=boundary] .layer-sub', e => e.textContent);
 results.push(['Area with the street edge straight', await area()]);
 
 // Bend the street edge (BR → P) by dragging its middle handle onto the drawn curve.
@@ -39,8 +39,8 @@ const target = await toScreen(ARC_MID);
 await page.mouse.move(...chordMid); await page.mouse.down();
 await page.mouse.move(...target, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(150);
 results.push(['Area with the street edge bent', await area()]);
-await page.fill('#lot-size', '13504'); await page.press('#lot-size', 'Tab'); await page.waitForTimeout(100);
-results.push(['vs printed lot size 13,504 sq ft', await page.$eval('#panel .field-row .status-ok, #panel .field-row .status-warn', e => e.textContent)]);
+const bentArea = Number((await area()).replace(/[^\d]/g, ''));
+results.push(['vs printed lot size 13,504 sq ft', `${((bentArea - 13504) / 13504 * 100).toFixed(1)}% off`]);
 
 await page.mouse.move(...await toScreen([ARC_MID[0] - 30, ARC_MID[1] - 2.6])); await page.waitForTimeout(150);
 results.push(['Curved edge length (printed L = 62.02′)', await page.$eval('.tip', e => e.textContent)]);

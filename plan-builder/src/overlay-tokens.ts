@@ -23,3 +23,4 @@ export const MARK = {
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;
 export const POPOVER = { margin: 8, below: 24, fallbackWidth: 300, fallbackHeight: 170 } as const;
 export const TIP = { offset: 14 } as const; // edge-length tip, down-right of the pointer
+export const SQUARE_CHIP = { dx: 20, dy: -60, margin: 8 } as const; // "87° · Square" chip, up-right of the selected corner

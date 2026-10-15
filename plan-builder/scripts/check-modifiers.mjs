@@ -14,7 +14,7 @@ await page.waitForFunction(() => document.getElementById('toast').textContent.st
 const label = () => page.$$eval('.overlay .label.snap', ts => ts.map(t => t.textContent).join(' ') || '(none)');
 const check = async (name, fn) => { await fn(); await page.waitForTimeout(120); results.push([name, await label()]); };
 
-await page.click('#outline'); await page.click('[data-outline=boundary]');
+await page.click('[data-start=boundary]');
 await page.mouse.click(400, 300); await page.waitForTimeout(400);
 await check('Hover, no keys', () => page.mouse.move(520, 340));
 await check('Shift down', () => page.keyboard.down('Shift'));

@@ -45,7 +45,9 @@
 - Opens in about a second once the app has warmed up. Rendering uses **PDFium** (WebAssembly): PDF.js took ~12 s on a real plan whose text is drawn as shapes.
 - Pinch/scroll-pinch zooms; one finger or two-finger trackpad drag pans; **panning is free** (not limited to the page). Double-tap zooms in / back to fit.
 - Works **offline** after the first load.
-- 📝 Replace "Open another" with an **edit button next to the file name** (low priority; ❓ edit = rename or replace the file).
+- 🔨 **Plot plan layer** at the bottom of the Layers panel: **eye** shows/hides the plan (hidden = no snapping to its lines), the **file name** with a pencil opens a different plot plan, and an **opacity** slider (10–100%). Resets to shown, 100% on opening a file. ("Open another" removed.)
+- 🔨 **Side panel** on the right (always docked, 280 px), top to bottom: **Undo / Redo** · **zoom − / + / Fit page** · **Layers**. Layers has an **Outlines** section: one row per outline (tap a feature's row to select it), then suggestions while missing — **Plot boundary**, **House**, **Custom outline…** (quick picks: Driveway, Patio, Porch, Walk, Deck, Garage, Shed, Pool, or type a name). Sections by trade come later.
+- 🔨 **Snap toggle** floats at the bottom left of the plan, shown only while drawing an outline or with a finished outline's corner, edge or feature selected.
 
 ### 6.2 Outlining ✅🔨
 - **Pure drawing** — works the same for vector PDFs and scans; never relies on the PDF's vector data.
@@ -53,7 +55,11 @@
 - Placing: tap corners. On touch, a **tap places exactly under the finger**; when the finger **drags** to adjust, the point rises gradually to ~56 px **above the finger** so it stays visible, with a **magnifier**.
 - Closing: **Close shape** button, **double-tap/double-click**, or tap the first corner.
 - Clicking/tapping **outside a shape clears its selection** (selected corner, edge popover).
-- Editing: corners are always **freely movable** (even after snapping wrong); **nudge** with arrow buttons/keys.
+- **Select, then edit:** only the **selected** outline shows its corners and bend squares, and only its corners/edges can be dragged (freely, even after snapping wrong); **nudge** with arrow buttons/keys. Unselected outlines show just their shape and name. Select from the Layers row, by tapping inside a feature, or by tapping an edge (the boundary covers the whole lot, so it's selected from its edges or row). A just-closed outline stays selected. **Redo** for the plot boundary sits beside its Layers row.
+- 🔨 **Tidy: Square.** With a corner of a finished outline selected, a chip beside it shows its angle and **Square** (shown only while Square would move it). Square **lines the corner up with its neighbours**: along an edge running across it takes that neighbour's height, along one running down its left–right position — so the corner comes out square and in line with the walls. Only that corner moves. **Square all corners** (bottom panel, selected outline) lines every corner up at once (corners joined by an across edge share a height, by a down edge a left–right position).
+  - "Across/down" follow the **outline's own direction** (the direction most of its edge length agrees with), so a house drawn at an angle lines up with its own walls; worked out in true shape after any stretch correction.
+  - Only edges within **8°** of across/down are lined up: slanted edges (45° bays, Riesberg's side lot line at 16°) and **bent edges** are left alone; bent edges keep their bulge per chord. One undo step.
+  - ⚠️ Square all on a lot also flattens real slight slants within 8° (Riesberg's top line is 1.3° off flat) — per-corner Square is the safer tool on lot boundaries.
 - **Touch navigation while outlining:** one finger places and drags points; **two fingers always pan and zoom** (a second finger cancels whatever the first started, so nothing gets placed or moved by accident).
 - **Snapping** on by default to drawn lines and corners (heavy outlines preferred, lettering ignored) and to the outline's own corners; **turn off** with the toolbar toggle, **hold Option/Alt** (keyboard), or on touch **press and hold still (~½ s) before moving** to place that point freely ("Free" label).
 - **Guides are hints only** (90°, straight, aligned with another corner): shown, never pulled into place. Straight lines and 45° steps come only from holding **Shift**, which still snaps along the ray. Snapping without Shift = the outlines' own corners, then lines/corners in the drawing.
@@ -64,9 +70,10 @@
 - **Undo/redo** for every step, including each dot of an unfinished outline.
 
 ### 6.3 Scale & checks ✅🔨
-- Tap an edge, type its printed length (`116.45`, `116' 5"`) → scale (shown as "1 in on paper = 30.0 ft").
+- Tap an edge, type its printed length (`116.45`, `116' 5"`) → scale (shown as "1 in on paper = 30.0 ft"). Every typed length is kept as a **reference**; the scale is fitted to all of them. The scale isn't shown on screen (only in the toast after typing); an edge with a typed length shows it in its popover with **Update** and **Remove this length** (undoable).
+- 🔨 **Stretched plans:** with references on edges running different ways (across vs down), the app fits **separate across and down scales** and stretches the plan picture and outlines back to their **true shape** ("Across 1 in = 30.0 ft · Down 1 in = 33.0 ft"). References all running the same way keep one best-fit scale and ask for one the other way. The correction is a general 2×2 transform (only stretch for now); 📝 skew later fits more of it from 3+ references. Redrawing an outline drops the lengths typed for its old edges.
 - Edge lengths appear only on **hover or tap**; curved edges measure along the curve.
-- Plot area is shown; type the printed lot size to see the % difference.
+- Plot area is shown quietly under **Plot boundary** in the Layers panel. (Typing the printed lot size to compare was removed: not needed.)
 - Accuracy target: **within 1%** of printed dimensions.
 - 📝 Later calibration methods: trace-the-lot with typed lengths for every edge; reading the printed scale (unreliable: Riesberg prints both 1"=30' and 1"=20'; only 1"=30' is right) — would need OCR, as plan text is often drawn as shapes.
 
@@ -86,7 +93,7 @@
 - Drawn with the same outline tool (snapping, guides, curves, undo/redo).
 - Shown as **grey fill + its name**, like the house on the Servin plan sheet.
 - Result of Step 3 is **visual only** — no quantities or totals yet.
-- 🔨 **Outline** menu = **Plot boundary** · **Existing feature…**. A feature is named first: quick picks (House, Driveway, Patio, Walk, Deck) or any typed name.
+- 🔨 Started from the **Layers → Outlines** suggestions (Plot boundary · House · Custom outline…). A feature is named first: a suggestion, a quick pick, or any typed name.
 - 🔨 **Tap inside** a feature to select it → **Rename**, **Redo outline** (Cancel puts the old one back), **Delete**. Overlapping features: the tap picks the smallest one under the finger (a porch inside the house).
 - 🔨 Features may overlap each other and the boundary; nothing is clipped. Any feature edge can still set the scale.
 - 🔨 While drawing, other outlines' corners are snap targets, not handles — tapping a shared corner (driveway meeting the garage) places a new point there instead of dragging the house's corner.
