@@ -57,7 +57,7 @@
 
   /* ---------- Space ---------- */
   --space-1: 2px; /* Focus-ring offset. */
-  --space-2: 4px; /* Smallest step of the spacing scale (nothing uses it right now). */
+  --space-2: 4px; /* Smallest step of the spacing scale: the gap between a material chip's swatch and name. */
   --space-3: 6px; /* Chip and nudge gaps; label-to-field gap; tip vertical padding. */
   --space-4: 8px; /* Default row gap; layer-list and layer-card gaps; layer-card top padding. */
   --space-5: 10px; /* Card inner gap; tip horizontal padding; layer-row and layer-card side padding; layer-fo… */
