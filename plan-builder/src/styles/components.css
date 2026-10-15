@@ -121,9 +121,9 @@ input.layer-rename { flex: 1; min-height: var(--control-sm); padding: 0 var(--sp
 input.layer-rename:hover, input.layer-rename:focus { background: var(--color-surface); border-color: var(--color-line); }
 .layer-form { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); }
 
-/* Plot plan layer: pinned to the bottom of the Layers panel (show/hide, file name, opacity) */
+/* Plot plan layer: at the end of the Outlines section, collapsing with it (show/hide, file name, opacity) */
 .side-section.layers { flex: 1; }
-.plan-layer { margin-top: auto; padding-top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); border-top: var(--border-width) solid var(--color-line); }
+.plan-layer { padding-top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); border-top: var(--border-width) solid var(--color-line); }
 .plan-layer .field-row { flex-wrap: nowrap; }
 .line-icon { flex: none; width: var(--width-icon); height: var(--width-icon); fill: none; stroke: currentColor; stroke-width: var(--stroke-regular); stroke-linejoin: round; stroke-linecap: round; }
 [aria-pressed="true"] > .line-icon .eye-off { display: none; }
@@ -151,3 +151,12 @@ button.chip.material-chip { display: inline-flex; align-items: center; gap: var(
 button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
 .swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
 .swatch.material svg { display: block; width: 100%; height: 100%; }
+/* ---------- Collapsible Layers section: a header button (chevron, title, count when collapsed) over its body ---------- */
+button.group-head {
+  display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: var(--control-sm); margin-top: var(--space-3); padding: 0 var(--space-2);
+  font-size: var(--text-sm); font-weight: var(--weight-strong); color: var(--color-muted); text-align: left; background: transparent; border-color: transparent;
+}
+button.group-head:hover { color: var(--color-ink); }
+button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+.group-count { font-weight: var(--weight-regular); font-variant-numeric: tabular-nums; }
+.group-body { display: flex; flex-direction: column; gap: var(--space-4); }

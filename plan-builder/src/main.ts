@@ -4,6 +4,7 @@ import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
+import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -69,6 +70,7 @@ const tool = new OutlineTool({
   changed() {
     surfaces?.render();
     outlines?.render();
+    updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
     $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
     stage.classList.toggle('drawing', !!tool.drawing);
@@ -102,10 +104,35 @@ const tool = new OutlineTool({
     return out;
   },
 }, stage);
+// Collapsible Layers sections: the open/closed state is remembered on this device; a collapsed header shows its count.
+const GROUPS_KEY = 'plan-builder.sections';
+const groupsOpen = readOpen((() => { try { return localStorage.getItem(GROUPS_KEY); } catch { return null; } })());
+let activeLayer: string | null = null; // the layer being drawn, else selected — its section opens when it changes
+function setGroupOpen(g: Group, open: boolean) {
+  groupsOpen[g] = open;
+  try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ }
+  updateGroups();
+}
+function updateGroups() {
+  const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
+  activeLayer = next;
+  if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
+  const counts = groupCounts(Object.values(tool.outlines));
+  document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
+    const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
+    b.setAttribute('aria-expanded', String(isOpen));
+    $(`group-${g}`).hidden = !isOpen;
+    count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
+  });
+}
+document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
+  b.onclick = () => setGroupOpen(b.dataset.group as Group, !groupsOpen[b.dataset.group as Group]);
+});
 surfaces = new SurfacesSection($('surfaces'), tool);
 surfaces.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
+updateGroups();
 
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
