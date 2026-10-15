@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -142,4 +142,11 @@ describe('outlineSuggestions', () => {
     expect(s.picks).not.toContain('Driveway');
     expect(s.picks).toContain('Patio');
   });
+});
+
+describe('rectCorners', () => {
+  test('opposite corners → four corners square to the axes, starting at the first', () => {
+    expect(rectCorners({ x: 10, y: 20 }, { x: 40, y: 5 })).toEqual([{ x: 10, y: 20 }, { x: 40, y: 20 }, { x: 40, y: 5 }, { x: 10, y: 5 }]);
+  });
+  test('area is width × height', () => expect(areaPt2(rectCorners({ x: 0, y: 0 }, { x: 30, y: 12 }))).toBe(360));
 });

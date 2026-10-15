@@ -22,7 +22,7 @@ await step('⌘Z (undo dot 2)', () => page.keyboard.press('Meta+z'));
 await step('⇧⌘Z (redo dot 2)', () => page.keyboard.press('Meta+Shift+z'));
 await step('⇧⌘Z (redo dot 3)', () => page.keyboard.press('Meta+Shift+z'));
 await step('⇧⌘Z again (nothing to redo)', () => page.keyboard.press('Meta+Shift+z'));
-await step('place dot 4, close', async () => { await page.mouse.click(400, 500); await page.waitForTimeout(400); await page.click('#panel [data-act=close]'); });
+await step('place dot 4, close', async () => { await page.mouse.click(400, 500); await page.waitForTimeout(400); await page.click('#outlines [data-act=close]'); });
 await step('⌘Z (reopen: back to 4 dots, not closed)', () => page.keyboard.press('Meta+z'));
 await step('⇧⌘Z (closed again)', () => page.keyboard.press('Meta+Shift+z'));
 await step('drag corner 600,500 → 650,560', async () => { await page.mouse.move(600, 500); await page.mouse.down(); await page.mouse.move(650, 560, { steps: 4 }); await page.mouse.up(); });

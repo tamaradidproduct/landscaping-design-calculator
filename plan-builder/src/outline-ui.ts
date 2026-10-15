@@ -2,14 +2,15 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
-  insidePolygon, labelPoint, outlinePath, parseFeet,
-  type Outline, type OutlineKind,
+  outlinePath, parseFeet, rectCorners,
+  type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
-import { body, button, cardHead, error, esc, figure, hint, input, label, nudgePad, row, token } from './ui';
+import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
+import { button, cardHead, error, esc, figure, hint, input, label, row, token } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -37,6 +38,7 @@ const TOUCH_OFFSET = 56;    // when dragging to place on touch, the point rises 
 const DOUBLE_TAP_MS = 350;
 const HOLD_MS = 450;        // touch: press and hold this long without moving to place freely
 const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holding still
+const RECT_MIN = 8;         // screen px: a rectangle narrower or shorter than this wasn't meant
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
@@ -44,7 +46,7 @@ const COLORS: Record<OutlineKind, string> = { boundary: 'var(--color-boundary)',
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
-  | { type: 'place'; finger: Point; start: Point; touch: boolean; offsetY: number }
+  | { type: 'place'; finger: Point; start: Point; touch: boolean; offsetY: number; rectStart?: boolean }
   | { type: 'corner'; id: string; i: number; grab: Point; moved: boolean }
   | { type: 'bend'; id: string; i: number; grab: Point; moved: boolean };
 
@@ -56,6 +58,9 @@ export class OutlineTool {
   /** The fit of refs, recomputed on every update; null until a length is typed. */
   cal: Calibration | null = null;
   private shownCorrection: Correction = IDENTITY;
+  /** What each layer shows once higher layers and the plot boundary have cut it (refreshed on every render). */
+  private visible = new Map<string, Shape>();
+  private visibleKey = '';
   private drag: Drag | null = null;
   private dragAt: Point | null = null;        // screen position of the point being placed or moved
   private hoverAt: Point | null = null;       // mouse position, for the rubber-band line
@@ -63,6 +68,8 @@ export class OutlineTool {
   private selectedEdge: { id: string; i: number } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
   snapOn = true;
+  /** How new outlines are drawn (the bottom bar's Freehand | Rectangle). */
+  shape: OutlineShape = 'freehand';
   private rawAt: Point | null = null;          // where the point would be without snapping
   private snapped: 'corner' | 'line' | 'own' | null = null;
   private stick: { page: Point; kind: 'corner' | 'line' | 'own' } | null = null; // current snap target (sticky)
@@ -82,9 +89,8 @@ export class OutlineTool {
   private popover: HTMLElement;
   private tip: HTMLElement;
   private squareChip: HTMLElement;
-  private panel: HTMLElement;
 
-  constructor(private host: ToolHost, stage: HTMLElement, panel: HTMLElement) {
+  constructor(private host: ToolHost, stage: HTMLElement) {
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.classList.add('overlay');
     this.magnifier = Object.assign(document.createElement('canvas'), { className: 'magnifier', hidden: true });
@@ -94,7 +100,6 @@ export class OutlineTool {
     this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } });
     this.squareChip.querySelector<HTMLButtonElement>('[data-act=square]')!.onclick = () => this.squareSelectedCorner();
     stage.append(this.svg, this.magnifier, this.tip, this.popover, this.squareChip);
-    this.panel = panel;
     window.addEventListener('keydown', e => this.onKey(e));
   }
 
@@ -160,13 +165,18 @@ export class OutlineTool {
     this.host.toast(`${o.name} deleted.`);
     this.update();
   }
-  close() {
+  close(record = true) {
     const o = this.current(); if (!o || o.pts.length < 3) return;
-    this.record();
+    if (record) this.record();
     // A redrawn outline's edges are new: lengths typed for the old ones no longer apply.
+    const isNew = !this.replaced;
     if (this.replaced) this.refs = this.refs.filter(r => r.id !== o.id);
     o.closed = true; this.drawing = null; this.replaced = null; this.selected = o.id; // stays selected for adjusting
     o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
+    // New layers go to the bottom (so higher ones cut them), except one drawn wholly inside another: it goes
+    // just above the topmost one containing it, so it isn't hidden the moment it's finished.
+    const inside = isNew && o.kind !== 'boundary' ? containers(o, Object.values(this.outlines)) : [];
+    if (inside.length) this.placeAbove(o.id, inside[0]);
     this.host.toast(this.cal
       ? `${o.name} outlined. Tap an edge to see its length.`
       : `${o.name} outlined. Now tap an edge and type its printed length to set the scale.`);
@@ -210,8 +220,11 @@ export class OutlineTool {
     if (this.drawing) {
       // A tap places right under the finger; only when the finger starts dragging does the point
       // rise above it (gradually, so it doesn't jump), keeping it visible while adjusting.
-      const touch = pointerType !== 'mouse';
-      this.drag = { type: 'place', finger: p, start: p, touch, offsetY: 0 };
+      const touch = pointerType !== 'mouse', o = this.current()!;
+      // Rectangle: the press places the first corner; the drag (or a second tap) gives the opposite one.
+      const rectStart = this.shape === 'rect' && !o.pts.length;
+      if (rectStart) { this.record(); o.pts.push(this.host.toPage(this.placeAt({ x: p.x, y: p.y }, null))); this.selectedCorner = null; }
+      this.drag = { type: 'place', finger: p, start: p, touch, offsetY: 0, rectStart };
       this.rawAt = { x: p.x, y: p.y };
       this.dragAt = this.placeAt(this.rawAt, this.anchorFor(null));
       if (touch) this.showMagnifier();
@@ -375,6 +388,11 @@ export class OutlineTool {
       this.dragAt = null; this.snapped = null; this.update(); return;
     }
     const o = this.current(); if (!o || !this.dragAt) return;
+    if (this.shape === 'rect') {
+      // A tap on the first corner leaves it waiting for the opposite one; a drag (or the second tap) finishes.
+      if (d.rectStart && dist(d.finger, d.start) < HOLD_SLOP) { this.dragAt = null; this.snapped = null; this.update(); return; }
+      this.finishRect(this.dragAt); return;
+    }
     const now = performance.now();
     const isDouble = this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS && dist(this.lastTap.finger, d.finger) < 30;
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
@@ -386,10 +404,24 @@ export class OutlineTool {
     this.update();
   }
 
+  /** Rectangle from the first corner to the opposite one at screen point `at`, square to the plan; closes it. */
+  private finishRect(at: Point) {
+    const o = this.current()!, a = this.host.toScreen(o.pts[0]);
+    this.dragAt = null; this.snapped = null;
+    if (Math.abs(at.x - a.x) < RECT_MIN || Math.abs(at.y - a.y) < RECT_MIN) {
+      this.host.toast('Drag to the opposite corner to draw a rectangle.'); this.update(); return;
+    }
+    this.record();
+    o.pts = rectCorners(a, at).map(q => this.host.toPage(q));
+    this.close(false);
+  }
+
   /** A second finger arrived: abandon the single-finger action. */
   /** A second finger arrived: the gesture is navigation, so drop the single-finger action entirely. */
   cancelPointer() {
     clearTimeout(this.holdTimer); this.downFinger = null; this.bypassHold = false;
+    // A rectangle's first corner, placed by the finger that turned out to be the start of a pinch: take it back.
+    if (this.drag?.type === 'place' && this.drag.rectStart) this.current()?.pts.pop();
     if ((this.drag?.type === 'corner' || this.drag?.type === 'bend') && this.drag.moved && this.dragBefore) {
       // Put a corner or bend back where it was before the accidental drag.
       const before = this.dragBefore;
@@ -417,6 +449,40 @@ export class OutlineTool {
     if (this.drawing || (id && !this.outlines[id]?.closed)) return;
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
   }
+  /** Switch between drawing corner by corner and dragging a rectangle; an outline already started starts over (undoable). */
+  setShape(shape: OutlineShape) {
+    if (shape === this.shape) return;
+    const o = this.current();
+    if (o?.pts.length) { this.record(); o.pts = []; this.selectedCorner = null; this.lastTap = null; }
+    this.shape = shape; this.dragAt = null; this.hoverPlaced = null;
+    this.update();
+    if (this.hoverAt) this.hover(this.hoverAt); // the pointer's mark follows the new tool straight away (X)
+  }
+  /**
+   * Move a layer up or down in Layers (dir −1 = up). Higher layers cut lower ones; the plot boundary stays
+   * first and never moves.
+   */
+  moveLayer(id: string, dir: -1 | 1) {
+    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary'), at = ids.indexOf(id), to = at + dir;
+    if (at < 0 || to < 0 || to >= ids.length) return;
+    this.record();
+    [ids[at], ids[to]] = [ids[to], ids[at]];
+    const b = this.outlines[BOUNDARY];
+    this.outlines = Object.fromEntries([...(b ? [[BOUNDARY, b]] : []), ...ids.map(k => [k, this.outlines[k]!])]);
+    this.update();
+  }
+  /** Put layer `id` directly above layer `above` (no undo step of its own: part of whatever made it). */
+  private placeAbove(id: string, above: string) {
+    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary' && k !== id);
+    ids.splice(ids.indexOf(above), 0, id);
+    const b = this.outlines[BOUNDARY];
+    this.outlines = Object.fromEntries([...(b ? [[BOUNDARY, b]] : []), ...ids.map(k => [k, this.outlines[k]!])]);
+  }
+  /** Where a layer sits among the movable ones (for disabling Move up / Move down at the ends). */
+  layerPosition(id: string) {
+    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary');
+    return { first: ids[0] === id, last: ids[ids.length - 1] === id };
+  }
   /** True while a finished outline has a corner, edge or feature selected. */
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
@@ -424,15 +490,11 @@ export class OutlineTool {
     if (!this.selectedEdge && !this.selectedCorner && !this.selected) return;
     this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.update();
   }
+  /** The layer whose visible part is under p (visible parts never overlap; one wholly covered can't be tapped). */
   private featureAt(p: Point): string | null {
     const pp = this.host.toPage(p);
-    let best: string | null = null, ba = Infinity;
-    for (const o of Object.values(this.outlines)) {
-      if (o.kind !== 'feature' || !o.closed) continue;
-      const a = Math.abs(areaPt2(o.pts, o.bulges));
-      if (a < ba && insidePolygon(outlinePath(o.pts, o.bulges, true), pp)) { ba = a; best = o.id; }
-    }
-    return best;
+    for (const [id, shape] of this.visible) if (insideShape(shape, pp)) return id;
+    return null;
   }
 
   /** Place freely (no snapping): derived on every use, so it never outlives the key or hold behind it. */
@@ -502,6 +564,8 @@ export class OutlineTool {
     if (!c || !o?.closed || this.drawing) return;
     this.applyTidy(o, alignCorner(o.pts, o.bulges, c.i, this.shownCorrection));
   }
+  /** True when a corner is selected and still exists (the nudge arrows apply to it). */
+  get cornerSelected() { const c = this.selectedCorner; return !!(c && this.outlines[c.id]?.pts[c.i]); }
   /** Square all corners: line every corner of an outline up with the others at once. */
   squareAll(id: string) {
     const o = this.outlines[id]; if (!o?.closed || this.drawing) return;
@@ -552,21 +616,30 @@ export class OutlineTool {
 
   // ---------- Rendering ----------
   /** Redraw overlay, popover and panel. */
-  update() { this.recalibrate(); this.render(); this.renderPopover(); this.renderPanel(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); this.host.changed(); }
+  update() { this.recalibrate(); this.render(); this.renderPopover(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); this.host.changed(); }
 
   render() {
     const h = this.host;
+    // Cutting only depends on the shapes and their order, not the view: redo it only when those change.
+    const key = JSON.stringify(Object.values(this.outlines).map(o => [o.id, o.closed, o.pts, o.bulges]));
+    if (key !== this.visibleKey) { this.visibleKey = key; this.visible = visibleShapes(Object.values(this.outlines)); }
     let svg = '';
     for (const o of Object.values(this.outlines)) {
       if (!o || !o.pts.length) continue;
       const pts = o.pts.map(p => h.toScreen(p));
-      const drawingThis = this.drawing === o.id;
-      if (drawingThis && this.dragAt) pts.push(this.dragAt);
-      else if (drawingThis && this.hoverPlaced && !this.drag) pts.push(this.hoverPlaced);
-      const line = o.closed ? outlinePath(o.pts, o.bulges, true).map(p => h.toScreen(p)) : pts;
-      const d = line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed ? ' Z' : '');
-      const sel = this.selected === o.id;
-      svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+      const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
+      // Rectangle in progress: preview the whole rectangle from the first corner to the pointer.
+      const rectPreview = drawingThis && this.shape === 'rect' && pts.length === 1 && cursor ? rectCorners(pts[0], cursor) : null;
+      if (cursor && !rectPreview) pts.push(cursor);
+      const line = o.closed ? outlinePath(o.pts, o.bulges, true).map(p => h.toScreen(p)) : rectPreview ?? pts;
+      const d = line.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ') + (o.closed || rectPreview ? ' Z' : '');
+      const sel = this.selected === o.id, shown = this.visible.get(o.id);
+      if (shown) {
+        // A finished layer shows only its visible part; selected, its whole drawn outline shows too (dashed) so
+        // it's clear what is being edited.
+        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+        if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${COLORS[o.kind]}"/>`;
+      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
@@ -587,9 +660,10 @@ export class OutlineTool {
       });
     }
     for (const o of Object.values(this.outlines)) {
-      // Names go on top of every shape so overlapping features stay readable.
-      if (o.kind !== 'feature' || !o.closed) continue;
-      const c = h.toScreen(labelPoint(outlinePath(o.pts, o.bulges, true)));
+      // Names go on top of every shape so overlapping features stay readable, inside each one's visible part.
+      const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
+      if (!at) continue;
+      const c = h.toScreen(at);
       svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
@@ -609,7 +683,11 @@ export class OutlineTool {
           : `<rect x="${x - MARK.snapCorner}" y="${y - MARK.snapCorner}" width="${2 * MARK.snapCorner}" height="${2 * MARK.snapCorner}" class="snap-mark"/>`;
         svg += `<text x="${x + MARK.labelDx}" y="${y + MARK.labelDy}" class="label snap">${label}</text>`;
       }
+      // Rectangle: dashed guides across the whole plan through the pointer (the rectangle runs square to the plan,
+      // so they show where its edges will go) and a ⌐ instead of Freehand's dot.
+      if (this.drawing && this.shape === 'rect') svg += `<path d="M-${MARK.guideSpan} ${y}H${MARK.guideSpan}M${x} -${MARK.guideSpan}V${MARK.guideSpan}" class="rect-guide"/>`;
       if (this.dragAt) svg += `<circle cx="${x}" cy="${y}" r="${MARK.ring}" class="placing"/>${crosshair(x, y)}`;
+      else if (this.drawing && this.shape === 'rect') { const k = MARK.cornerBracket; svg += `<path d="M${x} ${y + k}V${y}H${x + k}" class="corner-bracket"/>`; }
       else svg += `<circle cx="${x}" cy="${y}" r="${MARK.hoverDot}" class="hover-dot"/>`;
     }
     this.svg.innerHTML = svg;
@@ -720,62 +798,7 @@ export class OutlineTool {
     this.popover.style.top = `${Math.max(mg, Math.min(stage.height - hgt - mg, my + POPOVER.below))}px`;
   }
 
-  private renderPanel() {
-    const p = this.panel, o = this.current();
-    if (o) {
-      const n = o.pts.length;
-      p.innerHTML = `
-        ${body(`Tap each corner of the <b>${esc(o.kind === 'boundary' ? 'plot boundary' : o.name)}</b>. ${n >= 3 ? 'Double-tap, tap the first corner, or press Close shape to finish.' : `${n} of at least 3 corners placed.`}`)}
-        ${hint(this.snapOn ? 'Points snap to lines and corners on the plan. Hold Shift for straight lines in 45° steps. To place one freely, hold Option (Alt) — on touch, press and hold before moving. Two fingers move and zoom.' : 'Snapping is off.')}
-        ${this.nudge_()}
-        ${row(button('Close shape', { variant: 'primary', disabled: n < 3, data: { act: 'close' } }), button('Cancel', { data: { act: 'cancel' } }))}`;
-      p.hidden = false;
-    } else {
-      const closed = Object.values(this.outlines).filter(x => x.closed);
-      if (!closed.length) { p.hidden = true; return; }
-      const f = this.selected ? this.outlines[this.selected] : null;
-      if (f?.kind === 'feature') { this.renderFeaturePanel(f); return; }
-      p.innerHTML = `
-        ${body(this.cal ? 'Tap or hover an edge to see its length.' : 'Tap an edge and type its printed length to set the scale.')}
-        ${this.nudge_()}
-        ${closed.some(c => c.kind === 'feature') ? hint('Tap inside an existing feature to rename, delete or redraw it.') : ''}
-        ${f?.kind === 'boundary' ? row(button('Square all corners', { data: { act: 'square-all' } })) : ''}
-`;
-      p.hidden = false;
-    }
-    p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => {
-      btn.onclick = () => ({ close: () => this.close(), cancel: () => this.cancel(), 'square-all': () => this.squareAll(BOUNDARY) } as Record<string, () => void>)[btn.dataset.act!]();
-    });
-    p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
-      btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
-    });
-  }
 
-  /** Panel for a selected existing feature: rename, redraw, delete. */
-  private renderFeaturePanel(f: Outline) {
-    const p = this.panel;
-    p.innerHTML = `
-      <form class="field-row">
-        ${label('feature-name-edit', 'Existing feature')}${input('feature-name-edit', { value: f.name })}${button('Rename', { type: 'submit' })}
-      </form>
-      ${this.nudge_()}
-      ${row(button('Square all corners', { data: { act: 'square-all' } }), button('Redo outline', { data: { act: 'redraw' } }), button('Delete', { variant: 'danger', data: { act: 'delete' } }), button('Done', { data: { act: 'done' } }))}`;
-    p.hidden = false;
-    const field = p.querySelector<HTMLInputElement>('#feature-name-edit')!;
-    p.querySelector('form')!.onsubmit = ev => { ev.preventDefault(); this.renameFeature(f.id, field.value); field.blur(); };
-    const act: Record<string, () => void> = {
-      redraw: () => this.redraw(f.id), delete: () => this.deleteFeature(f.id), done: () => this.deselect(), 'square-all': () => this.squareAll(f.id),
-    };
-    p.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(btn => { btn.onclick = act[btn.dataset.act!]; });
-    p.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(btn => {
-      btn.onclick = () => { const [dx, dy] = btn.dataset.nudge!.split(',').map(Number); this.nudge(dx, dy); };
-    });
-  }
-
-  /** The nudge pad, when a corner is selected. */
-  private nudge_(): string {
-    return this.selectedCorner && this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i] ? nudgePad() : '';
-  }
 
 
   /**

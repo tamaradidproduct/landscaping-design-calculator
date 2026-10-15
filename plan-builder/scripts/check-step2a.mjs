@@ -34,7 +34,7 @@ await page.waitForTimeout(600);
 
 await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'BL']) { const s = await toScreen(C[k]); await page.mouse.click(...s); await page.waitForTimeout(150); }
-await page.click('#panel [data-act=close]');
+await page.click('#outlines [data-act=close]');
 results.push(['Closes with the Close button', String(await page.evaluate(() => document.querySelector('.overlay .shape.closed') !== null))]);
 
 // Set the scale on the top edge.
@@ -61,7 +61,7 @@ results.push(['Drag corner: magnifier shown while dragging', String(magnifierSho
 results.push(['Left edge after moving the corner', await hoverLength(C.TL, [C.BL[0] + 40 / 2, C.BL[1]])]);
 
 // Redo, then close with a double-click instead of the button.
-await page.click('[data-redo=boundary]');
+await page.click('#outlines [data-card=boundary] [data-act=redraw]'); // the boundary is selected after the drag, so its card is open
 for (const k of ['TL', 'TR', 'BR']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
 await page.mouse.dblclick(...await toScreen(C.BL));
 results.push(['Redo + close with double-click (4 corners)', await page.evaluate(() => {

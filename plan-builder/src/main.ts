@@ -3,6 +3,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
+import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 
@@ -63,6 +64,9 @@ const tool = new OutlineTool({
   changed() {
     outlines?.render();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
+    $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
+    stage.classList.toggle('drawing', !!tool.drawing);
+    $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === tool.shape)));
   },
   sampleLuminance(c, n) {
     if (!planVisible) return null; // a hidden plan has no lines to snap to
@@ -91,7 +95,7 @@ const tool = new OutlineTool({
     for (let i = 0; i < n * n; i++) if (data[i * 4 + 3]) out[i] = 0.3 * data[i * 4] + 0.59 * data[i * 4 + 1] + 0.11 * data[i * 4 + 2];
     return out;
   },
-}, stage, $('panel'));
+}, stage);
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 
@@ -105,6 +109,21 @@ window.addEventListener('blur', () => tool.setModifiers(false, false));
 
 $('undo').onclick = () => tool.undo();
 $('redo').onclick = () => tool.redo();
+
+// Freehand | Rectangle, remembered on this device (a convenience: losing it just means Freehand). X switches.
+const SHAPE_KEY = 'plan-builder.shape';
+try { if (localStorage.getItem(SHAPE_KEY) === 'rect') tool.shape = 'rect'; } catch { /* storage blocked */ }
+const pickShape = (shape: OutlineShape) => {
+  tool.setShape(shape);
+  try { localStorage.setItem(SHAPE_KEY, shape); } catch { /* storage blocked */ }
+};
+$('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => {
+  b.onclick = () => pickShape(b.dataset.shape === 'rect' ? 'rect' : 'freehand');
+});
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'x' || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea')) return;
+  e.preventDefault(); pickShape(tool.shape === 'rect' ? 'freehand' : 'rect');
+});
 
 $('snap').onclick = () => {
   tool.snapOn = !tool.snapOn;

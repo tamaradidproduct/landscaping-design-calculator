@@ -21,6 +21,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@hyzyla/pdfium": "^2.1.13"
+    "@hyzyla/pdfium": "^2.1.13",
+    "polygon-clipping": "0.15.7"
   }
 }
