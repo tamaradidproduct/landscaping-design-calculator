@@ -3,6 +3,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
+import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
@@ -12,6 +13,8 @@ registerSW({ immediate: true });
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage'), pageEl = $('page'), base = $<HTMLCanvasElement>('base'), sharp = $<HTMLCanvasElement>('sharp');
 const fileInput = $<HTMLInputElement>('file');
+// Surface fill patterns, defined once for the plan overlay and the Layers swatches.
+document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs></svg>`);
 const pdf = new PdfClient();
 pdf.warmup();
 

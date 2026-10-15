@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, moveInSection, sectionPosition, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, nearestOnRing, moveInSection, sectionPosition, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -168,4 +168,13 @@ describe('sections', () => {
     expect(sectionPosition(ids, all, 'f1')).toEqual({ first: true, last: false });
     expect(sectionPosition(['boundary', 'f1', 's1'], all, 'f1')).toEqual({ first: true, last: true });
   });
+});
+
+describe('nearestOnRing', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  test('the closest point on any edge, including the closing one', () => {
+    expect(nearestOnRing(sq, { x: 4, y: 2 })).toEqual({ point: { x: 4, y: 0 }, d: 2 });
+    expect(nearestOnRing(sq, { x: -3, y: 6 })).toEqual({ point: { x: 0, y: 6 }, d: 3 });
+  });
+  test('past an end, the corner', () => expect(nearestOnRing(sq, { x: 13, y: -4 })).toEqual({ point: { x: 10, y: 0 }, d: 5 }));
 });

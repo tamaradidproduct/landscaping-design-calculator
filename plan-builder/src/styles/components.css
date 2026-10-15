@@ -144,3 +144,5 @@ input[type="range"] { flex: 1; min-height: var(--control-sm); padding: 0; border
 .empty h1 { margin: 0; font-size: var(--text-display); font-weight: var(--weight-strong); text-wrap: balance; }
 .empty p { margin: 0 0 var(--space-4); color: var(--color-muted); font-size: var(--text-lg); max-width: var(--measure-body); line-height: var(--leading-body); }
 .loading { position: absolute; inset: 0; display: grid; place-content: center; font-size: var(--text-xl); color: var(--color-muted); }
+/* Pattern definitions for surfaces (no layout of their own). */
+svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }

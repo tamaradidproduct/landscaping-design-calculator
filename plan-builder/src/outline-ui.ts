@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
-  moveInSection, outlinePath, parseFeet, rectCorners, sectionPosition,
+  moveInSection, nearestOnRing, outlinePath, parseFeet, rectCorners, sectionPosition,
   type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -10,6 +10,7 @@ import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type C
 import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { stretchEdge } from './stretch';
+import { materialFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, cardHead, error, esc, figure, hint, input, label, row, token } from './ui';
@@ -46,6 +47,8 @@ const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners firs
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
 const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
+/** A surface's material fill (colour + pattern), as an inline style addition. */
+const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${materialFill(o.material)}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
@@ -373,6 +376,14 @@ export class OutlineTool {
       });
     }
     if (best) { this.snapped = 'own'; return best; }
+    // Then onto another finished outline's edge (a bed sharing the lawn's edge); corners win over edges.
+    const editing = exclude?.id ?? this.drawing;
+    for (const o of Object.values(this.outlines)) {
+      if (!o?.closed || o.id === editing) continue;
+      const near = nearestOnRing(outlinePath(o.pts, o.bulges, true).map(q => this.host.toScreen(q)), raw);
+      if (near.d < bd) { bd = near.d; best = near.point; }
+    }
+    if (best) { this.snapped = 'own'; return best; }
     const n = SNAP_WINDOW, g = this.host.sampleLuminance(raw, n);
     const hit = g && findImageSnap(g, { x: n / 2, y: n / 2 });
     if (!hit) return null;
@@ -661,7 +672,11 @@ export class OutlineTool {
     const key = JSON.stringify(Object.values(this.outlines).map(o => [o.id, o.closed, o.pts, o.bulges]));
     if (key !== this.visibleKey) { this.visibleKey = key; this.visible = visibleShapes(Object.values(this.outlines)); }
     let svg = '';
-    for (const o of Object.values(this.outlines)) {
+    // Paint surfaces first so outlines' strokes sit on top, and the layer being drawn or edited last of all.
+    const active = this.drawing ?? this.selected, all = Object.values(this.outlines);
+    const paint = [...all.filter(o => o.kind === 'surface'), ...all.filter(o => o.kind !== 'surface')];
+    paint.sort((a, b) => Number(a.id === active) - Number(b.id === active));
+    for (const o of paint) {
       if (!o || !o.pts.length) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
@@ -674,9 +689,9 @@ export class OutlineTool {
       if (shown) {
         // A finished layer shows only its visible part; selected, its whole drawn outline shows too (dashed) so
         // it's clear what is being edited.
-        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}"/>`;
+        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}${fillOf(o)}"/>`;
         if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
-      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${colorOf(o)}"/>`;
+      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
@@ -707,7 +722,7 @@ export class OutlineTool {
       const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
       if (!at) continue;
       const c = h.toScreen(at);
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label ${o.kind === 'surface' ? 'surface' : 'feature'}${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);

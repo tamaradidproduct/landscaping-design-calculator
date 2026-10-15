@@ -216,3 +216,15 @@ export function labelPoint(pts: Point[]): Point {
   for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > w) { w = xs[i + 1] - xs[i]; best = { x: (xs[i] + xs[i + 1]) / 2, y: c.y }; }
   return best;
 }
+
+/** The closest point to p on a closed ring of points (its closing edge included), and how far it is. */
+export function nearestOnRing(ring: Point[], p: Point): { point: Point; d: number } {
+  let best = { point: ring[0], d: Infinity };
+  ring.forEach((a, k) => {
+    const b = ring[(k + 1) % ring.length], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    const q = { x: a.x + t * dx, y: a.y + t * dy }, d = dist(q, p);
+    if (d < best.d) best = { point: q, d };
+  });
+  return best;
+}

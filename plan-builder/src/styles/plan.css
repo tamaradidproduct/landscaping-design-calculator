@@ -43,3 +43,8 @@
 .overlay .guide-angle { fill: none; stroke: var(--color-guide); stroke-width: var(--stroke-regular); }
 .overlay .guide-line { stroke: var(--color-guide); stroke-width: var(--stroke-hairline); stroke-dasharray: var(--dash-guide); }
 .overlay .fixed-end { fill: none; stroke: var(--c); stroke-width: var(--stroke-bold); }
+/* Surfaces: solid material fill (colour + pattern, set inline) with a darker edge; see-through while selected or drawn. */
+.overlay .shape.surface { stroke: color-mix(in srgb, var(--c) 65%, black); stroke-width: var(--stroke-hairline); }
+.overlay .shape.surface.closed { fill-opacity: 1; }
+.overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
+.overlay .label.surface { font-size: var(--text-sm); fill: var(--color-feature-ink); stroke: var(--color-feature-fill); text-anchor: middle; dominant-baseline: middle; }
