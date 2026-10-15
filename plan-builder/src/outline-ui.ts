@@ -9,6 +9,8 @@ import { History } from './history';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
+import { stretchEdge } from './stretch';
+import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, cardHead, error, esc, figure, hint, input, label, row, token } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
@@ -66,7 +68,8 @@ export class OutlineTool {
   private dragAt: Point | null = null;        // screen position of the point being placed or moved
   private hoverAt: Point | null = null;       // mouse position, for the rubber-band line
   private hoverEdge: { id: string; i: number } | null = null;
-  private selectedEdge: { id: string; i: number } | null = null;
+  /** The open edge; for a surface, `fixed` is the corner that stays put when a length is typed (0 = corner i). */
+  private selectedEdge: { id: string; i: number; fixed: 0 | 1 } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
   snapOn = true;
   /** How new outlines are drawn (the bottom bar's Freehand | Rectangle). */
@@ -134,13 +137,30 @@ export class OutlineTool {
     while (this.outlines[`f${n}`]) n++;
     this.begin(`f${n}`, 'feature', name.trim() || 'Feature');
   }
+  /** True once the plot boundary is closed: surfaces need the lot to clip to. */
+  get boundaryClosed() { return !!this.outlines[BOUNDARY]?.closed && this.drawing !== BOUNDARY; }
+  /** Draw a new surface (zone) of a material; its name starts as the material's. */
+  startSurface(m: MaterialId) {
+    if (!this.boundaryClosed) return;
+    let n = 1;
+    while (this.outlines[`s${n}`]) n++;
+    this.begin(`s${n}`, 'surface', material(m).name, m);
+  }
+  /** Change a surface's material; a zone still named after its old material takes the new name. */
+  setMaterial(id: string, m: MaterialId) {
+    const o = this.outlines[id]; if (o?.kind !== 'surface' || o.material === m) return;
+    this.record();
+    if (!o.material || o.name === material(o.material).name) o.name = material(m).name;
+    o.material = m;
+    this.update();
+  }
   /** Draw an existing outline again from scratch, keeping its name; Cancel puts the old one back. */
-  redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name); }
-  private begin(id: string, kind: OutlineKind, name: string) {
+  redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name, o.material); }
+  private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
     if (this.drawing) this.cancel();
     this.record();
     this.replaced = this.outlines[id] ?? null;
-    this.outlines[id] = { id, kind, name, pts: [], closed: false };
+    this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
     this.drawing = id;
     this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selected = null;
     this.update();
@@ -151,12 +171,14 @@ export class OutlineTool {
     if (this.replaced) this.outlines[this.drawing] = this.replaced; else delete this.outlines[this.drawing];
     this.replaced = null; this.drawing = null; this.update();
   }
-  renameFeature(id: string, name: string) {
+  /** Rename a feature or surface (the plot boundary keeps its name). */
+  renameLayer(id: string, name: string) {
     const o = this.outlines[id], n = name.trim(); if (!o || !n || n === o.name) return;
     this.record(); o.name = n; this.update();
   }
-  deleteFeature(id: string) {
-    const o = this.outlines[id]; if (!o || o.kind !== 'feature') return;
+  /** Delete a feature or surface (never the plot boundary). */
+  deleteLayer(id: string) {
+    const o = this.outlines[id]; if (!o || o.kind === 'boundary') return;
     this.record();
     delete this.outlines[id];
     this.refs = this.refs.filter(r => r.id !== id);
@@ -233,7 +255,11 @@ export class OutlineTool {
       return true;
     }
     const edge = this.edgeAt(p);
-    if (edge) { this.selectedEdge = edge; this.selected = edge.id; this.update(); return true; }
+    if (edge) {
+      // The corner nearer the tap stays put if a length is typed for a surface edge.
+      const o = this.outlines[edge.id]!, a = this.host.toScreen(o.pts[edge.i]), b = this.host.toScreen(o.pts[(edge.i + 1) % o.pts.length]);
+      this.selectedEdge = { ...edge, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 }; this.selected = edge.id; this.update(); return true;
+    }
     return false;
   }
 
@@ -372,7 +398,7 @@ export class OutlineTool {
     if (!d) return;
     if (d.type === 'bend') {
       if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
-      else this.selectedEdge = { id: d.id, i: d.i }; // a tap on the handle opens the edge
+      else this.selectedEdge = { id: d.id, i: d.i, fixed: 0 }; // a tap on the handle opens the edge
       this.dragBefore = null; this.dragAt = null; this.snapped = null; this.update(); return;
     }
     if (d.type === 'corner') {
@@ -539,6 +565,7 @@ export class OutlineTool {
   // ---------- Scale ----------
   /** The contractor typed edge i's printed length: keep it as a reference and refit the scale. */
   setEdgeLength(id: string, i: number, feet: number) {
+    if (this.outlines[id]?.kind === 'surface') return; // surfaces are designed, not traced: they never set the scale
     this.record();
     this.refs = [...this.refs.filter(r => r.id !== id || r.i !== i), { id, i, feet }];
     this.selectedEdge = null;
@@ -547,6 +574,22 @@ export class OutlineTool {
     this.host.toast(c.stretched ? `Plan stretch corrected. ${formatCalibration(c)}.`
       : c.needsOtherDirection ? 'These lengths all run the same way. Type one on an edge running the other way to correct a stretched plan.'
       : this.refs.length > 1 ? `Scale refitted: ${formatScale(c.ftPerPt)}.` : `Scale set: ${formatScale(c.ftPerPt)}.`);
+  }
+  /** A surface edge's typed length: stretch the zone along that edge from its fixed end. */
+  resizeEdge(id: string, i: number, feet: number) {
+    const o = this.outlines[id], c = this.cal, e = this.selectedEdge;
+    if (o?.kind !== 'surface' || !o.closed || !c) return;
+    this.record();
+    const t = stretchEdge(o.pts, o.bulges, i, e?.id === id && e.i === i ? e.fixed : 0, feet / c.ftPerPt, c.correction);
+    o.pts = t.pts; if (t.bulges) o.bulges = t.bulges;
+    this.selectedEdge = null;
+    this.update();
+    this.host.toast(`${o.name}: edge now ${formatFeet(this.edgeFeet(id, i) ?? feet)}.`);
+  }
+  /** Swap which end of the open surface edge stays put. */
+  swapFixedEnd() {
+    const e = this.selectedEdge; if (!e) return;
+    this.selectedEdge = { ...e, fixed: e.fixed ? 0 : 1 }; this.update();
   }
   removeReference(k: number) {
     if (!this.refs[k]) return;
@@ -653,6 +696,12 @@ export class OutlineTool {
         svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${colorOf(o)}"/>`;
       });
     }
+    const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
+    if (fe && feo?.kind === 'surface' && feo.closed) {
+      // The end that stays put when a length is typed.
+      const s = h.toScreen(feo.pts[(fe.i + fe.fixed) % feo.pts.length]);
+      svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="fixed-end" style="--c:${colorOf(feo)}"/>`;
+    }
     for (const o of Object.values(this.outlines)) {
       // Names go on top of every shape so overlapping features stay readable, inside each one's visible part.
       const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
@@ -754,6 +803,7 @@ export class OutlineTool {
   private renderPopover() {
     const e = this.selectedEdge;
     if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
+    if (this.outlines[e.id]!.kind === 'surface') { this.renderSurfacePopover(e); return; }
     const ft = this.edgeFeet(e.id, e.i);
     const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i], ref = this.refs.find(r => r.id === e.id && r.i === e.i);
     this.popover.innerHTML = `
@@ -779,6 +829,34 @@ export class OutlineTool {
       const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
       if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
       this.setEdgeLength(e.id, e.i, feet);
+    };
+    this.positionPopover();
+  }
+  /** A surface edge: its length can be typed to resize the zone (never the scale). */
+  private renderSurfacePopover(e: { id: string; i: number; fixed: 0 | 1 }) {
+    const o = this.outlines[e.id]!, ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
+    this.popover.innerHTML = `
+      ${cardHead(`${esc(o.name)} edge`)}
+      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
+      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : ''}
+      ${ft === null ? hint('Set the scale on an outline edge first.') : `<form class="stack">
+        <div class="field">${label('edge-len', 'Length')}
+        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' }))}</div>
+        ${row(`<span class="text-hint">Stays put: the marked end</span>`, button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
+        ${error(`Type a length in feet, like 16 or 16' 6".`)}
+      </form>`}`;
+    this.popover.hidden = false;
+    this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
+    const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
+    if (straighten) straighten.onclick = () => { this.record(); o.bulges![e.i] = 0; this.update(); };
+    const swap = this.popover.querySelector<HTMLButtonElement>('[data-act=swap]');
+    if (swap) swap.onclick = () => this.swapFixedEnd();
+    const form = this.popover.querySelector('form');
+    if (form) form.onsubmit = ev => {
+      ev.preventDefault();
+      const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
+      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
+      this.resizeEdge(e.id, e.i, feet);
     };
     this.positionPopover();
   }

@@ -91,7 +91,7 @@ export class OutlinesSection {
     const id = card.dataset.card!;
     const act: Record<string, () => void> = {
       close: () => t.close(), cancel: () => t.cancel(), collapse: () => t.selectOutline(null),
-      'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteFeature(id),
+      'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteLayer(id),
       up: () => t.moveLayer(id, -1), down: () => t.moveLayer(id, 1),
     };
     card.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(b => { b.onclick = act[b.dataset.act!]; });
@@ -104,7 +104,7 @@ export class OutlinesSection {
     };
     const rename = card.querySelector<HTMLInputElement>('#outline-rename');
     if (rename) {
-      rename.onchange = () => t.renameFeature(id, rename.value);
+      rename.onchange = () => t.renameLayer(id, rename.value);
       rename.onkeydown = e => {
         if (e.key === 'Enter') rename.blur();
         else if (e.key === 'Escape') { rename.value = t.outlines[id]?.name ?? rename.value; rename.blur(); }
