@@ -10,6 +10,8 @@ export interface ButtonOptions {
   mods?: string[];
   type?: 'button' | 'submit';
   disabled?: boolean;
+  /** A toggle or choice that is on (aria-pressed="true"). */
+  pressed?: boolean;
   ariaLabel?: string;
   /** data-* attributes, e.g. { act: 'close' } → data-act="close". */
   data?: Record<string, string>;
@@ -23,7 +25,7 @@ export function button(label: string, o: ButtonOptions = {}): string {
   const cls = [o.variant && o.variant !== 'default' ? o.variant : '', ...(o.mods ?? [])].filter(Boolean).join(' ');
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="${o.type ?? 'button'}"${cls ? ` class="${cls}"` : ''}${data}`
-    + `${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+    + `${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
 }
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
@@ -60,7 +62,7 @@ export function nudgePad(): string {
 
 /** A layer's swatch: the outline kind's look, or a surface's material (colour + pattern). */
 export type Swatch = 'boundary' | 'feature' | { material: MaterialId };
-const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
+export const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
   : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${materialFill(s.material)}"/></svg></span>`;
 
 /** Layer row: a swatch for the outline kind, the name, and an optional status (e.g. "Drawing…"). */
@@ -84,15 +86,16 @@ export function layerRow(name: string, o: LayerRowOptions): string {
  */
 export interface LayerCardOptions {
   id: string; swatch: Swatch; name: string; sub?: string; meta?: string;
-  /** Show the name as a field (id "outline-rename") so it can be renamed in place. */
+  /** Show the name as a field (id `renameId`, default "outline-rename") so it can be renamed in place. */
   rename?: boolean;
+  renameId?: string;
   /** Show a Done button (data-act="collapse") that closes the card. */
   done?: boolean;
   body: string;
 }
 export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
-    ? `<input id="outline-rename" class="layer-rename" autocomplete="off" aria-label="Name" value="${esc(o.name)}" />`
+    ? `<input id="${o.renameId ?? 'outline-rename'}" class="layer-rename" autocomplete="off" aria-label="Name" value="${esc(o.name)}" />`
     : layerName(o.name, o.sub);
   return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`

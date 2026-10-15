@@ -146,3 +146,8 @@ input[type="range"] { flex: 1; min-height: var(--control-sm); padding: 0; border
 .loading { position: absolute; inset: 0; display: grid; place-content: center; font-size: var(--text-xl); color: var(--color-muted); }
 /* Pattern definitions for surfaces (no layout of their own). */
 svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* Material chips: swatch + name; the zone's current material is pressed. */
+button.chip.material-chip { display: inline-flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4); }
+button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
+.swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
+.swatch.material svg { display: block; width: 100%; height: 100%; }

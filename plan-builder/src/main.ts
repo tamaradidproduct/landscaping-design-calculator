@@ -3,6 +3,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
+import { SurfacesSection } from './surfaces-ui';
 import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -33,6 +34,7 @@ const shown = (): Size => ({ w: pageSize.w * correction.a, h: pageSize.h * corre
 const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale });
 
 // ---------- Outline tool (Step 2a) ----------
+let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
@@ -65,6 +67,7 @@ const tool = new OutlineTool({
     ($('redo') as HTMLButtonElement).disabled = !canRedo;
   },
   changed() {
+    surfaces?.render();
     outlines?.render();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
     $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
@@ -99,6 +102,8 @@ const tool = new OutlineTool({
     return out;
   },
 }, stage);
+surfaces = new SurfacesSection($('surfaces'), tool);
+surfaces.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 
