@@ -228,3 +228,16 @@ export function nearestOnRing(ring: Point[], p: Point): { point: Point; d: numbe
   });
   return best;
 }
+
+/**
+ * The order an edge tap tries layers in: the selected layer first, then outlines (they sit on top), then
+ * surfaces from the top, then the plot boundary — so a zone edge lying on the lot line opens the zone's edge.
+ */
+export function edgeTapOrder(outlines: Outline[], selected: string | null): Outline[] {
+  const order = cutOrder(outlines), lot = order.filter(o => o.kind === 'boundary');
+  const rest = [...order.filter(o => o.kind !== 'boundary'), ...lot];
+  return [...rest.filter(o => o.id === selected), ...rest.filter(o => o.id !== selected)];
+}
+/** What a point being placed may snap to: tracing the boundary or a feature ignores designed surfaces. */
+export const snapSources = (outlines: Outline[], editing: OutlineKind | null): Outline[] =>
+  editing === 'boundary' || editing === 'feature' ? outlines.filter(o => o.kind !== 'surface') : outlines;

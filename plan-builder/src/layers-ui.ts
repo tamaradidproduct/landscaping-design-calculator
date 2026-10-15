@@ -113,6 +113,6 @@ export class OutlinesSection {
   }
 }
 
-/** Rows and cards here only list the boundary and features. */
+/** A row's swatch: the outline kind, or a surface's material. */
 const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material! } : o.kind;
 const areaText = (sqft: number | null) => sqft === null ? undefined : formatArea(sqft);

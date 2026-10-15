@@ -47,4 +47,9 @@ describe('stretchEdge', () => {
     shape.forEach((p, k) => expect(along(r.pts[k])).toBeCloseTo(2 * along(p), 9));
     shape.forEach((p, k) => expect(-0.8 * r.pts[k].x + 0.6 * r.pts[k].y).toBeCloseTo(-0.8 * p.x + 0.6 * p.y, 9));
   });
+  test('a zero-length edge is left alone (no NaN)', () => {
+    const pts = [P(0, 0), P(0, 0), P(10, 10)];
+    const r = stretchEdge(pts, undefined, 0, 0, 5, IDENTITY);
+    expect(r.pts).toEqual(pts);
+  });
 });

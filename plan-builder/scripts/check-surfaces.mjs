@@ -29,6 +29,7 @@ const zones = () => page.$$eval('#surfaces .layer-name, #surfaces .layer-rename'
 const fillOpacity = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => getComputedStyle(e).fillOpacity);
 const toast = () => page.textContent('#toast');
 
+try {
 results.push(['Before the plot boundary', `${await page.textContent('#surfaces')} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`.trim()]);
 
 // Lot 250..550 × 150..650 (rect tool).
@@ -39,6 +40,7 @@ results.push(['After the plot boundary', `${(await page.textContent('#surfaces')
 // Sod before any scale: tapping its edge offers no length field.
 await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=sod]');
 await drag([280, 180], [520, 400]);
+results.push(['Zone closed before a scale: toast', await toast()]);
 await tap([400, 400]);
 results.push(['Zone edge before a scale', `field shown: ${!!await page.$('#edge-len')} · ${(await page.textContent('.popover')).replace(/\s+/g, ' ').trim().slice(0, 80)}`]);
 await page.keyboard.press('Escape');
@@ -62,12 +64,19 @@ results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod ring
 results.push(['Selected zone see-through, other solid', `pavers ${await fillOpacity('s2')} · sod ${await fillOpacity('s1')}`]);
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 
+// With the pavers still selected, Add surface… starts a new zone (it must not re-material the pavers).
+await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=mulch]');
+results.push(['Add surface… while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
+await drag([250, 150], [330, 190]); // its top edge lies on the lot line
+await tap([290, 150]);
+results.push(['Tap the mulch edge on the lot line', `${(await page.textContent('.popover .card-head').catch(() => '?')).trim()} · field label "${await page.textContent('.popover .text-label').catch(() => '?')}"`]);
+await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 // Zoom in on the patio so its edge can be tapped clear of corners and the bend handle.
 await page.mouse.move(...await toScreen([330, 300]));
 await page.keyboard.down('Control'); for (let i = 0; i < 10; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(600);
 await tap([320, 250]); // top edge, near the left corner → the left corner stays
-results.push(['Pavers top edge', `${(await page.textContent('.popover .text-figure')).trim()} · label "${(await page.textContent('.popover .text-label'))}" · fixed mark ${!!await page.$('.overlay .fixed-end')}`]);
+results.push(['Pavers top edge', `${(await page.textContent('.popover .text-figure')).trim()} · label "${(await page.textContent('.popover .text-label'))}" · fixed mark in accent ${await page.$eval('.overlay .fixed-end', e => getComputedStyle(e).stroke === getComputedStyle(document.querySelector('button.primary') ?? document.body).backgroundColor).catch(() => 'missing')}`]);
 await page.fill('#edge-len', '16'); await page.click('.popover button[type=submit]');
 const p16 = await shape('s2');
 results.push(['Typed 16′', `${await toast()} · x ${p16.x0}..${p16.x1} (expect 300..380) · y ${p16.y0}..${p16.y1} (expect 250..350)`]);
@@ -95,7 +104,7 @@ await page.click('#surfaces [data-act=up]'); await page.waitForTimeout(150);
 // Redraw the boundary: zones stay; Add surface hidden until it closes; Cancel restores.
 await page.keyboard.press('Escape');
 await page.click('#outlines [data-layer=boundary]'); await page.click('#outlines [data-card=boundary] [data-act=redraw]');
-results.push(['Redrawing the boundary', `${(await page.textContent('#surfaces')).trim()}`]);
+results.push(['Redrawing the boundary', `${await zones()} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`]);
 await page.click('#outlines [data-act=cancel]'); await page.waitForTimeout(150);
 results.push(['Cancel', `${await zones()} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`]);
 
@@ -105,5 +114,6 @@ await page.mouse.move(...await toScreen([250, 600])); await page.waitForTimeout(
 results.push(['Boundary left edge', await page.textContent('.tip')]);
 await page.screenshot({ path: `${outDir}/surfaces-end.png` });
 
+} catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();

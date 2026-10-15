@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, nearestOnRing, moveInSection, sectionPosition, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -177,4 +177,19 @@ describe('nearestOnRing', () => {
     expect(nearestOnRing(sq, { x: -3, y: 6 })).toEqual({ point: { x: 0, y: 6 }, d: 3 });
   });
   test('past an end, the corner', () => expect(nearestOnRing(sq, { x: 13, y: -4 })).toEqual({ point: { x: 10, y: 0 }, d: 5 }));
+});
+
+describe('review fixes', () => {
+  const o = (id: string, kind: Outline['kind']): Outline => ({ id, kind, name: id, pts: [], closed: true });
+  const all = [o('boundary', 'boundary'), o('s1', 'surface'), o('f1', 'feature'), o('s2', 'surface')];
+  test('edge taps: the selected layer, then outlines, then surfaces from the top, then the boundary', () => {
+    expect(edgeTapOrder(all, 's2').map(x => x.id)).toEqual(['s2', 'f1', 's1', 'boundary']);
+    expect(edgeTapOrder(all, null).map(x => x.id)).toEqual(['f1', 's1', 's2', 'boundary']);
+  });
+  test('tracing the boundary or a feature never snaps to designed surfaces; a surface snaps to everything', () => {
+    expect(snapSources(all, 'feature').map(x => x.id)).toEqual(['boundary', 'f1']);
+    expect(snapSources(all, 'boundary').map(x => x.id)).toEqual(['boundary', 'f1']);
+    expect(snapSources(all, 'surface').map(x => x.id)).toEqual(['boundary', 's1', 'f1', 's2']);
+    expect(snapSources(all, null).map(x => x.id)).toEqual(['boundary', 's1', 'f1', 's2']);
+  });
 });

@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
-  moveInSection, nearestOnRing, outlinePath, parseFeet, rectCorners, sectionPosition,
+  edgeTapOrder, moveInSection, nearestOnRing, snapSources, outlinePath, parseFeet, rectCorners, sectionPosition,
   type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -203,7 +203,9 @@ export class OutlineTool {
     // just above the topmost one containing it, so it isn't hidden the moment it's finished.
     const inside = isNew && o.kind !== 'boundary' ? containers(o, Object.values(this.outlines)) : [];
     if (inside.length) this.placeAbove(o.id, inside[0]);
-    this.host.toast(this.cal
+    this.host.toast(o.kind === 'surface'
+      ? (this.cal ? `${o.name} added. Tap an edge to type the length you want.` : `${o.name} added. Set the scale on an outline edge to size it by typing lengths.`)
+      : this.cal
       ? `${o.name} outlined. Tap an edge to see its length.`
       : `${o.name} outlined. Now tap an edge and type its printed length to set the scale.`);
     this.update();
@@ -318,7 +320,7 @@ export class OutlineTool {
     const len = dist(anchor, c); if (len < 1) return c;
     const ux = (c.x - anchor.x) / len, uy = (c.y - anchor.y) / len;
     let best: Point | null = null, bd = OWN_SNAP;
-    for (const o of Object.values(this.outlines)) o?.pts.forEach((pt, i) => {
+    for (const o of this.snapTargets(exclude)) o?.pts.forEach((pt, i) => {
       if (exclude && exclude.id === o.id && exclude.i === i) return;
       const s = this.host.toScreen(pt), t = (s.x - anchor.x) * ux + (s.y - anchor.y) * uy;
       const q = { x: anchor.x + t * ux, y: anchor.y + t * uy };
@@ -359,6 +361,11 @@ export class OutlineTool {
     if (found) this.stick = { page: this.host.toPage(found), kind: foundKind! };
     return found ?? raw;
   }
+  /** Outlines a placed point may snap to: tracing the boundary or a feature ignores designed surfaces. */
+  private snapTargets(exclude?: { id: string; i: number }) {
+    const editing = exclude?.id ?? this.drawing;
+    return snapSources(Object.values(this.outlines), editing ? this.outlines[editing]?.kind ?? null : null);
+  }
   private findSnap(raw: Point, exclude: { id: string; i: number } | undefined, lineOnly: boolean): Point | null {
     if (lineOnly) {
       // Bending: follow the drawn curve, so snap onto lines only (never to corners).
@@ -368,7 +375,7 @@ export class OutlineTool {
       return { x: raw.x - n / 2 + hit.x, y: raw.y - n / 2 + hit.y };
     }
     let best: Point | null = null, bd = OWN_SNAP;
-    for (const o of Object.values(this.outlines)) {
+    for (const o of this.snapTargets(exclude)) {
       o?.pts.forEach((pt, i) => {
         if (exclude && exclude.id === o.id && exclude.i === i) return;
         const s = this.host.toScreen(pt), d = dist(s, raw);
@@ -378,7 +385,7 @@ export class OutlineTool {
     if (best) { this.snapped = 'own'; return best; }
     // Then onto another finished outline's edge (a bed sharing the lawn's edge); corners win over edges.
     const editing = exclude?.id ?? this.drawing;
-    for (const o of Object.values(this.outlines)) {
+    for (const o of this.snapTargets(exclude)) {
       if (!o?.closed || o.id === editing) continue;
       const near = nearestOnRing(outlinePath(o.pts, o.bulges, true).map(q => this.host.toScreen(q)), raw);
       if (near.d < bd) { bd = near.d; best = near.point; }
@@ -565,7 +572,7 @@ export class OutlineTool {
   }
   private edgeAt(p: Point): { id: string; i: number } | null {
     const tol = EDGE_HIT / this.host.pxPerPt(), pp = this.host.toPage(p);
-    for (const o of Object.values(this.outlines)) {
+    for (const o of edgeTapOrder(Object.values(this.outlines), this.selected)) {
       if (!o?.closed) continue;
       const i = nearestEdge(o.pts, pp, tol, o.bulges);
       if (i !== null) return { id: o.id, i };
@@ -809,7 +816,7 @@ export class OutlineTool {
 
   private showTip(e: { id: string; i: number }, p: Point) {
     const ft = this.edgeFeet(e.id, e.i);
-    this.tip.textContent = ft ? formatFeet(ft) : 'Tap to set this edge’s length';
+    this.tip.textContent = ft ? formatFeet(ft) : this.outlines[e.id]?.kind === 'surface' ? 'No scale yet' : 'Tap to set this edge’s length';
     this.tip.style.left = `${p.x + TIP.offset}px`; this.tip.style.top = `${p.y + TIP.offset}px`;
     this.tip.hidden = false;
   }

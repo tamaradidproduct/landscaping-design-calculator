@@ -21,7 +21,9 @@ export function trueEdgeLength(pts: Point[], bulges: number[] | undefined, i: nu
 export function stretchEdge(pts: Point[], bulges: number[] | undefined, i: number, fixed: 0 | 1, length: number, m: Correction): Tidied {
   const n = pts.length, T = (p: Point) => applyCorrection(m, p), inv = invertCorrection(m), B = (p: Point) => applyCorrection(inv, p);
   const q = pts.map(T), a = q[i], b = q[(i + 1) % n], F = fixed ? b : a;
-  const chord = Math.hypot(b.x - a.x, b.y - a.y), u = { x: (b.x - a.x) / chord, y: (b.y - a.y) / chord };
+  const chord = Math.hypot(b.x - a.x, b.y - a.y);
+  if (chord < 1e-9) return { pts, bulges }; // a collapsed edge has no direction to stretch along
+  const u = { x: (b.x - a.x) / chord, y: (b.y - a.y) / chord };
   const mids = pts.map((_, j) => T(edgeMid(pts, j, bulges)));
   const at = (k: number): Tidied => {
     const move = (P: Point) => { const t = (k - 1) * ((P.x - F.x) * u.x + (P.y - F.y) * u.y); return B({ x: P.x + t * u.x, y: P.y + t * u.y }); };

@@ -19,28 +19,28 @@ export class SurfacesSection {
 
   render() {
     const t = this.tool;
-    if (!t.boundaryClosed) { this.picking = false; this.el.innerHTML = hint('Outline the plot boundary first.'); return; }
-    if (t.drawing) this.picking = false;
     const zones = Object.values(t.outlines).filter(o => o.kind === 'surface');
+    if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = hint('Outline the plot boundary first.'); return; }
+    if (t.drawing || !t.boundaryClosed) this.picking = false;
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
       : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id } }));
     this.el.innerHTML = `
       ${zones.length ? '' : hint('Add the new surfaces: lawn, beds, patio…')}
       ${rows.join('')}
-      ${t.drawing ? '' : this.picking
+      ${t.drawing || !t.boundaryClosed ? '' : this.picking
         ? layerForm(`${picker()}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-picker' } })}`)
         : suggestRow('Add surface…', { act: 'add-surface' })}`;
 
     this.el.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach(b => {
       b.onclick = () => { const id = b.dataset.zone!; t.selectOutline(id !== t.selected ? id : null); };
     });
-    this.el.querySelector<HTMLButtonElement>('[data-act=add-surface]')?.addEventListener('click', () => { this.picking = true; this.render(); });
+    // Adding a zone closes the selected one's card, so only one material picker shows at a time.
+    this.el.querySelector<HTMLButtonElement>('[data-act=add-surface]')?.addEventListener('click', () => { this.picking = true; if (t.selected) t.selectOutline(null); else this.render(); });
     this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
-    this.el.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => {
-      const m = b.dataset.material as MaterialId;
-      b.onclick = card ? () => t.setMaterial(card.dataset.card!, m) : () => t.startSurface(m);
-    });
+    // The picker's chips start a new zone; the card's chips change that zone's material.
+    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
+    card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) this.wireCard(card);
   }
