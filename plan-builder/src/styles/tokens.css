@@ -108,7 +108,6 @@
   --opacity-feature-fill-selected: 0.7; /* Selected existing feature. */
   --opacity-edge-highlight: 0.55; /* Edge highlight. */
   --opacity-handle: 0.85; /* Bend handles. */
-  --mix-shape-fill: 10%; /* Tint inside a closed boundary (its colour mixed with transparent). */
   --mix-snap-halo: 18%; /* Disc behind a snapped point. */
   --opacity-surface-editing: 0.5; /* Fill of the selected surface or the one being drawn, so the plan shows through. */
 

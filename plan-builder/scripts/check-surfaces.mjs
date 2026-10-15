@@ -61,6 +61,7 @@ results.push(['House (drawn later) cuts the sod', `sod rings ${sod?.rings} (2 = 
 await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=pavers]');
 await drag([300, 250], [360, 350]);
 results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod rings now ${(await shape('s1'))?.rings}`]);
+results.push(['Plan look', `boundary fill ${await page.$eval('.overlay .shape.boundary.closed', e => getComputedStyle(e).fill)} (expect none) · surface labels ${await page.$$eval('.overlay .label.surface', e => e.length)} (expect 0)`]);
 results.push(['Selected zone see-through, other solid', `pavers ${await fillOpacity('s2')} · sod ${await fillOpacity('s1')}`]);
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 

@@ -725,11 +725,13 @@ export class OutlineTool {
       svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="fixed-end" style="--c:${colorOf(feo)}"/>`;
     }
     for (const o of Object.values(this.outlines)) {
-      // Names go on top of every shape so overlapping features stay readable, inside each one's visible part.
+      // Feature names go on top of every shape so overlapping features stay readable, inside each one's visible
+      // part. Surfaces carry no label: their fill says what they are, and the row names them.
+      if (o.kind === 'surface') continue;
       const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
       if (!at) continue;
       const c = h.toScreen(at);
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label ${o.kind === 'surface' ? 'surface' : 'feature'}${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);

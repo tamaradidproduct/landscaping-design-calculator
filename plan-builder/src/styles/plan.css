@@ -8,7 +8,7 @@
 /* Overlay. Shapes take their colour from --c (set per outline kind: --color-boundary / --color-feature). */
 .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .overlay .shape { fill: none; stroke: var(--c); stroke-width: var(--stroke-bold); stroke-linejoin: round; }
-.overlay .shape.closed { fill: color-mix(in srgb, var(--c) var(--mix-shape-fill), transparent); fill-rule: evenodd; }
+.overlay .shape.closed { fill: none; fill-rule: evenodd; } /* the plot boundary is only its line: the plan shows through untouched */
 /* The whole drawn outline of a selected layer, where higher layers or the lot edge hide part of it */
 .overlay .shape.drawn { fill: none; stroke: var(--color-feature); stroke-width: var(--stroke-hairline); stroke-dasharray: var(--dash-guide); }
 .overlay .shape.feature.closed { fill: var(--color-feature-fill); fill-opacity: var(--opacity-feature-fill); stroke: var(--color-feature-stroke); stroke-width: var(--stroke-hairline); }
@@ -47,4 +47,3 @@
 .overlay .shape.surface { stroke: color-mix(in srgb, var(--c) 65%, black); stroke-width: var(--stroke-hairline); }
 .overlay .shape.surface.closed { fill-opacity: 1; }
 .overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
-.overlay .label.surface { font-size: var(--text-sm); fill: var(--color-feature-ink); stroke: var(--color-feature-fill); text-anchor: middle; dominant-baseline: middle; }
