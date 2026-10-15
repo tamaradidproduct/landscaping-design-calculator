@@ -1,6 +1,7 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
 import type { MaterialId } from './materials';
+import { cornerArc } from './shape-edit';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -14,7 +15,11 @@ const SUGGESTED_FEATURES = ['House'];
  * bulges[i] bends edge i into a circular arc: the arc's midpoint sits bulges[i] PDF points off the
  * chord's midpoint, along the chord's left normal. 0 or missing = straight.
  */
-export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId; }
+export interface Outline {
+  id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId;
+  /** Corner radii in page points (surfaces only; 0 or missing = sharp). */
+  radii?: number[];
+}
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';
@@ -102,10 +107,17 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
   return out;
 }
 
-/** The outline as a dense polyline (arcs sampled). */
-export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean): Point[] {
-  const out: Point[] = [], edges = closed ? pts.length : pts.length - 1;
-  for (let i = 0; i < edges; i++) out.push(...edgePoints(pts[i], pts[(i + 1) % pts.length], bulges?.[i] ?? 0));
+/**
+ * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points); a
+ * corner next to a bent edge stays sharp.
+ */
+export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean, radii?: number[]): Point[] {
+  const out: Point[] = [], n = pts.length, edges = closed ? n : n - 1;
+  for (let i = 0; i < edges; i++) {
+    const arc = closed && radii?.[i] && !bulges?.[i] && !bulges?.[(i - 1 + n) % n] ? cornerArc(pts, i, radii[i]) : null;
+    const edge = edgePoints(pts[i], pts[(i + 1) % n], bulges?.[i] ?? 0);
+    out.push(...(arc ?? [pts[i]]), ...edge.slice(1));
+  }
   if (!closed && pts.length) out.push(pts[pts.length - 1]);
   return out;
 }
@@ -241,3 +253,5 @@ export function edgeTapOrder(outlines: Outline[], selected: string | null): Outl
 /** What a point being placed may snap to: tracing the boundary or a feature ignores designed surfaces. */
 export const snapSources = (outlines: Outline[], editing: OutlineKind | null): Outline[] =>
   editing === 'boundary' || editing === 'feature' ? outlines.filter(o => o.kind !== 'surface') : outlines;
+/** A corner radius typed in feet: empty or zero means a sharp corner (0); null when it can't be read. */
+export const parseRadius = (v: string): number | null => /^\s*0*\.?0*\s*['′]?\s*$/.test(v) ? 0 : parseFeet(v);

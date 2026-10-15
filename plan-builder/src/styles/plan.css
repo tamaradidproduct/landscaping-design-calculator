@@ -47,3 +47,5 @@
 .overlay .shape.surface { stroke: color-mix(in srgb, var(--c) 65%, black); stroke-width: var(--stroke-hairline); }
 .overlay .shape.surface.closed { fill-opacity: 1; }
 .overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
+/* Surfaces: the round-corner handle on the selected corner's bisector */
+.overlay .round-handle { fill: var(--color-paper); stroke: var(--color-accent); stroke-width: var(--stroke-bold); }

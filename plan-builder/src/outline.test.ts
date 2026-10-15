@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -192,4 +192,9 @@ describe('review fixes', () => {
     expect(snapSources(all, 'surface').map(x => x.id)).toEqual(['boundary', 's1', 'f1', 's2']);
     expect(snapSources(all, null).map(x => x.id)).toEqual(['boundary', 's1', 'f1', 's2']);
   });
+});
+
+describe('parseRadius', () => {
+  test.each([['', 0], ['0', 0], ["0'", 0], ['2', 2], ["2' 6\"", 2.5]])('%s → %d ft', (v, ft) => expect(parseRadius(v)).toBe(ft));
+  test('rejects nonsense', () => expect(parseRadius('abc')).toBeNull());
 });

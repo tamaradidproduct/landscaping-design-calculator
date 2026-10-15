@@ -72,6 +72,7 @@ const tool = new OutlineTool({
     outlines?.render();
     updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
+    showSnap();
     $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
     stage.classList.toggle('drawing', !!tool.drawing);
     $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === tool.shape)));
@@ -160,12 +161,12 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); pickShape(tool.shape === 'rect' ? 'freehand' : 'rect');
 });
 
-$('snap').onclick = () => {
-  tool.snapOn = !tool.snapOn;
+// Snap is kept separately for tracing outlines (on by default) and designing surfaces (off by default).
+const showSnap = () => {
   $('snap').setAttribute('aria-pressed', String(tool.snapOn));
   $('snap').textContent = tool.snapOn ? 'Snap on' : 'Snap off';
-  tool.update();
 };
+$('snap').onclick = () => { tool.snapOn = !tool.snapOn; showSnap(); tool.update(); };
 
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 

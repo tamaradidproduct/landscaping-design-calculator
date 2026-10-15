@@ -117,8 +117,11 @@ button.layer-row.suggest { color: var(--color-muted); border: var(--border-width
 .layer-order { display: flex; align-items: center; gap: var(--space-3); }
 .layer-order > .text-hint { flex: 1; }
 .layer-order > button.icon { font-size: var(--text-2xl); }
-input.layer-rename { flex: 1; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); background: transparent; border-color: transparent; }
-input.layer-rename:hover, input.layer-rename:focus { background: var(--color-surface); border-color: var(--color-line); }
+/* Rename in place: an underlined field with a pencil, so it reads as editable before it's touched */
+.layer-rename-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); border-bottom: var(--border-width) dashed var(--color-line); cursor: text; }
+.layer-rename-wrap:hover, .layer-rename-wrap:focus-within { color: var(--color-ink); border-bottom-color: var(--color-accent); }
+input.layer-rename { flex: 1; min-height: var(--control-sm); padding: 0 var(--space-2); font-size: var(--text-base); color: var(--color-ink); background: transparent; border-color: transparent; }
+input.layer-rename:focus { background: var(--color-surface); }
 .layer-form { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); }
 
 /* Plot plan layer: at the end of the Outlines section, collapsing with it (show/hide, file name, opacity) */
@@ -160,3 +163,9 @@ button.group-head:hover { color: var(--color-ink); }
 button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .group-count { font-weight: var(--weight-regular); font-variant-numeric: tabular-nums; }
 .group-body { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Corner chip on a surface: the radius field ("Round 3′") */
+.chip-field { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-base); color: var(--color-muted); }
+.chip-field input { width: var(--control-xl); flex: none; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); }
+/* "Round all corners [ 2′ ] Apply" in a surface's card */
+.round-all .row { flex-wrap: nowrap; }
+.round-all input { min-height: var(--control-md); font-size: var(--text-base); }

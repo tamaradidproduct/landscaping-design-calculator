@@ -14,7 +14,7 @@ const clip = clipDefault as typeof Clip;
 export type Shape = Clip.MultiPolygon;
 
 const ring = (o: Outline): Clip.Ring => {
-  const pts = outlinePath(o.pts, o.bulges, true).map((p): Clip.Pair => [p.x, p.y]);
+  const pts = outlinePath(o.pts, o.bulges, true, o.radii).map((p): Clip.Pair => [p.x, p.y]);
   return [...pts, pts[0]];
 };
 const toPoints = (r: Clip.Ring): Point[] => r.slice(0, -1).map(([x, y]) => ({ x, y }));

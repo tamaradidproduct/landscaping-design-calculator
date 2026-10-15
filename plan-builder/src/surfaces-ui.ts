@@ -2,9 +2,9 @@
 // zone in layer order (a higher zone cuts the ones below; outlines cut every zone), then "Add surface…", which
 // opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
 import { materialsByTrade, type MaterialId, type Trade } from './materials';
-import type { Outline } from './outline';
+import { parseRadius, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, caption, chips, esc, hint, layerActions, layerCard, layerForm, layerOrder, layerRow, nudgePad, suggestRow, swatch } from './ui';
+import { button, caption, chips, esc, hint, input, label, layerActions, row, layerCard, layerForm, layerOrder, layerRow, nudgePad, suggestRow, swatch } from './ui';
 
 const TRADES: [Trade, string][] = [['hardscape', 'Hardscape'], ['softscape', 'Softscape']];
 
@@ -43,6 +43,12 @@ export class SurfacesSection {
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) this.wireCard(card);
+    const round = this.el.querySelector<HTMLFormElement>('form.round-all');
+    if (round && card) round.onsubmit = e => {
+      e.preventDefault();
+      const ft = parseRadius(round.querySelector('input')!.value);
+      if (ft !== null) t.roundAll(card.dataset.card!, ft);
+    };
   }
 
   /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, material, tidy, order. */
@@ -60,7 +66,7 @@ export class SurfacesSection {
     const p = t.layerPosition(o.id);
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      body: `${caption('Material')}${picker(o.material)}${nudge}${layerActions(
+      body: `${caption('Material')}${picker(o.material)}${nudge}${t.cal ? `<form class="field round-all">${label('round-all', 'Round all corners')}${row(input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: compact, type: 'submit' }))}</form>` : ''}${layerActions(
         button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
         button('Redo outline', { mods: compact, data: { act: 'redraw' } }),
         button('Delete', { variant: 'danger', mods: compact, data: { act: 'delete' } }))}${p.first && p.last ? '' : layerOrder(p.first, p.last)}`,
