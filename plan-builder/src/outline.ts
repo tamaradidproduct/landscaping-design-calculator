@@ -41,6 +41,11 @@ export function parseFeet(input: string): number | null {
 
 export const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** How an outline is drawn: freehand (corner by corner), or a rectangle dragged from one corner to the opposite one. */
+export type OutlineShape = 'freehand' | 'rect';
+/** The four corners of the rectangle with opposite corners a and b, square to the axes, in drawing order from a. */
+export const rectCorners = (a: Point, b: Point): Point[] => [a, { x: b.x, y: a.y }, b, { x: a.x, y: b.y }];
+
 const leftNormal = (a: Point, b: Point): Point => { const l = dist(a, b) || 1; return { x: -(b.y - a.y) / l, y: (b.x - a.x) / l }; };
 
 /** Signed distance of p from the chord a→b's midpoint, along the chord's left normal: the bulge that puts the arc through p. */

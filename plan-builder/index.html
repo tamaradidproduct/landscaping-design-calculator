@@ -23,8 +23,11 @@
           <div class="loading" id="loading" hidden>Opening plot plan…</div>
         </div>
         <div class="dock">
+          <div class="segmented" id="shape" role="group" aria-label="Draw the outline" hidden>
+            <button type="button" data-shape="freehand" aria-pressed="true" title="Freehand (X switches)">Freehand</button>
+            <button type="button" data-shape="rect" aria-pressed="false" title="Rectangle (X switches)">Rectangle</button>
+          </div>
           <button type="button" id="snap" class="toggle" aria-pressed="true" hidden>Snap on</button>
-          <div class="card panel" id="panel" hidden></div>
         </div>
         <div class="bubble toast" id="toast" role="status" hidden></div>
       </div>

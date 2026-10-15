@@ -26,11 +26,11 @@ await page.$eval('#snap', b => b.click()); // shown only while drawing; exact pl
 
 await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'P', 'BL']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
-await page.click('#panel [data-act=close]');
+await page.click('#outlines [data-act=close]');
 await page.mouse.click(...await toScreen([(C.TL[0] + C.TR[0]) / 2, (C.TL[1] + C.TR[1]) / 2]));
 await page.fill('#edge-len', '116.45');
 await page.click('.popover button[type=submit]');
-const area = async () => page.$eval('#outlines [data-layer=boundary] .layer-sub', e => e.textContent);
+const area = async () => page.$eval('#outlines [data-layer=boundary] .layer-sub, #outlines [data-card=boundary] .layer-sub', e => e.textContent);
 results.push(['Area with the street edge straight', await area()]);
 
 // Bend the street edge (BR → P) by dragging its middle handle onto the drawn curve.

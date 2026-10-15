@@ -37,7 +37,7 @@ async function hoverLength(a, b) {
 
 await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'BL']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(150); }
-await page.click('#panel [data-act=close]');
+await page.click('#outlines [data-act=close]');
 
 await typeLength(C.TL, C.TR, '116.45');
 results.push(['Top edge typed (116.45′): one scale', `${await scaleText()} · page stretch ×${(await aspect()).toFixed(4)}`]);
@@ -58,7 +58,7 @@ results.push(['⌘Z: back to the true lengths', `page stretch ×${(await aspect(
 await page.mouse.click(...await toScreen(mid(C.TL, C.BL))); await page.waitForTimeout(150);
 await page.click('.popover [data-act=unref]'); await page.waitForTimeout(600);
 results.push(['Remove the left length (edge popover): one scale again', `page stretch ×${(await aspect()).toFixed(4)} · left edge ${await hoverLength(C.TL, C.BL)}`]);
-results.push(['Plot area on the boundary row', await page.textContent('#outlines [data-layer=boundary] .layer-sub')]);
+results.push(['Plot area on the boundary row', await page.textContent('#outlines [data-layer=boundary] .layer-sub, #outlines [data-card=boundary] .layer-sub')]);
 
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();

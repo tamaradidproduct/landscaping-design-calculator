@@ -35,37 +35,39 @@ const outline = async name => {
   const pick = await page.$(`#outlines [data-feature="${name}"]`);
   if (pick) await pick.click(); else { await page.fill('#outline-name', name); await page.press('#outline-name', 'Enter'); }
   for (const p of F[name]) { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(380); }
-  await page.click('#panel [data-act=close]');
+  await page.click('#outlines [data-act=close]');
 };
 const tapInside = async name => { await page.mouse.click(...await toScreen(INSIDE[name])); await page.waitForTimeout(150); };
 
 await step('Outline House (quick pick)', () => outline('House'));
 await step('Outline Driveway (quick pick)', () => outline('Driveway'));
 await step('Outline Porch (typed)', () => outline('Porch'));
+// Drawn wholly inside the house, the porch goes straight above it in Layers (so it isn't hidden).
+results.push(['Layer order (porch drawn inside the house)', await page.$$eval('#outlines [data-layer], #outlines [data-card]', e => e.map(x => x.querySelector('.layer-name, .layer-rename')?.value || x.querySelector('.layer-name')?.textContent).join(' > '))]);
 // Zoom in on the porch so a tap in its middle is clear of its corners.
 await page.mouse.move(...await toScreen(INSIDE.Porch));
 await page.keyboard.down('Control'); for (let i = 0; i < 10; i++) { await page.mouse.wheel(0, -30); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(500);
 results.push(['Grey filled features', String(await page.$$eval('.overlay .shape.feature.closed', s => s.length))]);
 await tapInside('Porch');
-results.push(['Tap inside the porch (inside the house) selects', await page.inputValue('#feature-name-edit')]);
-await step('Rename porch → Covered porch', async () => { await page.fill('#feature-name-edit', 'Covered porch'); await page.press('#feature-name-edit', 'Enter'); });
+results.push(['Tap inside the porch (inside the house) selects', await page.inputValue('#outline-rename')]);
+await step('Rename porch → Covered porch', async () => { await page.fill('#outline-rename', 'Covered porch'); await page.press('#outline-rename', 'Enter'); });
 await page.screenshot({ path: `${outDir}/step3.png` });
 await page.click('#fit'); await page.waitForTimeout(300);
 await page.mouse.move(...await toScreen(INSIDE.Driveway));
 await page.keyboard.down('Control'); for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, -30); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(300);
 await tapInside('Driveway');
-results.push(['Tap inside the driveway selects', await page.inputValue('#feature-name-edit')]);
-await step('Delete driveway', () => page.click('#panel [data-act=delete]'));
+results.push(['Tap inside the driveway selects', await page.inputValue('#outline-rename')]);
+await step('Delete driveway', () => page.click('#outlines [data-act=delete]'));
 await step('⌘Z (driveway back)', () => page.keyboard.press('Meta+z'));
 await step('⌘Z (rename undone)', () => page.keyboard.press('Meta+z'));
 await step('⇧⌘Z (rename redone)', () => page.keyboard.press('Meta+Shift+z'));
 await step('⇧⌘Z (driveway deleted again)', () => page.keyboard.press('Meta+Shift+z'));
 await page.mouse.click(1100, 700); await page.waitForTimeout(150);
-results.push(['Tap outside clears the selection', (await page.$('#feature-name-edit')) ? 'still selected' : 'cleared']);
+results.push(['Tap outside clears the selection', (await page.$('#outline-rename')) ? 'still selected' : 'cleared']);
 await tapInside('House');
-await step('Redo outline of the house, then Cancel (house kept)', async () => { await page.click('#panel [data-act=redraw]'); await page.click('#panel [data-act=cancel]'); });
+await step('Redo outline of the house, then Cancel (house kept)', async () => { await page.click('#outlines [data-act=redraw]'); await page.click('#outlines [data-act=cancel]'); });
 
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();

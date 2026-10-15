@@ -4,7 +4,7 @@
 export type ButtonVariant = 'default' | 'primary' | 'danger';
 export interface ButtonOptions {
   variant?: ButtonVariant;
-  /** Extra modifiers from the Button component: 'large', 'icon', 'small', 'chip', 'toggle', 'layer-action'. */
+  /** Extra modifiers from the Button component: 'large', 'icon', 'small', 'chip', 'toggle', 'compact'. */
   mods?: string[];
   type?: 'button' | 'submit';
   disabled?: boolean;
@@ -25,7 +25,6 @@ export function button(label: string, o: ButtonOptions = {}): string {
 }
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
-export const body = (html: string) => `<p class="text-body">${html}</p>`;
 export const hint = (html: string) => `<p class="text-hint">${html}</p>`;
 export const error = (html: string, hidden = true) => `<p class="text-error"${hidden ? ' hidden' : ''}>${html}</p>`;
 export const label = (forId: string, text: string) => `<label class="text-label" for="${forId}">${text}</label>`;
@@ -53,7 +52,7 @@ export const cardHead = (titleHtml: string) =>
 /** Arrow pad that nudges the selected corner by one screen pixel (data-nudge="dx,dy"). */
 export function nudgePad(): string {
   const arrow = (glyph: string, dir: string, d: string) => button(glyph, { mods: ['icon'], ariaLabel: `Nudge ${dir}`, data: { nudge: d } });
-  return `<div class="nudge"><span class="text-hint">Nudge the selected corner</span>`
+  return `<div class="nudge"><span class="text-hint">Nudge corner</span>`
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
@@ -62,18 +61,45 @@ export interface LayerRowOptions {
   swatch: 'boundary' | 'feature'; meta?: string; selected?: boolean; data?: Record<string, string>;
   /** A quiet second line under the name (e.g. the plot area). */
   sub?: string;
-  /** A small action button beside the row (from button()), e.g. Redo. */
-  action?: string;
 }
+const layerName = (name: string, sub?: string) => sub
+  ? `<span class="layer-text"><span class="layer-name">${esc(name)}</span><span class="layer-sub">${esc(sub)}</span></span>`
+  : `<span class="layer-name">${esc(name)}</span>`;
 export function layerRow(name: string, o: LayerRowOptions): string {
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
-  const rowHtml = `<button type="button" class="layer-row${o.selected ? ' selected' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
-    + `<span class="swatch ${o.swatch}"></span>`
-    + (o.sub ? `<span class="layer-text"><span class="layer-name">${esc(name)}</span><span class="layer-sub">${esc(o.sub)}</span></span>`
-      : `<span class="layer-name">${esc(name)}</span>`)
+  return `<button type="button" class="layer-row${o.selected ? ' selected' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
+    + `<span class="swatch ${o.swatch}"></span>${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
-  return o.action ? `<div class="layer-item">${rowHtml}${o.action}</div>` : rowHtml;
 }
+/**
+ * Layer card: the row of the outline being drawn or edited, expanded in place. The head keeps the swatch and
+ * name (a name field when it can be renamed) and a Done button; the body holds the step, nudge arrows and actions.
+ */
+export interface LayerCardOptions {
+  id: string; swatch: 'boundary' | 'feature'; name: string; sub?: string; meta?: string;
+  /** Show the name as a field (id "outline-rename") so it can be renamed in place. */
+  rename?: boolean;
+  /** Show a Done button (data-act="collapse") that closes the card. */
+  done?: boolean;
+  body: string;
+}
+export function layerCard(o: LayerCardOptions): string {
+  const name = o.rename
+    ? `<input id="outline-rename" class="layer-rename" autocomplete="off" aria-label="Name" value="${esc(o.name)}" />`
+    : layerName(o.name, o.sub);
+  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head"><span class="swatch ${o.swatch}"></span>${name}`
+    + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
+    + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`
+    + `<div class="layer-body">${o.body}</div></div>`;
+}
+/** "Layer order ↑ ↓" in a layer card (data-act="up" / "down"); higher layers cut the ones below. */
+export function layerOrder(first: boolean, last: boolean): string {
+  const arrow = (glyph: string, dir: 'up' | 'down', disabled: boolean) =>
+    button(glyph, { mods: ['icon', 'small'], ariaLabel: `Move ${dir} (higher layers cut the ones below)`, disabled, data: { act: dir } });
+  return `<div class="layer-order"><span class="text-hint">Layer order</span>${arrow('↑', 'up', first)}${arrow('↓', 'down', last)}</div>`;
+}
+/** Wrapping group of compact actions inside a layer card. */
+export const layerActions = (...buttons: string[]) => `<div class="layer-actions">${buttons.join('')}</div>`;
 /** Layer form: a bordered block inside the layer list (naming a custom outline). */
 export const layerForm = (html: string) => `<form class="layer-form">${html}</form>`;
 /** Suggestion row: a dashed "+ name" row that starts outlining it. */

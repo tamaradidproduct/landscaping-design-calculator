@@ -18,6 +18,8 @@ export const MARK = {
   guideArm: 12,         // right-angle hint arm length
   guideLabelDx: 10,
   guideLabelDy: 24,
+  cornerBracket: 8,     // rectangle tool: arm length of the ⌐ mark at the pointer
+  guideSpan: 100000,    // rectangle tool: the guides run this far each way (the plan clips them)
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;

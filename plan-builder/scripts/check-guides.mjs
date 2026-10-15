@@ -23,11 +23,11 @@ await page.mouse.move(63, 318); await page.waitForTimeout(80);             // ne
 results.push(['4th corner near column of #1 and row of #3', await label()]);
 await page.mouse.click(63, 318); await page.waitForTimeout(400);
 results.push(['→ placed', JSON.stringify((await corners())[3]) + ' (expect 63,318: no pull)']);
-await page.click('#panel [data-act=close]'); await page.waitForTimeout(200);
+await page.click('#outlines [data-act=close]'); await page.waitForTimeout(200);
 // select a corner, then click empty space
 await page.mouse.click(200, 200); await page.waitForTimeout(200);
 results.push(['Corner selected (ring shown)', String(await page.$('.overlay .selected-corner') !== null)]);
 await page.mouse.click(130, 500); await page.waitForTimeout(200);
-results.push(['Click outside the shape → selection cleared', String(await page.$('.overlay .selected-corner') === null) + ', nudge pad gone: ' + String(await page.$('#panel .nudge') === null)]);
+results.push(['Click outside the shape → selection cleared', String(await page.$('.overlay .selected-corner') === null) + ', nudge pad gone: ' + String(await page.$('#outlines .nudge') === null)]);
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();

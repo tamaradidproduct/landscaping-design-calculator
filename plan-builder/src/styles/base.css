@@ -16,7 +16,6 @@ body {
 .row.split > * { flex: 1; }
 
 /* Text styles */
-.text-body { margin: 0; font-size: var(--text-lg); line-height: var(--leading-body); }
 .text-hint { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
 .text-label { display: block; font-size: var(--text-sm); color: var(--color-muted); }
 .text-error { margin: 0; font-size: var(--text-sm); color: var(--color-warn); }

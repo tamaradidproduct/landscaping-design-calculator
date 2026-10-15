@@ -11,7 +11,7 @@
  * .icon                    square glyph button (48 px); .icon.small = 40 px (card header close)
  * .toggle[aria-pressed]    on/off state
  * .chip                    centred quick pick inside a chip group
- * .layer-action            small action beside a layer row (Redo)
+ * .compact                 a step smaller (control-md, text-base) for actions inside a layer card
  * .layer-row               a row in the Layers panel (see Layer row below)
  */
 button {
@@ -29,6 +29,7 @@ button.icon.small { min-width: var(--control-sm); min-height: var(--control-sm);
 button.toggle[aria-pressed="false"] { color: var(--color-muted); }
 button.toggle[aria-pressed="true"] { border-color: var(--color-accent); }
 button.chip { text-align: center; }
+button.compact { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-base); white-space: nowrap; }
 
 /* ---------- Text field ---------- */
 input {
@@ -38,15 +39,13 @@ input {
 }
 input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outline-offset: var(--border-width); }
 
-/* ---------- Card: the floating surface behind the panel, popovers and the Square chip ---------- */
+/* ---------- Card: the floating surface behind popovers and the Square chip ---------- */
 .card {
   background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-7);
 }
 .card-head { display: flex; align-items: center; justify-content: space-between; }
 
-/* Panel: card docked at the bottom centre of the plan (instructions, figures, selection actions) */
-.panel { width: min(var(--width-panel), 100%); border-radius: var(--radius-xl); padding: var(--space-7) var(--space-8); gap: var(--space-6); }
 /* Square chip: a corner's angle and a Square button, beside the selected corner */
 .square-chip { position: absolute; z-index: var(--z-chip); flex-direction: row; align-items: center; gap: var(--space-5); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6); border-radius: var(--radius-pill); box-shadow: var(--shadow-sm); }
 .square-chip .text-figure { font-size: var(--text-base); }
@@ -54,13 +53,19 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 /* Popover: card anchored next to what it describes (an edge) */
 .popover { position: absolute; width: min(var(--width-card), calc(100% - 2 * var(--space-4))); }
 
-/* ---------- Dock: the bottom of the plan — the Snap toggle above the panel ---------- */
+/* ---------- Dock: a floating bar at the bottom of the plan — Corners | Rectangle and the Snap toggle ---------- */
 .dock {
   position: absolute; left: 0; right: 0; bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-4); padding: 0 var(--space-8); pointer-events: none;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-4); padding: 0 var(--space-8); pointer-events: none;
 }
 .dock > * { pointer-events: auto; }
-.dock > .toggle { align-self: flex-start; box-shadow: var(--shadow-sm); }
+.dock > .toggle, .dock > .segmented { box-shadow: var(--shadow-sm); }
+
+/* ---------- Segmented control: one choice of a few, joined (Corners | Rectangle) ---------- */
+.segmented { display: inline-flex; background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); overflow: hidden; }
+.segmented > button { border: 0; border-radius: 0; background: transparent; }
+.segmented > button + button { border-left: var(--border-width) solid var(--color-line); }
+.segmented > button[aria-pressed="true"] { background: var(--color-accent); color: var(--color-on-accent); font-weight: var(--weight-strong); }
 
 /* ---------- Field: stacked label over a control ---------- */
 .field > .text-label { margin-bottom: var(--space-3); }
@@ -92,7 +97,6 @@ button.layer-row.selected { background: var(--color-bg); border-color: var(--col
 button.layer-row.suggest { color: var(--color-muted); border: var(--border-width) dashed var(--color-line); }
 .layer-item { display: flex; align-items: center; gap: var(--space-3); }
 .layer-item > .layer-row { flex: 1; min-width: 0; }
-button.layer-action { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-sm); }
 .layer-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
 .layer-sub { font-size: var(--text-sm); color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -101,6 +105,20 @@ button.layer-action { min-height: var(--control-md); padding: 0 var(--space-6); 
 .swatch.boundary { border: var(--stroke-bold) solid var(--color-boundary); }
 .swatch.feature { background: var(--color-feature-fill); border: var(--border-width) solid var(--color-feature-stroke); }
 .swatch.add { display: grid; place-content: center; color: var(--color-accent); font-weight: var(--weight-strong); }
+/* Layer card: the row of the outline being drawn or edited, expanded in place (head over body) */
+.layer-card { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
+.layer-head { display: flex; align-items: center; gap: var(--space-5); min-height: var(--control-sm); font-size: var(--text-base); }
+.layer-body { display: flex; flex-direction: column; gap: var(--space-4); }
+.layer-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.layer-actions > button { flex: 1 1 auto; }
+/* Nudge arrows in a card: the label on its own line, then four smaller arrows in one row */
+.layer-body .nudge > .text-hint { flex-basis: 100%; }
+.layer-body .nudge > button.icon { min-width: var(--control-sm); min-height: var(--control-sm); }
+.layer-order { display: flex; align-items: center; gap: var(--space-3); }
+.layer-order > .text-hint { flex: 1; }
+.layer-order > button.icon { font-size: var(--text-2xl); }
+input.layer-rename { flex: 1; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); background: transparent; border-color: transparent; }
+input.layer-rename:hover, input.layer-rename:focus { background: var(--color-surface); border-color: var(--color-line); }
 .layer-form { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); }
 
 /* Plot plan layer: pinned to the bottom of the Layers panel (show/hide, file name, opacity) */
