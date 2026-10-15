@@ -1,8 +1,9 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
+import type { MaterialId } from './materials';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
-export type OutlineKind = 'boundary' | 'feature';
+export type OutlineKind = 'boundary' | 'feature' | 'surface';
 /** Common existing features, offered as one-tap names; the contractor can type any name. */
 export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Porch', 'Walk', 'Deck', 'Garage', 'Shed', 'Pool'];
 /** Presets suggested on their own row in the Layers panel (the rest are quick picks behind "Custom outline…"). */
@@ -13,7 +14,29 @@ const SUGGESTED_FEATURES = ['House'];
  * bulges[i] bends edge i into a circular arc: the arc's midpoint sits bulges[i] PDF points off the
  * chord's midpoint, along the chord's left normal. 0 or missing = straight.
  */
-export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; }
+export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId; }
+
+/** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
+export type Section = 'lot' | 'outlines' | 'surfaces';
+export const sectionOf = (kind: OutlineKind): Section => kind === 'boundary' ? 'lot' : kind === 'feature' ? 'outlines' : 'surfaces';
+const SECTION_RANK: Record<Section, number> = { lot: 0, outlines: 1, surfaces: 2 };
+
+/** The order layers cut each other in: the boundary, then every outline, then every surface (each in its own order). */
+export const cutOrder = (outlines: Outline[]): Outline[] =>
+  outlines.map((o, k) => ({ o, k })).sort((a, b) => SECTION_RANK[sectionOf(a.o.kind)] - SECTION_RANK[sectionOf(b.o.kind)] || a.k - b.k).map(x => x.o);
+
+/** `ids` with `id` swapped with its nearest neighbour of the same section (dir −1 = up); null at the section's end. */
+export function moveInSection(ids: string[], outlines: Record<string, Outline>, id: string, dir: -1 | 1): string[] | null {
+  const o = outlines[id]; if (!o || o.kind === 'boundary') return null;
+  const same = ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind));
+  const at = same.indexOf(id), other = same[at + dir]; if (at < 0 || !other) return null;
+  return ids.map(k => k === id ? other : k === other ? id : k);
+}
+/** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
+export function sectionPosition(ids: string[], outlines: Record<string, Outline>, id: string) {
+  const o = outlines[id], same = o ? ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)) : [];
+  return { first: same[0] === id, last: same[same.length - 1] === id };
+}
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 /** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,

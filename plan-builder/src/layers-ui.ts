@@ -4,7 +4,7 @@
 // panel over the plan).
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerOrder, layerRow, nudgePad, splitRow, suggestRow } from './ui';
+import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerOrder, layerRow, nudgePad, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
   private naming = false; // the custom-feature name form is open
@@ -18,7 +18,7 @@ export class OutlinesSection {
     const s = outlineSuggestions(all);
     const ordered = [...all.filter(o => o.kind === 'boundary'), ...all.filter(o => o.kind === 'feature')];
     const rows = ordered.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o) : layerRow(o.name, {
-      swatch: o.kind, data: { layer: o.id },
+      swatch: swatchOf(o), data: { layer: o.id },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
     const scaleHint = !t.cal && all.some(o => o.closed) && !t.drawing
@@ -68,12 +68,12 @@ export class OutlinesSection {
       const step = t.shape === 'rect'
         ? (n ? 'Now drag or tap to the opposite corner.' : `Drag from one corner of the ${what} to the opposite corner.`)
         : n >= 3 ? `${n} corners. Tap the first corner or double-tap to finish.` : `Tap each corner of the ${what} · ${n} placed`;
-      return layerCard({ id: o.id, swatch: o.kind, name: o.name, meta: 'Drawing…', body: `${hint(step)}${nudge}${layerActions(
+      return layerCard({ id: o.id, swatch: swatchOf(o), name: o.name, meta: 'Drawing…', body: `${hint(step)}${nudge}${layerActions(
         t.shape === 'rect' ? '' : button('Close shape', { variant: 'primary', mods: compact, disabled: n < 3, data: { act: 'close' } }),
         button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
     }
     return layerCard({
-      id: o.id, swatch: o.kind, name: o.name, done: true, rename: o.kind === 'feature',
+      id: o.id, swatch: swatchOf(o), name: o.name, done: true, rename: o.kind === 'feature',
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
       body: `${nudge}${layerActions(
         button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
@@ -113,4 +113,6 @@ export class OutlinesSection {
   }
 }
 
+/** Rows and cards here only list the boundary and features. */
+const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material! } : o.kind;
 const areaText = (sqft: number | null) => sqft === null ? undefined : formatArea(sqft);

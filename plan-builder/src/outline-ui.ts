@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
-  outlinePath, parseFeet, rectCorners,
+  moveInSection, outlinePath, parseFeet, rectCorners, sectionPosition,
   type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -42,7 +42,8 @@ const RECT_MIN = 8;         // screen px: a rectangle narrower or shorter than t
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
 const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
-const COLORS: Record<OutlineKind, string> = { boundary: 'var(--color-boundary)', feature: 'var(--color-feature)' };
+/** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
+const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
@@ -459,30 +460,23 @@ export class OutlineTool {
     if (this.hoverAt) this.hover(this.hoverAt); // the pointer's mark follows the new tool straight away (X)
   }
   /**
-   * Move a layer up or down in Layers (dir −1 = up). Higher layers cut lower ones; the plot boundary stays
-   * first and never moves.
+   * Move a layer up or down within its Layers section (dir −1 = up). Higher layers cut lower ones; outlines always
+   * cut surfaces; the plot boundary stays first and never moves.
    */
   moveLayer(id: string, dir: -1 | 1) {
-    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary'), at = ids.indexOf(id), to = at + dir;
-    if (at < 0 || to < 0 || to >= ids.length) return;
+    const ids = moveInSection(Object.keys(this.outlines), this.outlines, id, dir); if (!ids) return;
     this.record();
-    [ids[at], ids[to]] = [ids[to], ids[at]];
-    const b = this.outlines[BOUNDARY];
-    this.outlines = Object.fromEntries([...(b ? [[BOUNDARY, b]] : []), ...ids.map(k => [k, this.outlines[k]!])]);
+    this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
     this.update();
   }
   /** Put layer `id` directly above layer `above` (no undo step of its own: part of whatever made it). */
   private placeAbove(id: string, above: string) {
-    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary' && k !== id);
+    const ids = Object.keys(this.outlines).filter(k => k !== id);
     ids.splice(ids.indexOf(above), 0, id);
-    const b = this.outlines[BOUNDARY];
-    this.outlines = Object.fromEntries([...(b ? [[BOUNDARY, b]] : []), ...ids.map(k => [k, this.outlines[k]!])]);
+    this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
   }
-  /** Where a layer sits among the movable ones (for disabling Move up / Move down at the ends). */
-  layerPosition(id: string) {
-    const ids = Object.keys(this.outlines).filter(k => this.outlines[k]!.kind !== 'boundary');
-    return { first: ids[0] === id, last: ids[ids.length - 1] === id };
-  }
+  /** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
+  layerPosition(id: string) { return sectionPosition(Object.keys(this.outlines), this.outlines, id); }
   /** True while a finished outline has a corner, edge or feature selected. */
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
@@ -637,26 +631,26 @@ export class OutlineTool {
       if (shown) {
         // A finished layer shows only its visible part; selected, its whole drawn outline shows too (dashed) so
         // it's clear what is being edited.
-        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
-        if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${COLORS[o.kind]}"/>`;
-      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}"/>`;
+        if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
+      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel ? ' selected' : ''}" style="--c:${colorOf(o)}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
-        svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${COLORS[o.kind]}"/>`;
+        svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${colorOf(o)}"/>`;
       }
       // Only the outline being drawn or edited shows its handles; the rest are just shape and name.
       const handles = drawingThis || (!this.drawing && this.selected === o.id);
       if (o.closed && handles) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
-        svg += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${COLORS[o.kind]}"/>`;
+        svg += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${colorOf(o)}"/>`;
       });
       if (handles) o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
         const closeTarget = drawingThis && i === 0 && o.pts.length >= 3;
-        if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${COLORS[o.kind]}"/>`;
-        svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${COLORS[o.kind]}"/>`;
+        if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${colorOf(o)}"/>`;
+        svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${colorOf(o)}"/>`;
       });
     }
     for (const o of Object.values(this.outlines)) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, cutOrder, moveInSection, sectionPosition, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -149,4 +149,23 @@ describe('rectCorners', () => {
     expect(rectCorners({ x: 10, y: 20 }, { x: 40, y: 5 })).toEqual([{ x: 10, y: 20 }, { x: 40, y: 20 }, { x: 40, y: 5 }, { x: 10, y: 5 }]);
   });
   test('area is width × height', () => expect(areaPt2(rectCorners({ x: 0, y: 0 }, { x: 30, y: 12 }))).toBe(360));
+});
+
+describe('sections', () => {
+  const o = (id: string, kind: Outline['kind']): Outline => ({ id, kind, name: id, pts: [], closed: true });
+  const all = Object.fromEntries([o('s1', 'surface'), o('f1', 'feature'), o('boundary', 'boundary'), o('s2', 'surface'), o('f2', 'feature')].map(x => [x.id, x]));
+  const ids = Object.keys(all);
+  test('cutting order: boundary, then outlines, then surfaces', () => {
+    expect(cutOrder(Object.values(all)).map(x => x.id)).toEqual(['boundary', 'f1', 'f2', 's1', 's2']);
+  });
+  test('layer order moves only within a section', () => {
+    expect(moveInSection(ids, all, 's2', -1)).toEqual(['s2', 'f1', 'boundary', 's1', 'f2']);
+    expect(moveInSection(ids, all, 's1', -1)).toBeNull();
+    expect(moveInSection(ids, all, 'f2', 1)).toBeNull();
+    expect(moveInSection(ids, all, 'boundary', 1)).toBeNull();
+  });
+  test('position within the section', () => {
+    expect(sectionPosition(ids, all, 'f1')).toEqual({ first: true, last: false });
+    expect(sectionPosition(['boundary', 'f1', 's1'], all, 'f1')).toEqual({ first: true, last: true });
+  });
 });

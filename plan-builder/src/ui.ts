@@ -1,5 +1,7 @@
 // UI components as HTML-string builders. Every class name the components in styles/components.css
 // rely on is written here, so templates elsewhere compose these instead of spelling out markup.
+import type { MaterialId } from './materials';
+import { materialFill } from './patterns';
 
 export type ButtonVariant = 'default' | 'primary' | 'danger';
 export interface ButtonOptions {
@@ -56,9 +58,14 @@ export function nudgePad(): string {
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
+/** A layer's swatch: the outline kind's look, or a surface's material (colour + pattern). */
+export type Swatch = 'boundary' | 'feature' | { material: MaterialId };
+const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
+  : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${materialFill(s.material)}"/></svg></span>`;
+
 /** Layer row: a swatch for the outline kind, the name, and an optional status (e.g. "Drawing…"). */
 export interface LayerRowOptions {
-  swatch: 'boundary' | 'feature'; meta?: string; selected?: boolean; data?: Record<string, string>;
+  swatch: Swatch; meta?: string; selected?: boolean; data?: Record<string, string>;
   /** A quiet second line under the name (e.g. the plot area). */
   sub?: string;
 }
@@ -68,7 +75,7 @@ const layerName = (name: string, sub?: string) => sub
 export function layerRow(name: string, o: LayerRowOptions): string {
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="button" class="layer-row${o.selected ? ' selected' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
-    + `<span class="swatch ${o.swatch}"></span>${layerName(name, o.sub)}`
+    + `${swatch(o.swatch)}${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
 }
 /**
@@ -76,7 +83,7 @@ export function layerRow(name: string, o: LayerRowOptions): string {
  * name (a name field when it can be renamed) and a Done button; the body holds the step, nudge arrows and actions.
  */
 export interface LayerCardOptions {
-  id: string; swatch: 'boundary' | 'feature'; name: string; sub?: string; meta?: string;
+  id: string; swatch: Swatch; name: string; sub?: string; meta?: string;
   /** Show the name as a field (id "outline-rename") so it can be renamed in place. */
   rename?: boolean;
   /** Show a Done button (data-act="collapse") that closes the card. */
@@ -87,7 +94,7 @@ export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
     ? `<input id="outline-rename" class="layer-rename" autocomplete="off" aria-label="Name" value="${esc(o.name)}" />`
     : layerName(o.name, o.sub);
-  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head"><span class="swatch ${o.swatch}"></span>${name}`
+  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
     + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`
     + `<div class="layer-body">${o.body}</div></div>`;
