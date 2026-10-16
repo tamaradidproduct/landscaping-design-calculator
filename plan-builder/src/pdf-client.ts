@@ -18,11 +18,16 @@ export class PdfClient {
   }
 
   private send(req: Distribute<WorkerRequest>, transfer: Transferable[] = []): Promise<WorkerResponse> {
+    return this.sendWithId(req, transfer).promise;
+  }
+
+  private sendWithId(req: Distribute<WorkerRequest>, transfer: Transferable[] = []) {
     const id = this.nextId++;
-    return new Promise((resolve, reject) => {
+    const promise = new Promise<WorkerResponse>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.worker.postMessage({ ...req, id }, transfer);
     });
+    return { id, promise };
   }
 
   /** Start loading the PDF engine now, so opening a file later is instant. */
@@ -37,6 +42,28 @@ export class PdfClient {
     const r = await this.send({ type: 'open', bytes }, [bytes]);
     if (r.type !== 'opened') throw new Error('Unexpected reply');
     return { pageCount: r.pageCount, pageSize: r.pageSize };
+  }
+
+  /**
+   * Text of page 1, read from a separate copy of the file so the open document is untouched.
+   * Returns '' on any failure or after 3 s (a running worker call can't be interrupted, so a late reply is dropped).
+   */
+  async text(bytes: ArrayBuffer): Promise<string> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { id, promise } = this.sendWithId({ type: 'text', bytes }, [bytes]);
+    const timeout = new Promise<string>(resolve => {
+      timer = setTimeout(() => { this.pending.delete(id); resolve(''); }, 3000);
+    });
+    try {
+      return await Promise.race([
+        promise.then(r => (r.type === 'text' ? r.text : '')),
+        timeout,
+      ]);
+    } catch {
+      return '';
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** RGBA pixels of page 1: page point (x, y) lands at (a·x + c·y + e, b·x + d·y + f). */

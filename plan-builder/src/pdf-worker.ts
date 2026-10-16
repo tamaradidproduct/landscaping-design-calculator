@@ -49,6 +49,15 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       const size = { w: m._FPDF_GetPageWidthF(page) as number, h: m._FPDF_GetPageHeightF(page) as number };
       m._FPDF_ClosePage(page);
       post({ type: 'opened', id: req.id, pageCount: doc.getPageCount(), pageSize: size });
+    } else if (req.type === 'text') {
+      await engine();
+      // Its own temporary document: the one the viewer has open stays untouched
+      const tmp = await lib!.loadDocument(new Uint8Array(req.bytes));
+      try {
+        post({ type: 'text', id: req.id, text: tmp.getPage(0).getText() });
+      } finally {
+        tmp.destroy();
+      }
     } else if (req.type === 'render') {
       if (!doc) throw new Error('No document open');
       const pixels = render(req.width, req.height, req.matrix);
