@@ -21,7 +21,8 @@ export const MARK = {
   cornerBracket: 8,     // rectangle tool: arm length of the ⌐ mark at the pointer
   guideSpan: 100000,    // rectangle tool: the guides run this far each way (the plan clips them)
   roundHandle: 6,       // surfaces: radius of the round-corner handle on the selected corner's bisector
-  roundHandleMin: 18,   // …and its least distance from the corner (screen px), so it doesn't hide under the corner dot
+  roundHandleMin: 22,   // …and its least distance from the corner (screen px), so it doesn't hide under the corner dot
+  roundHandleHit: 13,   // press radius around the round handle (small, so the sides next to it stay easy to grab)
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;

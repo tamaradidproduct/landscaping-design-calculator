@@ -1,7 +1,7 @@
 // The Layers panel's Surfaces section: the new work (hardscape and softscape zones), above Outlines. One row per
 // zone in layer order (a higher zone cuts the ones below; outlines cut every zone), then "Add surface…", which
 // opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
-import { materialsByTrade, type MaterialId, type Trade } from './materials';
+import { material, materialsByTrade, type MaterialId, type Trade } from './materials';
 import { parseRadius, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
 import { button, caption, chips, esc, hint, input, label, layerActions, row, layerCard, layerForm, layerOrder, layerRow, nudgePad, suggestRow, swatch } from './ui';
@@ -14,6 +14,7 @@ const picker = (current?: MaterialId) => TRADES.map(([trade, title]) => `${capti
 
 export class SurfacesSection {
   private picking = false; // the material picker for a new zone is open
+  private changing: string | null = null; // the zone whose material picker is open in its card
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
@@ -22,6 +23,7 @@ export class SurfacesSection {
     const zones = Object.values(t.outlines).filter(o => o.kind === 'surface');
     if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = hint('Outline the plot boundary first.'); return; }
     if (t.drawing || !t.boundaryClosed) this.picking = false;
+    if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
       : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id } }));
     this.el.innerHTML = `
@@ -40,7 +42,8 @@ export class SurfacesSection {
     const card = this.el.querySelector<HTMLElement>('[data-card]');
     // The picker's chips start a new zone; the card's chips change that zone's material.
     this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
-    card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); });
+    card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
+    card?.querySelector<HTMLButtonElement>('[data-act=change-material]')?.addEventListener('click', () => { this.changing = card.dataset.card!; this.render(); });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) this.wireCard(card);
     const round = this.el.querySelector<HTMLFormElement>('form.round-all');
@@ -66,7 +69,9 @@ export class SurfacesSection {
     const p = t.layerPosition(o.id);
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      body: `${caption('Material')}${picker(o.material)}${nudge}${t.cal ? `<form class="field round-all">${label('round-all', 'Round all corners')}${row(input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: compact, type: 'submit' }))}</form>` : ''}${layerActions(
+      // The material shows as one line; Change opens the picker in place.
+      body: `${caption('Material')}${this.changing === o.id ? picker(o.material)
+        : `<div class="material-current">${swatch(sw)}<span class="layer-name">${esc(material(o.material!).name)}</span>${button('Change', { mods: compact, data: { act: 'change-material' } })}</div>`}${nudge}${t.cal ? `<form class="field round-all">${label('round-all', 'Round all corners')}${row(input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: compact, type: 'submit' }))}</form>` : ''}${layerActions(
         button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
         button('Redo outline', { mods: compact, data: { act: 'redraw' } }),
         button('Delete', { variant: 'danger', mods: compact, data: { act: 'delete' } }))}${p.first && p.last ? '' : layerOrder(p.first, p.last)}`,

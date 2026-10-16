@@ -49,6 +49,15 @@ try {
   results.push(['Hover inside', `${await tipAt([330, 300])} · cursor ${await cursor()}`]);
   results.push(['Hover the right side', `${await tipAt([360, 275])} · cursor ${await cursor()}`]);
   results.push(['Hover the middle square', await tipAt([360, 300])]);
+  await page.mouse.move(...await toScreen([357, 347])); await page.waitForTimeout(150);
+  results.push(['Hover near the bottom-right corner (not selected)', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
+  await page.mouse.move(...await toScreen([330, 300])); await page.waitForTimeout(150);
+  results.push(['Pointer back in the middle', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
+  results.push(['Material in the card', `${(await page.textContent('#surfaces .material-current')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  await page.click('#surfaces [data-act=change-material]');
+  results.push(['Change', `chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(150);
+  results.push(['Pick Flagstone', `${(await page.textContent('#surfaces .material-current')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
 
   const before = await shape('s1');
   await drag([330, 320], [345, 330]);
@@ -66,6 +75,11 @@ try {
   results.push(['Corner selected', `round field ${await page.$eval('.square-chip .chip-field', e => !e.hidden).catch(() => false)} · handle ${!!await page.$('.overlay .round-handle')}`]);
   await page.fill('#corner-radius', '2'); await page.press('#corner-radius', 'Enter'); await page.waitForTimeout(200);
   const r2 = await shape('s1');
+  await page.focus('#corner-radius');
+  await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Shift+ArrowUp'); await page.waitForTimeout(150);
+  const stepped = `${await page.inputValue('#corner-radius')}′ · area ${(await shape('s1')).area}`;
+  await page.evaluate(() => document.activeElement.blur()); await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
+  results.push(['↑ ↑ ⇧↑ in the radius field, then ⌘Z', `${stepped} (2 → 2.5 → 3 → 4′) · after ⌘Z area ${(await shape('s1')).area} (${r2.area}: one undo step)`]);
   results.push(['Radius 2′ (10 pt)', `area ${r2.area} (8000 − 100·(1 − π/4) ≈ 7979)`]);
   const h = await page.$eval('.overlay .round-handle', e => [+e.getAttribute('cx'), +e.getAttribute('cy')]);
   const st = await page.$eval('#stage', e => { const r = e.getBoundingClientRect(); return [r.left, r.top]; });

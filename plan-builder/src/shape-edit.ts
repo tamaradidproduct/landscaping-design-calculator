@@ -56,3 +56,15 @@ export function cornerArc(pts: Point[], i: number, r: number): Point[] | null {
   for (let k = 0; k <= ARC_SAMPLES; k++) { const ang = a0 + sweep * k / ARC_SAMPLES; out.push({ x: c.x + rr * Math.cos(ang), y: c.y + rr * Math.sin(ang) }); }
   return out;
 }
+
+/** The two-way arrow pointer for pushing a side whose (screen) normal is `n`: the nearest of the four CSS ones. */
+export function resizeCursor(n: Point): string {
+  const deg = ((Math.atan2(n.y, n.x) * 180 / Math.PI) % 180 + 180) % 180;
+  return ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'][Math.round(deg / 45) % 4];
+}
+/** One arrow-key step of a corner radius in feet: 0.5′ (Shift: 2′), onto that grid, never below 0. */
+export function stepRadius(ft: number, dir: 1 | -1, big: boolean): number {
+  const step = big ? 2 : 0.5;
+  const next = dir > 0 ? Math.floor(ft / step + 1e-9) * step + step : Math.ceil(ft / step - 1e-9) * step - step;
+  return Math.max(0, Math.round(next * 100) / 100);
+}

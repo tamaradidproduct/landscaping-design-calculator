@@ -169,3 +169,5 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 /* "Round all corners [ 2′ ] Apply" in a surface's card */
 .round-all .row { flex-wrap: nowrap; }
 .round-all input { min-height: var(--control-md); font-size: var(--text-base); }
+/* A zone's material in its card: swatch + name + Change (the picker opens in place) */
+.material-current { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }

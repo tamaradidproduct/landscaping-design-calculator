@@ -10,7 +10,7 @@ import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type C
 import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { stretchEdge } from './stretch';
-import { cornerBisector, pushSide, radiusFromHandle, roundHandleDistance, translate } from './shape-edit';
+import { cornerBisector, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
 import { materialFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
@@ -45,7 +45,8 @@ const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holdi
 const RECT_MIN = 8;         // screen px: a rectangle narrower or shorter than this wasn't meant
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
-const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
+const RELEASE = 34;
+const ROUND_REVEAL = 48;    // screen px: hovering this near a selected surface's corner shows its round handle         // screen px: once snapped, the point stays put until the pointer moves this far away
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
 const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's material fill (colour + pattern), as an inline style addition. */
@@ -76,6 +77,8 @@ export class OutlineTool {
   private dragAt: Point | null = null;        // screen position of the point being placed or moved
   private hoverAt: Point | null = null;       // mouse position, for the rubber-band line
   private hoverEdge: { id: string; i: number } | null = null;
+  /** The selected surface's corner the pointer is near (its round handle shows), or null. */
+  private hoverCorner: number | null = null;
   /** The open edge; for a surface, `fixed` is the corner that stays put when a length is typed (0 = corner i). */
   private selectedEdge: { id: string; i: number; fixed: 0 | 1 } | null = null;
   private lastTap: { t: number; finger: Point } | null = null;
@@ -117,14 +120,24 @@ export class OutlineTool {
     this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
     this.squareChip = Object.assign(document.createElement('div'), { className: 'card square-chip', hidden: true });
     this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } })
-      + `<label class="chip-field" hidden>Round ${input('corner-radius', { inputmode: 'decimal', placeholder: '0′' })}</label>`;
+      + `<label class="chip-field" hidden title="↑ ↓ to adjust (Shift: 2′)">Round ${input('corner-radius', { inputmode: 'decimal', placeholder: '0′' })}</label>`;
     this.squareChip.querySelector<HTMLButtonElement>('[data-act=square]')!.onclick = () => this.squareSelectedCorner();
     const radius = this.squareChip.querySelector<HTMLInputElement>('#corner-radius')!;
     radius.onchange = () => {
       const c = this.selectedCorner, ft = parseRadius(radius.value);
       if (c && ft !== null) this.setCornerRadius(c.id, c.i, ft);
     };
-    radius.onkeydown = e => { if (e.key === 'Enter') radius.blur(); };
+    radius.onkeydown = e => {
+      if (e.key === 'Enter') { radius.blur(); return; }
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // Arrow keys step the radius live (0.5′, Shift 2′); a run of steps undoes as one.
+      e.preventDefault();
+      const c = this.selectedCorner, o = c && this.outlines[c.id]; if (!c || !o || !this.cal) return;
+      const now = parseRadius(radius.value) ?? (o.radii?.[c.i] ?? 0) * this.cal.ftPerPt;
+      const ft = stepRadius(now, e.key === 'ArrowUp' ? 1 : -1, e.shiftKey);
+      radius.value = ft ? String(ft) : '';
+      this.setCornerRadius(c.id, c.i, ft, true);
+    };
     stage.append(this.svg, this.magnifier, this.tip, this.popover, this.squareChip);
     window.addEventListener('keydown', e => this.onKey(e));
   }
@@ -624,6 +637,13 @@ export class OutlineTool {
     const edge = p && !this.drawing ? this.edgeAt(p) : null;
     const changed = edge?.id !== this.hoverEdge?.id || edge?.i !== this.hoverEdge?.i;
     this.hoverEdge = edge;
+    // Near a corner of the selected surface, show that corner's round handle.
+    const z = p && !this.drag ? this.selectedZone : null;
+    let near: number | null = null, nd = ROUND_REVEAL;
+    if (z && p) z.pts.forEach((q, k) => { const d = dist(this.host.toScreen(q), p); if (d < nd) { nd = d; near = k; } });
+    const cornerChanged = near !== this.hoverCorner;
+    this.hoverCorner = near;
+    if (cornerChanged && !changed && !this.drawing) this.render();
     // On the selected surface, say what a drag would do (and show it in the pointer).
     const action = p && !this.drag ? this.zoneActionAt(p) : null;
     this.stageEl.style.cursor = action ? action.cursor : '';
@@ -639,7 +659,11 @@ export class OutlineTool {
     if (this.cornerAt(p)?.id === o.id) return { label: 'Drag to move the corner', cursor: 'grab' };
     if (this.bendHandleAt(p)?.id === o.id) return { label: 'Drag to curve the side', cursor: 'grab' };
     const i = nearestEdge(o.pts, this.host.toPage(p), EDGE_HIT / this.host.pxPerPt(), o.bulges);
-    if (i !== null) { const ft = this.edgeFeet(o.id, i); return { label: `Drag to move the side${ft ? ` · ${formatFeet(ft)}` : ''}`, cursor: 'grab' }; }
+    if (i !== null) {
+      // A two-way arrow across the side, like design tools show on a movable edge.
+      const a = this.host.toScreen(o.pts[i]), b = this.host.toScreen(o.pts[(i + 1) % o.pts.length]), ft = this.edgeFeet(o.id, i);
+      return { label: `Drag to move the side${ft ? ` · ${formatFeet(ft)}` : ''}`, cursor: resizeCursor({ x: -(b.y - a.y), y: b.x - a.x }) };
+    }
     if (insideShape(this.visible.get(o.id) ?? [], this.host.toPage(p))) return { label: 'Drag to move', cursor: 'move' };
     return null;
   }
@@ -650,7 +674,9 @@ export class OutlineTool {
   }
   /** Where the selected surface corner's round handle sits (screen), on its bisector at the arc's middle. */
   private roundHandlePos(): { id: string; i: number; at: Point } | null {
-    const o = this.selectedZone, c = this.selectedCorner;
+    const o = this.selectedZone, sel = this.selectedCorner;
+    // The corner the pointer is near shows its handle; otherwise the selected corner does.
+    const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
     if (!o || c?.id !== o.id || !o.pts[c.i] || o.bulges?.[c.i] || o.bulges?.[(c.i - 1 + o.pts.length) % o.pts.length]) return null;
     const { dir, half } = cornerBisector(o.pts, c.i), k = this.host.pxPerPt();
     const d = Math.max(roundHandleDistance(o.radii?.[c.i] ?? 0, half) * k, MARK.roundHandleMin);
@@ -660,7 +686,7 @@ export class OutlineTool {
   }
   private roundHandleAt(p: Point) {
     const h = this.drawing ? null : this.roundHandlePos();
-    return h && dist(h.at, p) < CORNER_HIT * 0.75 ? h : null;
+    return h && dist(h.at, p) < MARK.roundHandleHit ? h : null;
   }
   private bendHandleAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd = BEND_HIT;
@@ -734,9 +760,12 @@ export class OutlineTool {
   /** True when a corner is selected and still exists (the nudge arrows apply to it). */
   get cornerSelected() { const c = this.selectedCorner; return !!(c && this.outlines[c.id]?.pts[c.i]); }
   /** Round surface corner i to a radius in feet (0 = sharp). */
-  setCornerRadius(id: string, i: number, feet: number) {
+  setCornerRadius(id: string, i: number, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c || !o.pts[i]) return;
-    this.record();
+    // Arrow-key steps on the same corner within 1.5 s undo as one step (like nudges).
+    const t = performance.now(), ln = this.lastNudge, key = -2 - i;
+    if (!(steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500)) this.record();
+    if (steps) this.lastNudge = { t, id, i: key };
     o.radii = o.pts.map((_, k) => k === i ? feet / c.ftPerPt : o.radii?.[k] ?? 0);
     this.update();
   }

@@ -25,7 +25,7 @@ const shape = id => page.evaluate(id => {
   const xs = rings.flat().map(p => p[0]), ys = rings.flat().map(p => p[1]);
   return { rings: rings.length, x0: Math.round(Math.min(...xs)), x1: Math.round(Math.max(...xs)), y0: Math.round(Math.min(...ys)), y1: Math.round(Math.max(...ys)) };
 }, id);
-const zones = () => page.$$eval('#surfaces .layer-name, #surfaces .layer-rename', e => e.map(x => x.value || x.textContent).join(' > '));
+const zones = () => page.$$eval('#surfaces .layer-row .layer-name, #surfaces .layer-rename', e => e.map(x => x.value || x.textContent).join(' > '));
 const fillOpacity = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => getComputedStyle(e).fillOpacity);
 const toast = () => page.textContent('#toast');
 
@@ -87,10 +87,10 @@ results.push(['⌘Z', `x ${back.x0}..${back.x1} (expect 300..360)`]);
 await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(150);
 
 // Material and name.
-await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(100);
 results.push(['Pavers → Flagstone', await zones()]);
 await page.fill('#surface-rename', 'Back patio'); await page.press('#surface-rename', 'Enter'); await page.waitForTimeout(100);
-await page.click('#surfaces [data-card] [data-material=gravel]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=gravel]'); await page.waitForTimeout(100);
 const mat = () => page.$eval('#surfaces [data-card] .layer-head .swatch rect', e => e.getAttribute('fill'));
 results.push(['Renamed, then → Gravel', `${await zones()} · ${await mat()}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);

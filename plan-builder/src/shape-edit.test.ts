@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { areaPt2, outlinePath } from './outline';
-import { cornerBisector, pushSide, radiusFromHandle, roundHandleDistance, translate } from './shape-edit';
+import { cornerBisector, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
 
 const P = (x: number, y: number) => ({ x, y });
 const sq = [P(0, 0), P(10, 0), P(10, 10), P(0, 10)];
@@ -40,5 +40,21 @@ describe('rounded corners', () => {
     const d = roundHandleDistance(2, b.half);
     expect(d).toBeCloseTo(2 * (Math.SQRT2 - 1), 9);
     expect(radiusFromHandle(d, b.half)).toBeCloseTo(2, 9);
+  });
+});
+
+describe('pointer and keyboard helpers', () => {
+  test('a side shows a two-way arrow across it (screen y points down)', () => {
+    expect(resizeCursor({ x: 1, y: 0 })).toBe('ew-resize');
+    expect(resizeCursor({ x: 0, y: -1 })).toBe('ns-resize');
+    expect(resizeCursor({ x: 1, y: 1 })).toBe('nwse-resize');
+    expect(resizeCursor({ x: 1, y: -1 })).toBe('nesw-resize');
+    expect(resizeCursor({ x: -0.95, y: 0.2 })).toBe('ew-resize');
+  });
+  test('arrow keys step a radius by 0.5′ (Shift: 2′), never below 0', () => {
+    expect(stepRadius(2, 1, false)).toBe(2.5);
+    expect(stepRadius(2, -1, true)).toBe(0);
+    expect(stepRadius(0.2, -1, false)).toBe(0);
+    expect(stepRadius(1.2, 1, false)).toBe(1.5); // snaps onto the 0.5′ grid
   });
 });
