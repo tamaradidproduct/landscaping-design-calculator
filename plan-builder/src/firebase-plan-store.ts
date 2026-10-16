@@ -4,14 +4,15 @@ import {
   collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc,
   type Firestore,
 } from 'firebase/firestore';
-import { deleteObject, getBytes, ref as storageRef, uploadBytes, type FirebaseStorage } from 'firebase/storage';
+import { deleteObject, getBytes, ref as storageRef, uploadBytesResumable, type FirebaseStorage, type UploadTask } from 'firebase/storage';
 import { getFirebase } from './firebase';
 import { cleanAddress, docBytes, fromDoc, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
 import { AccessDeniedError, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
 import { pdfCache } from './pdf-cache';
 
 const NOT_FOUND = 'Plan not found';
-const PDF_META = { contentType: 'application/pdf' }; // iPad files can have an empty type; rules require this
+const CONTENT_TYPE = 'application/pdf'; // iPad files can have an empty type; rules require this
+const DOWNLOAD_TIMEOUT_MS = 15_000; // Storage otherwise retries for up to 2 min
 
 const code = (e: unknown) => (e as { code?: unknown } | null)?.code;
 const isDenied = (e: unknown) => code(e) === 'permission-denied' || code(e) === 'storage/unauthorized';
@@ -25,8 +26,11 @@ export class FirebasePlanStore implements PlanStore {
   private storage: FirebaseStorage;
   /** Latest known doc per id: from the snapshot listener, getDoc, and our own local writes. */
   private known = new Map<string, PlanDoc>();
-  /** Rev of the upload in flight per id, so flushes don't start a duplicate. */
-  private uploading = new Map<string, number>();
+  /** Per-id upload queue: one upload at a time, so an older PDF can't land after a newer one. */
+  private uploadQueue = new Map<string, Promise<void>>();
+  private inFlight = new Map<string, { rev: number; task: UploadTask }>();
+  /** Ids currently over SIZE_WARN_BYTES, so the warning fires once per crossing. */
+  private oversize = new Set<string>();
   private errorCbs: Array<(e: Error) => void> = [];
   private onOnline = () => { void this.flushUploads(); };
 
@@ -42,11 +46,11 @@ export class FirebasePlanStore implements PlanStore {
   private docRef = (id: string) => doc(this.plans(), id);
   private pdfRef = (id: string) => storageRef(this.storage, `users/${this.uid}/plans/${id}/plan.pdf`);
 
+  private static toError = (e: unknown): Error => (isDenied(e) ? new AccessDeniedError({ cause: e }) : asError(e));
   /** Wraps permission errors in AccessDeniedError and sends them to onError; returns the error to throw. */
   private wrap(e: unknown): Error {
-    if (!isDenied(e)) return asError(e);
-    const err = new AccessDeniedError({ cause: e });
-    this.emit(err);
+    const err = FirebasePlanStore.toError(e);
+    if (err instanceof AccessDeniedError) this.emit(err);
     return err;
   }
   private emit(e: Error) { this.errorCbs.forEach(cb => cb(e)); }
@@ -84,7 +88,7 @@ export class FirebasePlanStore implements PlanStore {
         }
       });
       onPlans(sortPlans(list));
-    }, e => onError(this.wrap(e)));
+    }, e => onError(FirebasePlanStore.toError(e)));
   }
 
   async create(address: string, pdf: File): Promise<string> {
@@ -98,7 +102,7 @@ export class FirebasePlanStore implements PlanStore {
     setDoc(ref, d).catch(this.report);
     this.known.set(ref.id, d);
     await pdfCache.put(ref.id, 1, bytes);
-    void this.upload(ref.id, 1, bytes).catch(this.report);
+    void this.upload(ref.id).catch(this.report);
     return ref.id;
   }
 
@@ -116,7 +120,8 @@ export class FirebasePlanStore implements PlanStore {
     if (!prev) { this.emit(new Error(NOT_FOUND)); return; }
     const next = toDoc(state, { address: prev.address, createdAt: prev.createdAt, updatedAt: Date.now(), pdf: prev.pdf });
     const bytes = docBytes(next);
-    if (bytes > SIZE_WARN_BYTES) this.emit(new SizeWarning(bytes));
+    if (bytes <= SIZE_WARN_BYTES) this.oversize.delete(id);
+    else if (!this.oversize.has(id)) { this.oversize.add(id); this.emit(new SizeWarning(bytes)); }
     // Only the editor's fields: a full set could clobber a newer pdf/address from another device.
     // updateDoc replaces each named field whole (no deep merge), so removed outlines go away.
     updateDoc(this.docRef(id), { v: 1, outlines: next.outlines, refs: next.refs, updatedAt: next.updatedAt }).catch(this.report);
@@ -124,12 +129,13 @@ export class FirebasePlanStore implements PlanStore {
   }
 
   async rename(id: string, address: string): Promise<void> {
-    const prev = await this.current(id);
+    // No fromDoc check: an unreadable plan can still be renamed (rules only need v and address)
     const clean = cleanAddress(address);
     if (!clean) throw new PlanInputError('address');
     const updatedAt = Date.now();
     updateDoc(this.docRef(id), { address: clean, updatedAt }).catch(this.report);
-    this.known.set(id, { ...prev, address: clean, updatedAt });
+    const prev = this.known.get(id);
+    if (prev) this.known.set(id, { ...prev, address: clean, updatedAt });
   }
 
   async replacePdf(id: string, pdf: File): Promise<void> {
@@ -142,15 +148,17 @@ export class FirebasePlanStore implements PlanStore {
     updateDoc(this.docRef(id), { pdf: info, updatedAt }).catch(this.report);
     this.known.set(id, { ...prev, pdf: info, updatedAt });
     await pdfCache.put(id, rev, bytes);
-    void this.upload(id, rev, bytes).catch(this.report);
+    void this.upload(id).catch(this.report);
   }
 
   async remove(id: string): Promise<void> {
-    await this.current(id);
+    // By id, without fromDoc, so unreadable plans can be deleted
     deleteDoc(this.docRef(id)).catch(this.report);
     // Storage has no offline queue; an offline delete leaves the PDF behind (reported via onError)
     deleteObject(this.pdfRef(id)).catch(e => { if (code(e) !== 'storage/object-not-found') this.report(e); });
     this.known.delete(id);
+    this.oversize.delete(id);
+    this.inFlight.get(id)?.task.cancel();
     await pdfCache.delete(id);
   }
 
@@ -161,8 +169,12 @@ export class FirebasePlanStore implements PlanStore {
     });
     const cached = await pdfCache.get(id);
     if (cached && cached.rev >= d.pdf.rev) return cached.bytes;
+    // Storage still holds an older rev (another device hasn't uploaded yet), or we're offline
+    if (!d.pdf.uploaded || !navigator.onLine) throw new PdfUnavailableError();
     try {
-      const bytes = await getBytes(this.pdfRef(id));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new PdfUnavailableError()), DOWNLOAD_TIMEOUT_MS); });
+      const bytes = await Promise.race([getBytes(this.pdfRef(id)), timeout]).finally(() => clearTimeout(timer));
       await pdfCache.put(id, d.pdf.rev, bytes);
       return bytes;
     } catch (e) {
@@ -173,35 +185,53 @@ export class FirebasePlanStore implements PlanStore {
 
   async flushUploads(): Promise<void> {
     if (!navigator.onLine) return;
-    try {
-      const qs = await getDocs(this.plans());
-      for (const s of qs.docs) {
-        let d: PlanDoc;
-        try { d = fromDoc(s.data()); } catch { continue; }
-        if (d.pdf.uploaded) continue;
-        const cached = await pdfCache.get(s.id);
-        if (cached?.rev !== d.pdf.rev) continue; // not this device's PDF, or an older one
-        const k = this.known.get(s.id);
-        if (!k || k.pdf.rev < d.pdf.rev) this.known.set(s.id, d);
-        await this.upload(s.id, d.pdf.rev, cached.bytes);
-      }
-    } catch (e) { this.report(e); }
+    let docs;
+    try { docs = (await getDocs(this.plans())).docs; } catch (e) { this.report(e); return; }
+    for (const s of docs) {
+      let d: PlanDoc;
+      try { d = fromDoc(s.data()); } catch { continue; }
+      if (d.pdf.uploaded) continue;
+      const k = this.known.get(s.id);
+      if (!k || k.pdf.rev < d.pdf.rev) this.known.set(s.id, d);
+      // One plan's failure doesn't stop the rest
+      try { await this.upload(s.id); } catch (e) { this.report(e); }
+    }
   }
 
   onError(cb: (e: Error) => void): void { this.errorCbs.push(cb); }
 
-  private async upload(id: string, rev: number, bytes: ArrayBuffer): Promise<void> {
-    if (this.uploading.get(id) === rev) return;
-    this.uploading.set(id, rev);
-    try {
-      await uploadBytes(this.pdfRef(id), bytes, PDF_META);
-    } finally {
-      if (this.uploading.get(id) === rev) this.uploading.delete(id);
-    }
-    // A replace since this upload started owns the flag now
+  /** Queues an upload of the plan's latest rev; a newer rev cancels the older one in flight. */
+  private upload(id: string): Promise<void> {
+    const rev = this.known.get(id)?.pdf.rev;
+    const running = this.inFlight.get(id);
+    if (running && rev !== undefined && running.rev < rev) running.task.cancel();
+    const run = (this.uploadQueue.get(id) ?? Promise.resolve()).then(() => this.uploadLatest(id));
+    const tail = run.catch(() => {});
+    this.uploadQueue.set(id, tail);
+    void tail.then(() => { if (this.uploadQueue.get(id) === tail) this.uploadQueue.delete(id); });
+    return run;
+  }
+
+  private async uploadLatest(id: string): Promise<void> {
     const cur = this.known.get(id);
-    if (!cur || cur.pdf.rev !== rev) return;
+    if (!cur || cur.pdf.uploaded) return;
+    const cached = await pdfCache.get(id);
+    if (cached?.rev !== cur.pdf.rev) return; // not this device's PDF, or an older one
+    const rev = cached.rev;
+    const task = uploadBytesResumable(this.pdfRef(id), cached.bytes, { contentType: CONTENT_TYPE, customMetadata: { rev: String(rev) } });
+    this.inFlight.set(id, { rev, task });
+    try {
+      await task;
+    } catch (e) {
+      if (code(e) === 'storage/canceled') return; // superseded; the newer rev's upload is queued
+      throw e;
+    } finally {
+      if (this.inFlight.get(id)?.task === task) this.inFlight.delete(id);
+    }
+    // Flip the flag only if no replace happened while this rev was uploading
+    const now = this.known.get(id);
+    if (!now || now.pdf.rev !== rev || now.pdf.uploaded) return;
     updateDoc(this.docRef(id), { 'pdf.uploaded': true }).catch(this.report);
-    this.known.set(id, { ...cur, pdf: { ...cur.pdf, uploaded: true } });
+    this.known.set(id, { ...now, pdf: { ...now.pdf, uploaded: true } });
   }
 }
