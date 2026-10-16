@@ -9,12 +9,13 @@ import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
+import { docBytes, toDoc } from './plan-model';
+import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage'), pageEl = $('page'), base = $<HTMLCanvasElement>('base'), sharp = $<HTMLCanvasElement>('sharp');
-const fileInput = $<HTMLInputElement>('file');
 // Surface fill patterns, defined once for the plan overlay and the Layers swatches.
 document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs></svg>`);
 const pdf = new PdfClient();
@@ -35,6 +36,7 @@ const shown = (): Size => ({ w: pageSize.w * correction.a, h: pageSize.h * corre
 const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale });
 
 // ---------- Outline tool (Step 2a) ----------
+let shell: Shell | null = null; // sign-in, Plans and autosave (app-shell.ts); told about every editor change
 let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const tool = new OutlineTool({
@@ -68,6 +70,7 @@ const tool = new OutlineTool({
     ($('redo') as HTMLButtonElement).disabled = !canRedo;
   },
   changed() {
+    shell?.changed();
     surfaces?.render();
     outlines?.render();
     updateGroups();
@@ -135,6 +138,10 @@ outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 updateGroups();
 
+// Dev only: size of the plan document as it would be saved (outlines + refs + small fixed metadata); scripts assert it stays small.
+if (import.meta.env.DEV) (window as unknown as { __planBytes: unknown }).__planBytes = () =>
+  docBytes(toDoc(tool.state(), { address: 'x', createdAt: 0, updatedAt: 0, pdf: { name: 'x.pdf', size: 0, rev: 1, uploaded: false } }));
+
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
 
@@ -183,42 +190,47 @@ function applyPlanLook() {
 $('plan-visible').onclick = () => { planVisible = !planVisible; applyPlanLook(); };
 $<HTMLInputElement>('plan-opacity').oninput = e => { planOpacity = Number((e.target as HTMLInputElement).value) / 100; applyPlanLook(); };
 
-// ---------- Opening a file ----------
-$('open-empty').onclick = () => fileInput.click();
-$('file-button').onclick = () => fileInput.click();
+// ---------- Opening a plot plan ----------
 $('fit').onclick = () => { fitToStage(); };
 const ZOOM_STEP = 1.25; // − / + buttons, around the middle of the plan
 const zoomBy = (k: number) => { if (page) applyView(zoomAt(view, k, { x: stageSize.w / 2, y: stageSize.h / 2 })); };
 $('zoom-in').onclick = () => zoomBy(ZOOM_STEP);
 $('zoom-out').onclick = () => zoomBy(1 / ZOOM_STEP);
-fileInput.onchange = () => { const f = fileInput.files?.[0]; fileInput.value = ''; if (f) void openFile(f); };
 
-async function openFile(file: File) {
-  const t0 = performance.now();
-  $('empty').hidden = true; $('loading').hidden = false;
+let openVersion = 0; // bumped by every open and by leaving the editor: a stale open stops quietly
+/**
+ * Shows the PDF in the editor; `name` labels the plot plan layer (the plan's address). 'failed' leaves
+ * whatever was open before (a failed Replace keeps the current plot plan) and says nothing: the caller does.
+ */
+async function openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult> {
+  const t0 = performance.now(), v = ++openVersion;
+  if (!page) $('loading').hidden = false;
+  let swapped = false; // the page state now describes the new document
   try {
     const mark = (label: string) => console.debug(`[open] ${label}: ${Math.round(performance.now() - t0)} ms`);
-    const bytes = await file.arrayBuffer();
-    mark('file read');
     const opened = await pdf.open(bytes);
+    if (v !== openVersion) return 'stale';
     mark('document loaded');
     pageSize = opened.pageSize;
-    page = true;
+    page = true; swapped = true;
     measureStage();
     fitToStage(false);
     await renderBase();
+    if (v !== openVersion) return 'stale';
     mark('page drawn');
-    $('loading').hidden = true; pageEl.hidden = false; $('sidebar').hidden = false;
-    $('name').textContent = file.name;
+    $('loading').hidden = true; pageEl.hidden = false;
+    $('name').textContent = name;
     planVisible = true; planOpacity = 1; $<HTMLInputElement>('plan-opacity').value = '100'; applyPlanLook();
     renderSharpSoon(0);
     const pages = opened.pageCount > 1 ? ` Showing page 1 of ${opened.pageCount}.` : '';
     toast(`Opened in ${((performance.now() - t0) / 1000).toFixed(1)} s.${pages}`);
+    return 'ok';
   } catch (err) {
+    if (v !== openVersion) return 'stale';
     console.error(err);
-    page = false; $('loading').hidden = true; pageEl.hidden = true; sharp.hidden = true;
-    $('empty').hidden = false; $('sidebar').hidden = true;
-    toast('That file could not be opened as a PDF. Pick the plot plan PDF from the closing documents.');
+    $('loading').hidden = true;
+    if (swapped || !page) { page = false; pageEl.hidden = true; sharp.hidden = true; }
+    return 'failed';
   }
 }
 
@@ -392,3 +404,14 @@ function toast(msg: string) {
   const t = $('toast'); t.textContent = msg; t.hidden = false;
   clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { t.hidden = true; }, 3500);
 }
+
+// ---------- Screens and saving ----------
+shell = startShell({
+  tool,
+  openBytes,
+  closePage() {
+    openVersion++; page = false; pageEl.hidden = true; sharp.hidden = true; $('loading').hidden = true;
+    clearTimeout(toastTimer); $('toast').hidden = true; // an editor message doesn't follow you to Plans
+  },
+  toast,
+});

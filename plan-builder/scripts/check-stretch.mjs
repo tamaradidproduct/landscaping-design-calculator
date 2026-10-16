@@ -3,8 +3,9 @@
 // (as a plan printed 10% short vertically would need), and removing that length (edge popover) must undo it.
 // Usage: node scripts/check-stretch.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // Same corners as check-step2a (PDF points on the 612 x 1008 page).
 const C = { TL: [253.15, 213.24], TR: [532.62, 206.88], BL: [253.21, 545.22] };
 const u = [-23.27, 81.36], ul = Math.hypot(...u), runPt = 155.55 / (30 / 72);
@@ -15,8 +16,7 @@ const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, dev
 const results = [];
 await page.goto(url);
 await page.waitForTimeout(3500); // engine warm-up
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 await page.$eval('#snap', b => b.click()); // exact placement from the known coordinates
 
 const toScreen = async ([x, y]) => page.evaluate(([x, y]) => {

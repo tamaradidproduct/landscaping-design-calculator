@@ -40,6 +40,7 @@
 | 4 | Surfaces, stage 1: material zones (hardscape + softscape), solid fills, resize by typed edge length | 🔨 done, in review | `feat/material-zones` |
 | 4b | Surfaces stage 2 (Width × Depth for rectangles), stage 3 (move one corner) | 📝 next | — |
 | 5+ | Plant symbols, objects, edging/walls… | ❓ | — |
+| 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
 ### 6.1 Viewing the plan ✅🔨
@@ -120,6 +121,20 @@
 - 🔨 **Snap is off by default for surfaces** (designed, not traced) and on for outlines; the Snap toggle switches the one for what's being drawn or edited.
 - 📝 Next: **Width × Depth** fields for Rectangle zones (stage 2); **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, library textures, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
 
+### 6.9 Plans & sign-in ✅🔨
+- A contractor keeps **many plans, one per job/address**, and opens any of them on any of their devices.
+- **Sign-in:** Google only; required to use the app. **Invite-only:** an `invites/<email>` doc added by hand in the Firebase console; security rules refuse everything else. An un-invited account sees "not invited" and can read or write nothing. No in-app admin, no invite email.
+- **Privacy:** each user sees only their own plans; no sharing.
+- **Offline:** full offline (open, edit, create) after one online sign-in on that device; syncs when back online. Plans not yet uploaded show "Not synced yet".
+- **Storage:** Firebase (Auth, Firestore `nam5`, Cloud Storage `us-central1`, Blaze plan). One doc per plan (outlines, surfaces, typed lengths); the plot plan PDF in Cloud Storage and cached on the device.
+- **Saving:** autosave about 1 s after each change; no Save button. Last write wins per plan.
+- **Plans screen:** newest-edited first; New plan (address + PDF), rename address, delete (inline confirm). "← Plans" in the editor.
+- **Replace plot plan:** allowed from the plot plan row (e.g. a revised survey); **outlines, surfaces and typed lengths are kept** as they are, for the contractor to re-check. Undo doesn't cover it.
+- Not saved: undo history, selection, zoom/pan, plot plan visibility.
+- ✅ Local testing without Google: dev builds only, `?store=memory`.
+- ⏸ Later: Firestore rules emulator tests; automated offline check (needs a built preview); contractor profile; sharing/teams; in-app invite admin; version history; importing old local-only work.
+- Spec: `docs/superpowers/specs/2026-10-15-plans-auth-design.md`.
+
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')
 - Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
 - Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
@@ -131,7 +146,7 @@
 
 ## 8. Open questions
 - ❓ Homeowners (DIY) as a later audience?
-- ❓ Saving jobs: on-device only, or sync/accounts?
+- ✅ Saving jobs: Google sign-in, invite-only, Firebase sync, works offline (§6.9)
 - ❓ Multi-page plot plans; edit-name button meaning.
 - ❓ Pilot contractor recruitment; business model; success measure.
 - ❓ Mature-spread data for plant symbols.

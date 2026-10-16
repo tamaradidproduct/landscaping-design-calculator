@@ -25,6 +25,8 @@ Read by the `dev-setup` skill. Unknown values are marked `TODO`.
   - `Record successful staging deployment` — webhook from `deploy-staging.yml` (`AIRTABLE_DEPLOY_WEBHOOK` secret); creates a Deployments record and moves Findings named in `issue_numbers` to `Ready to retest`. The workflow, not Airtable, extracts `#N` from behavior commits.
   - `Flag open Findings to GitHub` / `Flag untyped Findings to GitHub` — daily 12:30 AM MT; open `qa-flagged` issues for New / Need clarification Findings
   - `Close GitHub issue when Finding is Resolved`, `Reopen GitHub issue when Finding fails retest`
+- **Firebase:** project `landscaping-design-calculator` (Blaze, owner tamara.did.product@gmail.com); rules in `firestore.rules` / `storage.rules`, deploy with `npx firebase-tools deploy --only firestore:rules,storage`; invite = add `invites/<email>` doc
+- **Local testing without Google:** `npm run dev`, then open `http://localhost:5180/?store=memory` (dev builds only)
 - **Not ported from Designer:** GitHub issue close/reopen → Finding sync webhook, test-case retest matching, latest-run rollups
 - **Feedback intake:** none yet
 

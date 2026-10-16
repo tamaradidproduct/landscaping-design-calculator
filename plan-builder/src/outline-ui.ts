@@ -6,6 +6,8 @@ import {
   type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
+import { committedOutlines } from './editor-state';
+import type { PlanState } from './plan-model';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
@@ -149,6 +151,18 @@ export class OutlineTool {
     this.update();
     if (this.hoverAt) this.hover(this.hoverAt);
   }
+  /** Replace everything with a saved plan: no selection, no undo history; snap and shape preferences stay. */
+  load(state: PlanState) {
+    this.outlines = structuredClone(state.outlines); this.refs = structuredClone(state.refs);
+    this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
+    this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
+    this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
+    this.magnifier.hidden = true;
+    this.history.clear();
+    this.update();
+  }
+  /** What to save: outlines and references, minus any outline still being drawn. */
+  state(): PlanState { return { outlines: committedOutlines(this.outlines, this.drawing, this.replaced), refs: structuredClone(this.refs) }; }
   undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
   redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
 

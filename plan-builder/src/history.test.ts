@@ -37,4 +37,10 @@ describe('History', () => {
     expect(h.undo(3)).toBe(2);
     expect(h.undo(2)).toBeNull();
   });
+  test('clear empties undo and redo', () => {
+    const h = new History<number>();
+    h.record(0); h.record(1); h.undo(2);
+    h.clear();
+    expect([h.canUndo, h.canRedo]).toEqual([false, false]);
+  });
 });

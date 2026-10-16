@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function invited() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/invites/$(request.auth.token.email.lower()));
+    }
+
+    match /invites/{email} {
+      allow get: if request.auth != null && request.auth.token.email.lower() == email;
+    }
+
+    match /users/{uid}/plans/{planId} {
+      allow read, delete: if invited() && request.auth.uid == uid;
+      allow create, update: if invited() && request.auth.uid == uid
+        && request.resource.data.v == 1
+        && request.resource.data.address is string
+        && request.resource.data.address.size() >= 1
+        && request.resource.data.address.size() <= 200;
+    }
+  }
+}

@@ -11,15 +11,10 @@
   </head>
   <body>
     <main class="app">
-      <div class="canvas">
+      <div class="canvas" id="canvas" hidden>
         <div class="stage" id="stage">
           <div class="page" id="page" hidden><canvas id="base"></canvas></div>
           <canvas class="sharp" id="sharp" hidden></canvas>
-          <div class="empty" id="empty">
-            <h1>Open the homeowner's plot plan</h1>
-            <p>Pick the PDF from Files or Google Drive. It stays on this device.</p>
-            <button type="button" class="primary large" id="open-empty">Open plot plan</button>
-          </div>
           <div class="loading" id="loading" hidden>Opening plot plan…</div>
         </div>
         <div class="dock">
@@ -29,9 +24,13 @@
           </div>
           <button type="button" id="snap" class="toggle" aria-pressed="true" hidden>Snap on</button>
         </div>
-        <div class="bubble toast" id="toast" role="status" hidden></div>
       </div>
+      <section class="screen" id="screen-auth" hidden></section>
+      <section class="screen" id="screen-plans" hidden></section>
       <aside class="sidebar" id="sidebar" hidden>
+        <section class="side-section">
+          <button type="button" id="back-to-plans">← Plans</button>
+        </section>
         <section class="side-section">
           <div class="row split">
             <button type="button" id="undo" disabled title="Undo (⌘Z)">↶ Undo</button>
@@ -66,10 +65,17 @@
                 <button type="button" class="icon" id="plan-visible" aria-pressed="true" aria-label="Hide the plot plan" title="Hide the plot plan">
                   <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
                 </button>
-                <button type="button" class="layer-row" id="file-button" title="Open a different plot plan">
+                <button type="button" class="layer-row" id="file-button" title="Replace the plot plan">
                   <span class="layer-name" id="name"></span>
                   <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg>
                 </button>
+              </div>
+              <div class="replace-confirm" id="replace-confirm" hidden>
+                <p class="replace-text" id="replace-text"></p>
+                <div class="row split">
+                  <button type="button" class="primary compact" id="replace-pick">Pick PDF</button>
+                  <button type="button" class="compact" id="replace-cancel">Cancel</button>
+                </div>
               </div>
               <div class="field-row">
                 <label class="text-label" for="plan-opacity">Opacity</label>
@@ -80,6 +86,7 @@
           </div>
         </section>
       </aside>
+      <div class="bubble toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf" hidden />
     </main>
     <script type="module" src="/src/main.ts"></script>

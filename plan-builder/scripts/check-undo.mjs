@@ -1,14 +1,14 @@
 // Undo/redo check: dots on an unfinished outline, closing, dragging a corner, setting the scale.
 // Usage: node scripts/check-undo.mjs <plot-plan.pdf> [url]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 await page.$eval('#snap', b => b.click()); // shown only while drawing; exact clicks
 
 const dots = () => page.$$eval('.overlay circle.corner', cs => cs.map(c => `${Math.round(+c.getAttribute('cx'))},${Math.round(+c.getAttribute('cy'))}`).join(' '));

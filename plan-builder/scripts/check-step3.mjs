@@ -2,8 +2,9 @@
 // delete one, and undo/redo through it all.
 // Usage: node scripts/check-step3.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // Corners in PDF points, read off the drawn plan (approximate: this checks the flow, not precision).
 const F = {
   House: [[291.3, 301.1], [376.1, 301.1], [376.1, 314.8], [432.6, 314.8], [432.6, 504.4], [377.6, 504.4], [377.6, 435.8], [278.9, 435.8], [278.9, 400.5], [291.3, 400.5]],
@@ -16,8 +17,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
   const r = document.getElementById('page').getBoundingClientRect();
   return [r.left + x * r.width / 612, r.top + y * r.height / 1008];

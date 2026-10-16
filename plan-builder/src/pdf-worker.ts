@@ -41,8 +41,10 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       post({ type: 'ready', id: req.id });
     } else if (req.type === 'open') {
       await engine();
+      // Load first: a file that won't open leaves the current document open and usable
+      const next = await lib!.loadDocument(new Uint8Array(req.bytes));
       doc?.destroy();
-      doc = await lib!.loadDocument(new Uint8Array(req.bytes));
+      doc = next;
       const m = raw(), page = m._FPDF_LoadPage(docIdx(), 0);
       const size = { w: m._FPDF_GetPageWidthF(page) as number, h: m._FPDF_GetPageHeightF(page) as number };
       m._FPDF_ClosePage(page);

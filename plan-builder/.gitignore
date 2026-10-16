@@ -2,3 +2,6 @@ node_modules/
 dist/
 dev-dist/
 test-fixtures/
+
+# Screenshots written by the check scripts
+scripts/*.png

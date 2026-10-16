@@ -1,0 +1,17 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function invited() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && firestore.exists(/databases/(default)/documents/invites/$(request.auth.token.email.lower()));
+    }
+
+    match /users/{uid}/plans/{planId}/plan.pdf {
+      allow read, delete: if invited() && request.auth.uid == uid;
+      allow write: if invited() && request.auth.uid == uid
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size <= 25 * 1024 * 1024;
+    }
+  }
+}

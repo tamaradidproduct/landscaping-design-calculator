@@ -13,6 +13,9 @@ export interface ButtonOptions {
   /** A toggle or choice that is on (aria-pressed="true"). */
   pressed?: boolean;
   ariaLabel?: string;
+  id?: string;
+  /** A button that opens or closes something (aria-expanded="true"/"false"). */
+  expanded?: boolean;
   /** data-* attributes, e.g. { act: 'close' } → data-act="close". */
   data?: Record<string, string>;
 }
@@ -24,8 +27,8 @@ export function esc(s: string): string {
 export function button(label: string, o: ButtonOptions = {}): string {
   const cls = [o.variant && o.variant !== 'default' ? o.variant : '', ...(o.mods ?? [])].filter(Boolean).join(' ');
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
-  return `<button type="${o.type ?? 'button'}"${cls ? ` class="${cls}"` : ''}${data}`
-    + `${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+  return `<button type="${o.type ?? 'button'}"${o.id ? ` id="${o.id}"` : ''}${cls ? ` class="${cls}"` : ''}${data}`
+    + `${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
 }
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
@@ -44,9 +47,15 @@ export const splitRow = (...children: string[]) => `<div class="row split">${chi
 /** Wrapping group of quick-pick chips (buttons with mods: ['chip']). */
 export const chips = (buttons: string[]) => `<div class="chips">${buttons.join('')}</div>`;
 
-export interface InputOptions { value?: string; placeholder?: string; inputmode?: 'decimal' | 'numeric' | 'text' }
+export interface InputOptions {
+  value?: string; placeholder?: string; inputmode?: 'decimal' | 'numeric' | 'text';
+  /** Extra class for a field that looks different in place (an inline rename). */
+  cls?: string;
+  ariaLabel?: string;
+  required?: boolean;
+}
 export function input(id: string, o: InputOptions = {}): string {
-  return `<input id="${id}" autocomplete="off"`
+  return `<input id="${id}"${o.cls ? ` class="${o.cls}"` : ''} autocomplete="off"${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.required ? ' required' : ''}`
     + `${o.inputmode ? ` inputmode="${o.inputmode}"` : ''}${o.placeholder ? ` placeholder="${esc(o.placeholder)}"` : ''}`
     + `${o.value !== undefined ? ` value="${esc(o.value)}"` : ''} />`;
 }
@@ -55,13 +64,30 @@ export function input(id: string, o: InputOptions = {}): string {
 export const field = (id: string, labelText: string, control: string, cls = '') =>
   `<div class="field${cls ? ` ${cls}` : ''}">${label(id, labelText)}${control}</div>`;
 /** A form whose children stack (fields, actions, its error line). */
-export const formStack = (html: string, cls = 'stack') => `<form class="${cls}">${html}</form>`;
+export const formStack = (html: string, cls = 'stack', novalidate = false) =>
+  `<form class="${cls}"${novalidate ? ' novalidate' : ''}>${html}</form>`;
+/** The floating surface (see Card in components.css): popovers, menus and forms that sit above the page. */
+export const card = (html: string, cls = '') => `<div class="card${cls ? ` ${cls}` : ''}">${html}</div>`;
 /** Inline field inside a chip: a muted label before a short input ("Round [ 2 ]"). */
 export const chipField = (id: string, labelText: string, o: InputOptions & { title?: string } = {}) =>
   `<label class="chip-field" hidden${o.title ? ` title="${esc(o.title)}"` : ''}>${labelText} ${input(id, o)}</label>`;
 /** One chosen value shown as a line — swatch, name and an action that opens the choices (e.g. a zone's material). */
 export const choiceLine = (swatchHtml: string, name: string, action: string) =>
   `<div class="choice-line">${swatchHtml}<span class="layer-name">${esc(name)}</span>${action}</div>`;
+
+/** Screen panel: the app name over one centred action (Sign-in, Not invited). */
+export const screenPanel = (titleHtml: string, bodyHtml: string) =>
+  card(`<h1 class="screen-title">${titleHtml}</h1>${bodyHtml}`, 'auth-panel');
+/** Body text on a screen (larger than a hint). */
+export const screenText = (html: string) => `<p class="screen-text">${html}</p>`;
+/** What a list says when it has nothing in it. */
+export const emptyNote = (text: string) => `<p class="plans-empty">${esc(text)}</p>`;
+/**
+ * List row: a bordered strip holding a main part and its actions (a plan: open, Rename, Delete). `state` swaps the
+ * contents for an inline edit ('editing') or an inline confirm ('confirming') and outlines the row.
+ */
+export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming') =>
+  `<div class="plan-row${state ? ` ${state}` : ''}" data-id="${esc(id)}">${children.join('')}</div>`;
 
 /** Card header: a title and a small close button (data-act="close"). */
 export const cardHead = (titleHtml: string) =>
@@ -110,7 +136,7 @@ export interface LayerCardOptions {
 export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
     // Looks like a field (underline + pencil) so it's clear the name can be changed right here.
-    ? `<label class="layer-rename-wrap" title="Rename"><input id="${o.renameId ?? 'outline-rename'}" class="layer-rename" autocomplete="off" aria-label="Name" value="${esc(o.name)}" />`
+    ? `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}`
       + `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg></label>`
     : layerName(o.name, o.sub);
   return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`

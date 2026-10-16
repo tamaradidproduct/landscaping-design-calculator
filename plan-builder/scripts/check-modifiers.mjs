@@ -2,14 +2,14 @@
 // even when a keyup is missed (window loses focus, e.g. a ⇧⌘4 screenshot).
 // Usage: node scripts/check-modifiers.mjs <plot-plan.pdf> [url]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 
 const label = () => page.$$eval('.overlay .label.snap', ts => ts.map(t => t.textContent).join(' ') || '(none)');
 const check = async (name, fn) => { await fn(); await page.waitForTimeout(120); results.push([name, await label()]); };
