@@ -15,6 +15,7 @@ const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
   address: "Enter the job's address.",
   'not-pdf': "That file isn't a PDF. Pick the plot plan PDF.",
   'too-big': 'This PDF is over 25 MB. Export a smaller copy and try again.',
+  'device-storage': "Couldn't keep this PDF on the device. Connect to the internet and try again.",
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
 
@@ -54,8 +55,8 @@ export interface PlansScreenOptions {
   onOpen(id: string): void;
   onSignOut(): void;
   email: string;
-  /** Store failures with no inline place to show them (rename, delete, the list itself). */
-  onError?(e: Error): void;
+  /** Store failures with no inline place to show them: 'load' for the list itself, 'save' for rename, delete, create. */
+  onError?(e: Error, what: 'load' | 'save'): void;
 }
 
 type Inline = { kind: 'rename'; id: string } | { kind: 'delete'; id: string } | null;
@@ -71,6 +72,7 @@ export class PlansScreen {
   private signOutWarn = false;
   private opening: string | null = null;
   private unwatch: (() => void) | null = null;
+  private revived = false;
   private tick = 0;
 
   constructor(private root: HTMLElement, private store: PlanStore, private opts: PlansScreenOptions) {
@@ -82,9 +84,8 @@ export class PlansScreen {
   show(): void {
     this.root.hidden = false;
     this.inline = null; this.opening = null; this.menuOpen = false; this.signOutWarn = false;
-    if (!this.unwatch) {
-      this.unwatch = this.store.watchPlans(p => { this.plans = p; this.loaded = true; this.render(); }, e => this.opts.onError?.(e));
-    }
+    this.revived = false;
+    this.watch();
     clearInterval(this.tick);
     this.tick = window.setInterval(() => this.render(), 60_000); // keep "Edited … ago" current
     this.render();
@@ -95,6 +96,22 @@ export class PlansScreen {
     this.unwatch?.(); this.unwatch = null;
     clearInterval(this.tick);
     this.closeNew();
+  }
+
+  /** Restarts the list after an error ended it (e.g. permission-denied, then the invite re-check passed). Once per show, so a lasting denial can't loop. */
+  revive(): void {
+    if (this.root.hidden || this.unwatch || this.revived) return;
+    this.revived = true;
+    this.watch();
+  }
+
+  private watch() {
+    if (this.unwatch) return;
+    const off = this.store.watchPlans(p => { this.plans = p; this.loaded = true; this.render(); }, e => {
+      if (this.unwatch === off) this.unwatch = null; // an error ends the listener
+      this.opts.onError?.(e, 'load');
+    });
+    this.unwatch = off;
   }
 
   /** Marks a row as opening (main is loading its plan), or clears it. */
@@ -115,7 +132,7 @@ export class PlansScreen {
       + (this.menuOpen ? `<div class="account-menu card">`
         + `<p class="text-hint">${esc(this.opts.email)}</p>`
         + (this.signOutWarn
-          ? `<p class="text-error">Some changes haven't synced yet. Signing out now loses them.</p>`
+          ? `<p class="text-error">Some changes haven't synced yet. They'll sync when you sign back in on this device.</p>`
             + `<div class="row split">${button('Sign out anyway', { variant: 'danger', data: { act: 'sign-out-anyway' } })}${button('Cancel', { data: { act: 'menu-close' } })}</div>`
           : `<button type="button" id="sign-out">Sign out</button>`)
         + `</div>` : '')
@@ -191,7 +208,7 @@ export class PlansScreen {
       case 'delete': this.inline = { kind: 'delete', id }; this.render(); return;
       case 'delete-confirm': {
         this.inline = null;
-        this.store.remove(id).catch(err => this.opts.onError?.(err));
+        this.store.remove(id).catch(err => this.opts.onError?.(err, 'save'));
         this.render(); return;
       }
       case 'inline-cancel': this.inline = null; this.render(); return;
@@ -226,7 +243,7 @@ export class PlansScreen {
       await this.store.rename(id, clean);
     } catch (err) {
       if (err instanceof PlanInputError) { this.inline = { kind: 'rename', id }; this.render(); return; }
-      this.opts.onError?.(err as Error);
+      this.opts.onError?.(err as Error, 'save');
     }
     this.render();
   }
@@ -247,7 +264,7 @@ export class PlansScreen {
     } catch (err) {
       this.creating = false;
       if (err instanceof PlanInputError) this.newError = INPUT_MESSAGES[err.reason];
-      else { console.error('create failed', err); this.opts.onError?.(err as Error); }
+      else { console.error('create failed', err); this.opts.onError?.(err as Error, 'save'); }
       this.render();
     }
   }

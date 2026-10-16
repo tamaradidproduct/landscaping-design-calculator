@@ -38,3 +38,12 @@ export function getFirebase(): FirebaseServices {
   services = { app, auth, db, storage };
   return services;
 }
+
+let persistAsked = false;
+
+/** Asks once (after a successful sign-in) that the browser not evict the offline data; result ignored. */
+export function persistStorageOnce(): void {
+  if (persistAsked) return;
+  persistAsked = true;
+  try { void navigator.storage?.persist?.().catch(() => {}); } catch { /* unsupported */ }
+}

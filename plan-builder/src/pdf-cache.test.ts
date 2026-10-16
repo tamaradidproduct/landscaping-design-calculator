@@ -8,7 +8,7 @@ describe('pdfCache', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('put then get returns the rev and bytes', async () => {
-    await pdfCache.put('a', 1, bytes(5));
+    expect(await pdfCache.put('a', 1, bytes(5))).toBe(true);
     const got = await pdfCache.get('a');
     expect(got?.rev).toBe(1);
     expect(got?.bytes.byteLength).toBe(5);
@@ -39,11 +39,37 @@ describe('pdfCache', () => {
     try {
       const fresh = (await import('./pdf-cache')).pdfCache;
       expect(await fresh.get('x')).toBeNull();
-      await expect(fresh.put('x', 1, bytes(1))).resolves.toBeUndefined();
+      await expect(fresh.put('x', 1, bytes(1))).resolves.toBe(false);
       await expect(fresh.delete('x')).resolves.toBeUndefined();
       expect(warn).toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('reopens after its connection is closed', async () => {
+    vi.resetModules();
+    const opened: IDBOpenDBRequest[] = [];
+    const realOpen = indexedDB.open.bind(indexedDB);
+    vi.spyOn(indexedDB, 'open').mockImplementation((...a) => { const r = realOpen(...a); opened.push(r); return r; });
+    const fresh = (await import('./pdf-cache')).pdfCache;
+    await fresh.put('d', 1, bytes(4));
+    opened[0].result.close(); // no onclose event: the next transaction throws InvalidStateError
+    expect((await fresh.get('d'))?.rev).toBe(1);
+    expect(await fresh.put('d', 2, bytes(4))).toBe(true);
+    expect(opened).toHaveLength(2);
+  });
+
+  it('lets the database be deleted, then starts over', async () => {
+    await pdfCache.put('e', 1, bytes(4));
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('plan-builder-pdfs');
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('blocked: the cache kept its connection open'));
+    });
+    expect(await pdfCache.get('e')).toBeNull();
+    expect(await pdfCache.put('e', 2, bytes(4))).toBe(true);
+    expect((await pdfCache.get('e'))?.rev).toBe(2);
   });
 });

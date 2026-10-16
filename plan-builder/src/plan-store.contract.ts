@@ -64,6 +64,20 @@ export function runPlanStoreContract(make: () => PlanStore) {
       expect(meta.id).toBe(id);
     });
 
+    it('save of an unreadable state (NaN point) keeps the last good one and reports it', async () => {
+      const s = fresh();
+      const errors: Error[] = [];
+      s.onError(e => errors.push(e));
+      const id = await s.create('x', pdfFile());
+      s.save(id, state());
+      const bad = state();
+      bad.outlines.a.pts[1] = { x: NaN, y: 0 };
+      s.save(id, bad);
+      await s.flushUploads();
+      expect((await s.load(id)).state).toEqual(state());
+      expect(errors).toHaveLength(1);
+    });
+
     it('save bumps updatedAt', async () => {
       const s = fresh();
       const id = await s.create('x', pdfFile());

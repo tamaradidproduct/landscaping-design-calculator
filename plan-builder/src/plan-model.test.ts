@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { PlanFormatError, cleanAddress, docBytes, editedAgo, fromDoc, sortPlans, toDoc, type PlanMeta, type PlanState } from './plan-model';
+import { PlanFormatError, cleanAddress, docBytes, downloadTimeoutMs, editedAgo, fromDoc, sortPlans, toDoc, type PlanMeta, type PlanState } from './plan-model';
 
 const pdf = { name: 'plot.pdf', size: 1234, rev: 1, uploaded: true };
 const meta = { address: '12 Elm St', createdAt: 1000, updatedAt: 2000, pdf };
@@ -59,6 +59,11 @@ describe('docBytes', () => {
     expect(docBytes(doc)).toBe(new TextEncoder().encode(JSON.stringify(doc)).length);
     expect(docBytes({ ...doc, address: 'é' })).toBe(docBytes({ ...doc, address: 'e' }) + 1);
   });
+});
+
+describe('downloadTimeoutMs', () => {
+  test('is 15 s for small files', () => { expect(downloadTimeoutMs(0)).toBe(15_000); expect(downloadTimeoutMs(500_000)).toBe(15_000); });
+  test('allows 50 KB/s for big files', () => expect(downloadTimeoutMs(5 * 1024 * 1024)).toBe(102_400));
 });
 
 describe('sortPlans', () => {

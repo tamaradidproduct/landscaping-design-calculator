@@ -15,8 +15,11 @@ export interface PlanStore {
   onError(cb: (e: Error) => void): void;
 }
 
+export const NOT_FOUND = 'Plan not found';
+
+/** 'device-storage': offline, and the PDF couldn't be kept on the device, so the plan would have no PDF anywhere. */
 export class PlanInputError extends Error {
-  constructor(public reason: 'address' | 'not-pdf' | 'too-big', message?: string) { super(message ?? reason); this.name = 'PlanInputError'; }
+  constructor(public reason: 'address' | 'not-pdf' | 'too-big' | 'device-storage', message?: string) { super(message ?? reason); this.name = 'PlanInputError'; }
 }
 export class PdfUnavailableError extends Error {
   constructor(message = 'PDF unavailable') { super(message); this.name = 'PdfUnavailableError'; }

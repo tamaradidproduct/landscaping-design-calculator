@@ -62,6 +62,9 @@ export function fromDoc(data: unknown): PlanDoc {
   return strip(data) as unknown as PlanDoc;
 }
 
+/** Whole-download timeout for a PDF of `size` bytes: 15 s, or longer at 50 KB/s for big files. */
+export const downloadTimeoutMs = (size: number): number => Math.max(15_000, Math.ceil(size / 51.2));
+
 /** UTF-8 length of the JSON; an estimate of Firestore's stored size. */
 export const docBytes = (doc: PlanDoc): number => new TextEncoder().encode(JSON.stringify(doc)).length;
 

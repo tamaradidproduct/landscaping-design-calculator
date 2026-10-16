@@ -6,7 +6,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { doc, getDocFromServer } from 'firebase/firestore';
-import { getFirebase } from './firebase';
+import { getFirebase, persistStorageOnce } from './firebase';
 import {
   SignInError,
   forgetInvite,
@@ -58,11 +58,13 @@ export class FirebaseAuthGate implements AuthGate {
     };
   }
 
+  /** Re-verifies with no head start: after permission-denied the remembered invite is in doubt. */
   recheck(): void {
-    if (this.user) void this.evaluate();
+    if (this.user) void this.evaluate(false);
   }
 
-  private async evaluate(): Promise<void> {
+  /** `trustMemory`: a remembered invite emits ready at once (offline cold start); the server check then runs behind it. */
+  private async evaluate(trustMemory = true): Promise<void> {
     const user = this.user;
     const n = ++this.seq;
     const emit = (s: AuthState) => {
@@ -76,11 +78,14 @@ export class FirebaseAuthGate implements AuthGate {
       forgetInvite(user.uid);
       return emit({ kind: 'not-invited', email });
     }
-    emit({ kind: 'loading' });
-    const verdict = resolveInvite(await checkInvite(email), wasInvited(user.uid));
+    const remembered = wasInvited(user.uid);
+    const early = trustMemory && remembered;
+    const ready = () => { emit({ kind: 'ready', uid: user.uid, email }); if (n === this.seq) persistStorageOnce(); };
+    if (early) ready(); else emit({ kind: 'loading' });
+    const verdict = resolveInvite(await checkInvite(email), remembered);
     if (verdict === 'invited') {
       rememberInvite(user.uid);
-      emit({ kind: 'ready', uid: user.uid, email });
+      if (!early) ready();
     } else if (verdict === 'not-invited') {
       forgetInvite(user.uid);
       emit({ kind: 'not-invited', email });

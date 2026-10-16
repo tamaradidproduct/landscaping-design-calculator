@@ -1,18 +1,16 @@
 // Firestore + Cloud Storage PlanStore. Firestore writes resolve only on server ack, so they are
 // never awaited in user-facing paths: the persistent cache applies them locally and queues them.
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, setDoc, updateDoc,
+  collection, deleteDoc, doc, getDoc, getDocFromCache, getDocs, onSnapshot, setDoc, updateDoc,
   type Firestore,
 } from 'firebase/firestore';
 import { deleteObject, getBytes, ref as storageRef, uploadBytesResumable, type FirebaseStorage, type UploadTask } from 'firebase/storage';
 import { getFirebase } from './firebase';
-import { cleanAddress, docBytes, fromDoc, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
-import { AccessDeniedError, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
+import { cleanAddress, docBytes, downloadTimeoutMs, fromDoc, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
+import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
 import { pdfCache } from './pdf-cache';
 
-const NOT_FOUND = 'Plan not found';
 const CONTENT_TYPE = 'application/pdf'; // iPad files can have an empty type; rules require this
-const DOWNLOAD_TIMEOUT_MS = 15_000; // Storage otherwise retries for up to 2 min
 
 const code = (e: unknown) => (e as { code?: unknown } | null)?.code;
 const isDenied = (e: unknown) => code(e) === 'permission-denied' || code(e) === 'storage/unauthorized';
@@ -29,6 +27,8 @@ export class FirebasePlanStore implements PlanStore {
   /** Per-id upload queue: one upload at a time, so an older PDF can't land after a newer one. */
   private uploadQueue = new Map<string, Promise<void>>();
   private inFlight = new Map<string, { rev: number; task: UploadTask }>();
+  /** This device's not-yet-uploaded PDF per id, so an upload or open never depends on the cache write. */
+  private pendingPdf = new Map<string, { rev: number; bytes: ArrayBuffer }>();
   /** Ids currently over SIZE_WARN_BYTES, so the warning fires once per crossing. */
   private oversize = new Set<string>();
   private errorCbs: Array<(e: Error) => void> = [];
@@ -97,18 +97,25 @@ export class FirebasePlanStore implements PlanStore {
     checkPdf(pdf);
     const bytes = await pdf.arrayBuffer();
     const ref = doc(this.plans());
+    await this.keepPdf(ref.id, 1, bytes);
     const now = Date.now();
     const d = toDoc({ outlines: {}, refs: [] }, { address: clean, createdAt: now, updatedAt: now, pdf: { name: pdf.name, size: bytes.byteLength, rev: 1, uploaded: false } });
     setDoc(ref, d).catch(this.report);
     this.known.set(ref.id, d);
-    await pdfCache.put(ref.id, 1, bytes);
     void this.upload(ref.id).catch(this.report);
     return ref.id;
   }
 
+  /** Holds the PDF for upload; offline with no device copy it would be nowhere, so that refuses before any doc write. */
+  private async keepPdf(id: string, rev: number, bytes: ArrayBuffer): Promise<void> {
+    if (!(await pdfCache.put(id, rev, bytes)) && !navigator.onLine) throw new PlanInputError('device-storage');
+    this.pendingPdf.set(id, { rev, bytes });
+  }
+
   async load(id: string): Promise<{ meta: PlanMeta; state: PlanState }> {
-    // getDoc falls back to the persistent cache when the server can't be reached
-    const snap = await getDoc(this.docRef(id)).catch(e => { throw this.wrap(e); });
+    // Cache first (the plans listener keeps it current); getDoc asks the server, then falls back to the cache
+    const cached = await getDocFromCache(this.docRef(id)).catch(() => null);
+    const snap = cached?.exists() ? cached : await getDoc(this.docRef(id)).catch(e => { throw this.wrap(e); });
     if (!snap.exists()) throw new Error(NOT_FOUND);
     const d = fromDoc(snap.data());
     this.known.set(id, d);
@@ -119,6 +126,8 @@ export class FirebasePlanStore implements PlanStore {
     const prev = this.known.get(id);
     if (!prev) { this.emit(new Error(NOT_FOUND)); return; }
     const next = toDoc(state, { address: prev.address, createdAt: prev.createdAt, updatedAt: Date.now(), pdf: prev.pdf });
+    // Never write what load couldn't read back (e.g. a NaN point becomes null): that would lock the plan
+    try { fromDoc(next); } catch (e) { this.emit(asError(e)); return; }
     const bytes = docBytes(next);
     if (bytes <= SIZE_WARN_BYTES) this.oversize.delete(id);
     else if (!this.oversize.has(id)) { this.oversize.add(id); this.emit(new SizeWarning(bytes)); }
@@ -143,11 +152,11 @@ export class FirebasePlanStore implements PlanStore {
     checkPdf(pdf);
     const bytes = await pdf.arrayBuffer();
     const rev = prev.pdf.rev + 1;
+    await this.keepPdf(id, rev, bytes);
     const info = { name: pdf.name, size: bytes.byteLength, rev, uploaded: false };
     const updatedAt = Date.now();
     updateDoc(this.docRef(id), { pdf: info, updatedAt }).catch(this.report);
     this.known.set(id, { ...prev, pdf: info, updatedAt });
-    await pdfCache.put(id, rev, bytes);
     void this.upload(id).catch(this.report);
   }
 
@@ -158,6 +167,7 @@ export class FirebasePlanStore implements PlanStore {
     deleteObject(this.pdfRef(id)).catch(e => { if (code(e) !== 'storage/object-not-found') this.report(e); });
     this.known.delete(id);
     this.oversize.delete(id);
+    this.pendingPdf.delete(id);
     this.inFlight.get(id)?.task.cancel();
     await pdfCache.delete(id);
   }
@@ -167,13 +177,16 @@ export class FirebasePlanStore implements PlanStore {
       if (e instanceof AccessDeniedError) throw e;
       throw new PdfUnavailableError();
     });
+    const mine = this.pendingPdf.get(id);
+    if (mine && mine.rev >= d.pdf.rev) return mine.bytes.slice(0);
     const cached = await pdfCache.get(id);
     if (cached && cached.rev >= d.pdf.rev) return cached.bytes;
     // Storage still holds an older rev (another device hasn't uploaded yet), or we're offline
     if (!d.pdf.uploaded || !navigator.onLine) throw new PdfUnavailableError();
     try {
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new PdfUnavailableError()), DOWNLOAD_TIMEOUT_MS); });
+      // Storage otherwise retries for up to 2 min
+      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new PdfUnavailableError()), downloadTimeoutMs(d.pdf.size)); });
       const bytes = await Promise.race([getBytes(this.pdfRef(id)), timeout]).finally(() => clearTimeout(timer));
       await pdfCache.put(id, d.pdf.rev, bytes);
       return bytes;
@@ -215,10 +228,12 @@ export class FirebasePlanStore implements PlanStore {
   private async uploadLatest(id: string): Promise<void> {
     const cur = this.known.get(id);
     if (!cur || cur.pdf.uploaded) return;
-    const cached = await pdfCache.get(id);
-    if (cached?.rev !== cur.pdf.rev) return; // not this device's PDF, or an older one
-    const rev = cached.rev;
-    const task = uploadBytesResumable(this.pdfRef(id), cached.bytes, { contentType: CONTENT_TYPE, customMetadata: { rev: String(rev) } });
+    const mine = this.pendingPdf.get(id);
+    if (mine && mine.rev < cur.pdf.rev) this.pendingPdf.delete(id); // another device replaced it
+    const local = mine?.rev === cur.pdf.rev ? mine : await pdfCache.get(id);
+    if (local?.rev !== cur.pdf.rev) return; // not this device's PDF, or an older one
+    const rev = local.rev;
+    const task = uploadBytesResumable(this.pdfRef(id), local.bytes, { contentType: CONTENT_TYPE, customMetadata: { rev: String(rev) } });
     this.inFlight.set(id, { rev, task });
     try {
       await task;
@@ -228,6 +243,7 @@ export class FirebasePlanStore implements PlanStore {
     } finally {
       if (this.inFlight.get(id)?.task === task) this.inFlight.delete(id);
     }
+    if (this.pendingPdf.get(id)?.rev === rev) this.pendingPdf.delete(id);
     // Flip the flag only if no replace happened while this rev was uploading
     const now = this.known.get(id);
     if (!now || now.pdf.rev !== rev || now.pdf.uploaded) return;

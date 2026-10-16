@@ -1,10 +1,9 @@
 // In-memory PlanStore for dev builds (?store=memory) and the contract suite.
-import { cleanAddress, sortPlans, type PlanMeta, type PlanState } from './plan-model';
-import { PdfUnavailableError, PlanInputError, checkPdf, type PlanStore } from './plan-store';
+import { cleanAddress, fromDoc, sortPlans, toDoc, type PlanMeta, type PlanState } from './plan-model';
+import { NOT_FOUND, PdfUnavailableError, PlanInputError, checkPdf, type PlanStore } from './plan-store';
 
 interface Entry { meta: PlanMeta; state: PlanState; bytes: ArrayBuffer }
 
-const NOT_FOUND = 'Plan not found';
 const copy = <T>(v: T): T => structuredClone(v);
 
 export class MemoryPlanStore implements PlanStore {
@@ -18,6 +17,7 @@ export class MemoryPlanStore implements PlanStore {
     return e;
   }
   private list = () => sortPlans([...this.plans.values()].map(e => copy(e.meta)));
+  private emit(e: Error) { this.errorCbs.forEach(cb => cb(e)); }
   private notify() { this.watchers.forEach(w => w(this.list())); }
 
   watchPlans(onPlans: (plans: PlanMeta[]) => void): () => void {
@@ -49,7 +49,9 @@ export class MemoryPlanStore implements PlanStore {
 
   save(id: string, state: PlanState): void {
     const e = this.plans.get(id);
-    if (!e) { this.errorCbs.forEach(cb => cb(new Error(NOT_FOUND))); return; }
+    if (!e) { this.emit(new Error(NOT_FOUND)); return; }
+    // Same check as load: never store a state (e.g. a NaN point) that couldn't be read back
+    try { fromDoc(toDoc(state, { address: e.meta.address, createdAt: e.meta.createdAt, updatedAt: Date.now(), pdf: e.meta.pdf })); } catch (err) { this.emit(err as Error); return; }
     e.state = copy(state);
     e.meta.updatedAt = Date.now();
     this.notify();

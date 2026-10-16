@@ -3,7 +3,7 @@ import { DevAuthGate, type AuthGate, type AuthState } from './auth';
 import { Autosave } from './autosave';
 import { MemoryPlanStore } from './memory-plan-store';
 import { PlanFormatError, type PlanState } from './plan-model';
-import { AccessDeniedError, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
+import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
 import { armFilePicker, planInputMessage, PlansScreen, renderLoading, renderNotInvited, renderSignIn } from './plans-ui';
 
 /** What the shell needs from the editor in main.ts. */
@@ -82,7 +82,8 @@ export function startShell(ed: Editor): Shell {
       if (seq !== openSeq || session?.store !== store) return;
       plans.setOpening(null);
       if (e instanceof PdfUnavailableError) toast("This plan's PDF isn't on this device yet. Connect to the internet to open it.");
-      else if (e instanceof PlanFormatError) toast('This plan was saved by a newer version of Plan Builder. Reload to update.');
+      else if (e instanceof PlanFormatError && e.reason === 'newer') toast('This plan was saved by a newer version of Plan Builder. Reload to update.');
+      else if (e instanceof PlanFormatError) toast("This plan couldn't be read. Delete it and start a new plan.");
       else if (e instanceof AccessDeniedError) gate.recheck();
       else { console.error('open failed', e); toast("Couldn't open this plan. Try again."); }
     }
@@ -119,19 +120,22 @@ export function startShell(ed: Editor): Shell {
     }).click();
   };
 
-  let lastCloudToast = -Infinity;
-  function routeStoreError(e: Error) {
+  const lastToast = new Map<string, number>();
+  /** `what`: 'load' for list/read failures, 'save' (default) for writes and uploads. */
+  function routeStoreError(e: Error, what: 'load' | 'save' = 'save') {
     if (e instanceof SizeWarning) toast('This plan is getting large. Split very detailed outlines into simpler ones.');
     else if (e instanceof AccessDeniedError) gate.recheck();
     else {
       console.error(e);
-      // Offline uploads can fail over and over: say it once in a while, not on every retry
-      if (Date.now() - lastCloudToast < CLOUD_TOAST_GAP_MS) return;
-      lastCloudToast = Date.now();
-      toast("Couldn't save to the cloud. Your changes are kept on this device.");
+      const msg = e instanceof PlanFormatError ? "Couldn't save the last change. Undo it and try again."
+        : what === 'load' || e.message === NOT_FOUND ? "Couldn't load your plans. Check your connection."
+          : "Couldn't save to the cloud. Your changes are kept on this device.";
+      // Offline uploads (and a broken save on every edit) can fail over and over: say it once in a while
+      if (Date.now() - (lastToast.get(msg) ?? -Infinity) < CLOUD_TOAST_GAP_MS) return;
+      lastToast.set(msg, Date.now());
+      toast(msg);
     }
   }
-  window.addEventListener('online', () => { void session?.store.flushUploads(); });
 
   function endSession() {
     if (!session && !sessionUid) return;
@@ -151,7 +155,7 @@ export function startShell(ed: Editor): Shell {
       if (seq !== sessionSeq) return;
       store = new FirebasePlanStore(uid);
     }
-    const route = (e: Error) => { if (session?.store === store) routeStoreError(e); };
+    const route = (e: Error, what?: 'load' | 'save') => { if (session?.store === store) routeStoreError(e, what); };
     store.onError(route);
     const plans = new PlansScreen(plansRoot, store, {
       email,
@@ -167,7 +171,7 @@ export function startShell(ed: Editor): Shell {
     // recheck() re-emits loading → ready for the same account: keep whatever screen is up
     if (s.kind === 'loading') { if (!sessionUid) { renderLoading(authRoot); showScreen('auth'); } return; }
     if (s.kind === 'ready') {
-      if (sessionUid === s.uid) return;
+      if (sessionUid === s.uid) { session?.plans.revive(); return; }
       endSession();
       void startSession(s.uid, s.email).catch(e => { console.error('could not load plans', e); toast("Couldn't open your plans. Reload to try again."); });
       return;
