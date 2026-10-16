@@ -2,8 +2,9 @@
 // then read the other edges. Corner positions come from the PDF's own drawn property lines.
 // Usage: node scripts/check-step2a.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // PDF points (page 612 x 1008). TL/TR/BL: intersections/ends of the drawn property lines.
 // BR: along the drawn right line, 155.55 ft from TR at the printed 1" = 30' (0.41667 ft/pt).
 const C = { TL: [253.15, 213.24], TR: [532.62, 206.88], BL: [253.21, 545.22] };
@@ -15,8 +16,7 @@ const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, dev
 const results = [];
 await page.goto(url);
 await page.waitForTimeout(3500); // engine warm-up
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 
 const toScreen = async ([x, y]) => page.evaluate(([x, y]) => {
   const r = document.getElementById('page').getBoundingClientRect();

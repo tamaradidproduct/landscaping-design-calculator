@@ -2,14 +2,14 @@
 // preview get pulled onto it (and stay there); hold Shift to lock edges to 45° steps.
 // Usage: node scripts/check-snap-feel.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+import { openPlan } from './lib/open-plan.mjs';
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const TL = [253.15, 213.24], TR = [532.62, 206.88];
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 1008]; }, [x, y]);
 await page.mouse.move(...await toScreen([390, 380]));
 await page.keyboard.down('Control'); for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');

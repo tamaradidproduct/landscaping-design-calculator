@@ -2,15 +2,15 @@
 // one finger places, two fingers pan/zoom without placing, press-and-hold places freely.
 // Usage: node scripts/check-touch-nav.mjs <plot-plan.pdf> [url]
 import { chromium } from 'playwright-core';
-const [pdf, url = 'http://localhost:5180/'] = process.argv.slice(2);
+import { openPlan } from './lib/open-plan.mjs';
+const [pdf, url = 'http://localhost:5180/?store=memory'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: false });
 const page = await ctx.newPage();
 const cdp = await ctx.newCDPSession(page);
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
 const wait = ms => page.waitForTimeout(ms);
 const corners = () => page.$$eval('.overlay circle.corner', cs => cs.length);

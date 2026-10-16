@@ -2,13 +2,13 @@
 // Also checks deselect. Draws in empty space beside the page so nothing on the plan can pull.
 // Usage: node scripts/check-guides.mjs <plot-plan.pdf> [url]
 import { chromium } from 'playwright-core';
-const [pdf, url = 'http://localhost:5180/'] = process.argv.slice(2);
+import { openPlan } from './lib/open-plan.mjs';
+const [pdf, url = 'http://localhost:5180/?store=memory'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const corners = () => page.$$eval('.overlay circle.corner', cs => cs.map(c => [+(+c.getAttribute('cx')).toFixed(1), +(+c.getAttribute('cy')).toFixed(1)]));
 const label = () => page.$$eval('.overlay .label.snap', ls => ls.map(l => l.textContent).join(' + '));
 await page.click('[data-start=boundary]');

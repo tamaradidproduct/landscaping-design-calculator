@@ -3,16 +3,16 @@
 // stays within Surfaces; solid vs see-through; redrawing the boundary keeps the zones.
 // Usage: node scripts/check-surfaces.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
 await page.evaluate(() => localStorage.setItem('plan-builder.shape', 'rect'));
 await page.reload(); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 await page.$eval('#snap', b => b.click()); // exact placement (edge snapping is covered by hand)
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 1008]; }, [x, y]);
 const drag = async (p, q) => { const a = await toScreen(p), b = await toScreen(q); await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(200); };

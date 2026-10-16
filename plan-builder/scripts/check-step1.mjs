@@ -1,9 +1,10 @@
 // Checks Step 1's "done when" list against a built preview, in installed Google Chrome (headless).
 // Usage: node scripts/check-step1.mjs <path-to-plot-plan.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 import fs from 'node:fs';
 
-const [pdf, url = 'http://localhost:5181/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 if (!pdf || !fs.existsSync(pdf)) { console.error('Pass the path to a plot plan PDF.'); process.exit(1); }
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -14,15 +15,14 @@ const results = [];
 
 async function openPdf() {
   const t0 = Date.now();
-  await page.setInputFiles('#file', pdf);
-  await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'), null, { timeout: 30000 });
+  await openPlan(page, pdf);
   return { wall: (Date.now() - t0) / 1000, toast: await page.textContent('#toast') };
 }
 
 let engineReady = false;
 page.on('console', m => { if (m.text().startsWith('[open]')) { console.log('  ', m.text()); if (m.text().includes('engine ready')) engineReady = true; } });
 await page.goto(url);
-await page.waitForSelector('#open-empty');
+await page.waitForSelector('#new-plan');
 // A contractor takes a few seconds to find the file; give the engine that long to warm up.
 await page.waitForTimeout(3000);
 for (let i = 0; i < 100 && !engineReady; i++) await page.waitForTimeout(100);
@@ -53,11 +53,11 @@ results.push(['Sharp when zoomed', `transform ${zoom} · sharp layer shown: ${sh
 
 // Offline: service worker must be controlling, then reload with the network off and open the PDF again.
 await page.evaluate(() => navigator.serviceWorker.ready);
-await page.reload(); await page.waitForSelector('#open-empty');
+await page.reload(); await page.waitForSelector('#new-plan');
 const controlled = await page.evaluate(() => !!navigator.serviceWorker.controller);
 await context.setOffline(true);
 await page.reload();
-const offlineLoaded = await page.waitForSelector('#open-empty', { timeout: 5000 }).then(() => true).catch(() => false);
+const offlineLoaded = await page.waitForSelector('#new-plan', { timeout: 5000 }).then(() => true).catch(() => false);
 let offlineOpen = 'not tried';
 if (offlineLoaded) { const o = await openPdf().catch(e => ({ wall: NaN, toast: String(e).slice(0, 80) })); offlineOpen = `${o.wall.toFixed(2)} s · "${o.toast}"`; }
 results.push(['Works offline', `SW controlling: ${controlled} · app loads offline: ${offlineLoaded} · opens PDF offline: ${offlineOpen}`]);

@@ -9,6 +9,7 @@ import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
+import { docBytes, toDoc } from './plan-model';
 import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
@@ -136,6 +137,10 @@ surfaces.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 updateGroups();
+
+// Dev only: size of the plan document as it would be saved (outlines + refs + small fixed metadata); scripts assert it stays small.
+if (import.meta.env.DEV) (window as unknown as { __planBytes: unknown }).__planBytes = () =>
+  docBytes(toDoc(tool.state(), { address: 'x', createdAt: 0, updatedAt: 0, pdf: { name: 'x.pdf', size: 0, rev: 1, uploaded: false } }));
 
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);

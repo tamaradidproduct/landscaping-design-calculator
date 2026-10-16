@@ -2,8 +2,9 @@
 // snaps onto the drawn corner; Option/Alt and the Snap toggle place freely; arrow keys nudge.
 // Usage: node scripts/check-step2b.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5181/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const C = { TL: [253.15, 213.24], TR: [532.62, 206.88], BL: [253.21, 545.22] }; // drawn property-line corners (PDF pt)
 const OFF = [7, -5]; // tap this many screen px away from the true corner
 
@@ -11,8 +12,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
   const r = document.getElementById('page').getBoundingClientRect();
   return [r.left + x * r.width / 612, r.top + y * r.height / 1008];

@@ -3,8 +3,9 @@
 // Square all corners. The 16°-slanted side line and the bent street edge must be left alone; ⌘Z undoes.
 // Usage: node scripts/check-square.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // Corners from scripts/check-step2c.mjs; TL is placed 6 pt off to the right so it isn't square.
 const C = { TL: [259.15, 213.24], TR: [532.62, 206.88], BR: [429.95, 565.85], P: [282.96, 545.22], BL: [253.21, 545.22] };
 const ARC_MID = [357.18, 550.40];
@@ -13,8 +14,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.setInputFiles('#file', pdf);
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'));
+await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
   const r = document.getElementById('page').getBoundingClientRect();
   return [r.left + x * r.width / 612, r.top + y * r.height / 1008];

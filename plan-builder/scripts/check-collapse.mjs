@@ -3,14 +3,14 @@
 // survives a reload.
 // Usage: node scripts/check-collapse.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
 
-const [pdf, url = 'http://localhost:5180/', outDir = '.'] = process.argv.slice(2);
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 const open = async () => {
-  await page.setInputFiles('#file', pdf);
-  await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'), null, { timeout: 60000 });
+  await openPlan(page, pdf);
 };
 await page.goto(url); await page.waitForTimeout(3500);
 await page.evaluate(() => { localStorage.setItem('plan-builder.shape', 'rect'); localStorage.removeItem('plan-builder.sections'); });
