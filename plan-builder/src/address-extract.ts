@@ -6,7 +6,7 @@ export const UNTITLED = 'Untitled plan';
 const SUFFIX = 'St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Ln|Lane|Ct|Court|Way|Blvd|Cir|Circle|Pl|Place|Pkwy|Parkway|Ter|Terrace|Trl|Trail';
 // House number (not a lot/block/sheet/unit/suite/no./#, or dimension number), optional directional, 1-4 letter-only words, street suffix.
 const NOT_NAME = 'ft|feet|foot|in|inch|inches|x|by|of|the|and|at|to|setback|line|scale';
-const WORD = `(?!(?:${NOT_NAME})\\b)[A-Za-z][A-Za-z'-]*`;
+const WORD = `(?!(?:${NOT_NAME})\\b)(?:[A-Za-z][A-Za-z'-]*|\\d+(?:st|nd|rd|th))`;
 const STREET = new RegExp(
   `(?<![\\w.-])(?<!(?:\\b(?:lot|block|sheet|unit|suite|no)\\.?|\\bx|[#=])\\s*)\\d{1,6}\\s+(?:(?:[NSEW]|NE|NW|SE|SW)\\.?\\s+)?(?:${WORD}\\s+){1,4}?(?:${SUFFIX})\\b\\.?`, 'i');
 const CITY_TAIL = /^[A-Za-z][A-Za-z .'-]*,\s*[A-Z]{2}(?:\s+\d{5}(?:-\d{4})?)?\b/;

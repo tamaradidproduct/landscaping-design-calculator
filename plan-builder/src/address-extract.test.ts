@@ -11,6 +11,16 @@ describe('extractAddress', () => {
   test('street only', () => {
     expect(extractAddress('12 Oak Ln')).toBe('12 Oak Ln');
   });
+  test.each([
+    '123 1st St',
+    '456 2nd Ave, Denver, CO 80202',
+    '789 11th Rd',
+  ])('numbered street names are extracted: %j', t => {
+    expect(extractAddress(t)).toBe(t);
+  });
+  test('bare-number street names are not overmatched', () => {
+    expect(extractAddress('123 1 Street')).toBeNull();
+  });
   test('prefers a labelled title-block match', () => {
     expect(extractAddress('Surveyor: 99 Office Park Dr\nScale 1"=20\'\nSite address: 12 Oak Ln')).toBe('12 Oak Ln');
   });
