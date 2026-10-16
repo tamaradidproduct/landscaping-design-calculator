@@ -134,8 +134,10 @@ export class PlansScreen {
   private render() {
     if (this.root.hidden) return;
     // Keep what's being typed (and focus) across list updates from the store
-    const active = document.activeElement instanceof HTMLInputElement && this.root.contains(document.activeElement) ? document.activeElement.id : null;
-    const values = new Map([...this.root.querySelectorAll('input')].map(i => [i.id, i.value]));
+    const active = document.activeElement instanceof HTMLInputElement && this.root.contains(document.activeElement) && document.activeElement.id
+      ? document.activeElement.id
+      : null;
+    const values = new Map([...this.root.querySelectorAll('input')].filter((i): i is HTMLInputElement => !!i.id).map(i => [i.id, i.value]));
     const menu = this.menuOpen
       ? card(hint(esc(this.opts.email))
         + (this.signOutWarn
@@ -159,7 +161,7 @@ export class PlansScreen {
       : rows ? `<div class="plan-list">${rows}</div>`
         : emptyNote('No plans yet. Start one for your next job.');
     this.root.innerHTML = `<div class="plans">${head}${create}${list}</div>`;
-    for (const [id, v] of values) { const el = this.root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`); if (el && id) el.value = v; }
+    for (const [id, v] of values) { const el = this.root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`); if (el) el.value = v; }
     if (active) this.root.querySelector<HTMLInputElement>(`#${CSS.escape(active)}`)?.focus();
   }
 

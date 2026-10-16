@@ -1,7 +1,7 @@
 // Firestore + Cloud Storage PlanStore. Firestore writes resolve only on server ack, so they are
 // never awaited in user-facing paths: the persistent cache applies them locally and queues them.
 import {
-  collection, deleteDoc, doc, getDoc, getDocFromCache, getDocs, onSnapshot, setDoc, updateDoc,
+  collection, deleteDoc, doc, getDoc, getDocFromCache, getDocs, onSnapshot, query, setDoc, updateDoc, where,
   type Firestore,
 } from 'firebase/firestore';
 import { deleteObject, getBytes, ref as storageRef, uploadBytesResumable, type FirebaseStorage, type UploadTask } from 'firebase/storage';
@@ -199,11 +199,10 @@ export class FirebasePlanStore implements PlanStore {
   async flushUploads(): Promise<void> {
     if (!navigator.onLine) return;
     let docs;
-    try { docs = (await getDocs(this.plans())).docs; } catch (e) { this.report(e); return; }
+    try { docs = (await getDocs(query(this.plans(), where('pdf.uploaded', '==', false)))).docs; } catch (e) { this.report(e); return; }
     for (const s of docs) {
       let d: PlanDoc;
       try { d = fromDoc(s.data()); } catch { continue; }
-      if (d.pdf.uploaded) continue;
       const k = this.known.get(s.id);
       if (!k || k.pdf.rev < d.pdf.rev) this.known.set(s.id, d);
       // One plan's failure doesn't stop the rest

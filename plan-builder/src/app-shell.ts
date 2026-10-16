@@ -8,7 +8,7 @@ import { armFilePicker, planInputMessage, PlansScreen, renderLoading, renderNotI
 
 /** What the shell needs from the editor in main.ts. */
 export interface Editor {
-  tool: { load(state: PlanState): void; state(): PlanState };
+  tool: { load(state: PlanState): void; state(): PlanState; saveRevision: number };
   /** Shows the PDF; `name` labels the plot plan layer. 'failed' keeps what was open and shows no message; 'stale': a later open or leaving the editor overtook it. */
   openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult>;
   /** Hides the plot plan (nothing open) and any editor message. */
@@ -36,7 +36,7 @@ export function startShell(ed: Editor): Shell {
   let sessionUid: string | null = null; // set as soon as `ready` arrives, before the store has loaded
   let sessionSeq = 0;
   let current: { id: string; address: string } | null = null; // the plan open in the editor
-  let lastSaved = '';
+  let lastSavedRevision = -1;
   let openSeq = 0;
 
   const autosave = new Autosave(id => {
@@ -74,7 +74,7 @@ export function startShell(ed: Editor): Shell {
       plans.setOpening(null);
       showScreen('editor');
       tool.load(state);
-      lastSaved = JSON.stringify(tool.state());
+      lastSavedRevision = tool.saveRevision;
       current = { id, address: meta.address };
       if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it
@@ -199,9 +199,9 @@ export function startShell(ed: Editor): Shell {
     changed() {
       if (!current) return;
       // Save only when what would be saved changed (not on hover, selection or view moves)
-      const s = JSON.stringify(tool.state());
-      if (s === lastSaved) return;
-      lastSaved = s;
+      const revision = tool.saveRevision;
+      if (revision === lastSavedRevision) return;
+      lastSavedRevision = revision;
       autosave.changed(current.id);
     },
   };
