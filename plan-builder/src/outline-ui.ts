@@ -10,7 +10,7 @@ import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type C
 import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { stretchEdge } from './stretch';
-import { cornerBisector, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
+import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
 import { materialFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
@@ -45,8 +45,10 @@ const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holdi
 const RECT_MIN = 8;         // screen px: a rectangle narrower or shorter than this wasn't meant
 const BEND_HIT = 20;        // screen px around an edge's middle handle
 const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
-const RELEASE = 34;
-const ROUND_REVEAL = 48;    // screen px: hovering this near a selected surface's corner shows its round handle         // screen px: once snapped, the point stays put until the pointer moves this far away
+const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
+const ROUND_REVEAL = 24;    // screen px from the drawn line at a selected surface's corner (the arc, once rounded): shows its round handle
+const ZONE_SIDE_HIT = 10;
+const ZONE_CORNER_HIT = 14; // screen px around a selected surface's corner dot   // screen px from the straight part of a selected surface's side: push it
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
 const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's material fill (colour + pattern), as an inline style addition. */
@@ -262,7 +264,10 @@ export class OutlineTool {
     // The selected surface corner's round handle sits inside the corner, so it goes before the corner itself.
     const round = this.roundHandleAt(p);
     if (round) {
-      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0: this.outlines[round.id]!.radii?.[round.i] ?? 0, moved: false };
+      // Start from the radius as drawn (a typed one may be clamped to fit the sides).
+      const o = this.outlines[round.id]!, at = this.host.toPage(round.at), c = o.pts[round.i];
+      const r0 = o.radii?.[round.i] ? radiusFromHandle(Math.hypot(at.x - c.x, at.y - c.y), cornerBisector(o.pts, round.i).half) : 0;
+      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0, moved: false };
       this.dragBefore = this.snapshot();
       return true;
     }
@@ -301,7 +306,7 @@ export class OutlineTool {
     // A selected surface: press on a side to push it, or inside to move the whole zone (a tap still selects).
     const zone = this.selectedZone;
     if (zone) {
-      const i = nearestEdge(zone.pts, this.host.toPage(p), EDGE_HIT / this.host.pxPerPt(), zone.bulges);
+      const i = this.zoneSideAt(zone, p);
       const before = zone.pts.map(q => ({ ...q }));
       if (i !== null) {
         const a = this.host.toScreen(zone.pts[i]), b = this.host.toScreen(zone.pts[(i + 1) % zone.pts.length]);
@@ -640,7 +645,10 @@ export class OutlineTool {
     // Near a corner of the selected surface, show that corner's round handle.
     const z = p && !this.drag ? this.selectedZone : null;
     let near: number | null = null, nd = ROUND_REVEAL;
-    if (z && p) z.pts.forEach((q, k) => { const d = dist(this.host.toScreen(q), p); if (d < nd) { nd = d; near = k; } });
+    if (z && p) {
+      const pp = this.host.toPage(p), k = this.host.pxPerPt();
+      z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp) * k; if (d < nd) { nd = d; near = i; } });
+    }
     const cornerChanged = near !== this.hoverCorner;
     this.hoverCorner = near;
     if (cornerChanged && !changed && !this.drawing) this.render();
@@ -658,7 +666,7 @@ export class OutlineTool {
     if (this.roundHandleAt(p)) return { label: 'Drag to round the corner', cursor: 'grab' };
     if (this.cornerAt(p)?.id === o.id) return { label: 'Drag to move the corner', cursor: 'grab' };
     if (this.bendHandleAt(p)?.id === o.id) return { label: 'Drag to curve the side', cursor: 'grab' };
-    const i = nearestEdge(o.pts, this.host.toPage(p), EDGE_HIT / this.host.pxPerPt(), o.bulges);
+    const i = this.zoneSideAt(o, p);
     if (i !== null) {
       // A two-way arrow across the side, like design tools show on a movable edge.
       const a = this.host.toScreen(o.pts[i]), b = this.host.toScreen(o.pts[(i + 1) % o.pts.length]), ft = this.edgeFeet(o.id, i);
@@ -666,6 +674,16 @@ export class OutlineTool {
     }
     if (insideShape(this.visible.get(o.id) ?? [], this.host.toPage(p))) return { label: 'Drag to move', cursor: 'move' };
     return null;
+  }
+  /** The side of a surface whose drawn straight part is under p (screen); curved sides use their whole arc. */
+  private zoneSideAt(o: Outline, p: Point): number | null {
+    const pp = this.host.toPage(p), tol = ZONE_SIDE_HIT / this.host.pxPerPt();
+    let best: number | null = null, bd = tol;
+    o.pts.forEach((_, i) => {
+      const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
   }
   /** The selected, finished surface (it can be moved, pushed and rounded), if any. */
   private get selectedZone(): Outline | null {
@@ -679,7 +697,11 @@ export class OutlineTool {
     const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
     if (!o || c?.id !== o.id || !o.pts[c.i] || o.bulges?.[c.i] || o.bulges?.[(c.i - 1 + o.pts.length) % o.pts.length]) return null;
     const { dir, half } = cornerBisector(o.pts, c.i), k = this.host.pxPerPt();
-    const d = Math.max(roundHandleDistance(o.radii?.[c.i] ?? 0, half) * k, MARK.roundHandleMin);
+    // On the arc's middle once rounded (on the drawn line, even when the radius is clamped to the sides); a sharp
+    // corner's handle sits just inside it.
+    const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0);
+    if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]) };
+    const d = MARK.roundHandleMin;
     const s = this.host.toScreen(o.pts[c.i]), t = this.host.toScreen({ x: o.pts[c.i].x + dir.x, y: o.pts[c.i].y + dir.y });
     const u = { x: t.x - s.x, y: t.y - s.y }, l = Math.hypot(u.x, u.y) || 1;
     return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d } };
@@ -704,7 +726,9 @@ export class OutlineTool {
       if (this.drawing && o.id !== this.drawing) continue;
       // Otherwise only the selected outline's corners can be dragged: select first, then edit.
       if (!this.drawing && o.id !== this.selected) continue;
-      o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
+      // A selected surface's corners take a tighter area, so its sides and round handles stay easy to reach.
+      const hit = o === this.selectedZone ? ZONE_CORNER_HIT : CORNER_HIT;
+      o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < Math.min(bd, hit)) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
   }

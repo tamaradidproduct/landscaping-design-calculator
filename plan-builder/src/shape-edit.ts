@@ -68,3 +68,24 @@ export function stepRadius(ft: number, dir: 1 | -1, big: boolean): number {
   const next = dir > 0 ? Math.floor(ft / step + 1e-9) * step + step : Math.ceil(ft / step - 1e-9) * step - step;
   return Math.max(0, Math.round(next * 100) / 100);
 }
+
+const distToSegment = (p: Point, a: Point, b: Point) => {
+  const d = sub(b, a), l2 = dot(d, d), t = l2 ? Math.max(0, Math.min(1, dot(sub(p, a), d) / l2)) : 0;
+  return Math.hypot(p.x - a.x - t * d.x, p.y - a.y - t * d.y);
+};
+/** The straight part of side i (corner i → i+1): what's left between its corners' arcs. */
+export function straightPart(pts: Point[], i: number, radii?: number[]): [Point, Point] {
+  const n = pts.length, j = (i + 1) % n;
+  const a = cornerArc(pts, i, radii?.[i] ?? 0), b = cornerArc(pts, j, radii?.[j] ?? 0);
+  return [a ? a[a.length - 1] : pts[i], b ? b[0] : pts[j]];
+}
+/** How far p is from the drawn line at corner i: its arc once rounded, else the corner point. */
+export function distToCorner(pts: Point[], i: number, radii: number[] | undefined, p: Point): number {
+  const arc = cornerArc(pts, i, radii?.[i] ?? 0);
+  if (!arc) return Math.hypot(p.x - pts[i].x, p.y - pts[i].y);
+  let d = Infinity;
+  for (let k = 0; k + 1 < arc.length; k++) d = Math.min(d, distToSegment(p, arc[k], arc[k + 1]));
+  return d;
+}
+/** How far p is from the straight part of side i. */
+export const distToSide = (pts: Point[], i: number, radii: number[] | undefined, p: Point) => { const [a, b] = straightPart(pts, i, radii); return distToSegment(p, a, b); };

@@ -75,10 +75,13 @@ try {
   results.push(['Corner selected', `round field ${await page.$eval('.square-chip .chip-field', e => !e.hidden).catch(() => false)} · handle ${!!await page.$('.overlay .round-handle')}`]);
   await page.fill('#corner-radius', '2'); await page.press('#corner-radius', 'Enter'); await page.waitForTimeout(200);
   const r2 = await shape('s1');
+  results.push(['Rounded 2′: hover on the arc', await tipAt([301.3, 251.3])]);
+  results.push(['Rounded 2′: hover on the top side next to the arc', `${await tipAt([315, 250])} · cursor ${await cursor()}`]);
   await page.focus('#corner-radius');
   await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Shift+ArrowUp'); await page.waitForTimeout(150);
   const stepped = `${await page.inputValue('#corner-radius')}′ · area ${(await shape('s1')).area}`;
-  await page.evaluate(() => document.activeElement.blur()); await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
+  await page.evaluate(() => document.activeElement.blur()); await page.waitForTimeout(100);
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
   results.push(['↑ ↑ ⇧↑ in the radius field, then ⌘Z', `${stepped} (2 → 2.5 → 3 → 4′) · after ⌘Z area ${(await shape('s1')).area} (${r2.area}: one undo step)`]);
   results.push(['Radius 2′ (10 pt)', `area ${r2.area} (8000 − 100·(1 − π/4) ≈ 7979)`]);
   const h = await page.$eval('.overlay .round-handle', e => [+e.getAttribute('cx'), +e.getAttribute('cy')]);

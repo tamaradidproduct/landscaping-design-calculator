@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { areaPt2, outlinePath } from './outline';
-import { cornerBisector, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
+import { cornerBisector, distToCorner, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, straightPart, translate } from './shape-edit';
 
 const P = (x: number, y: number) => ({ x, y });
 const sq = [P(0, 0), P(10, 0), P(10, 10), P(0, 10)];
@@ -56,5 +56,20 @@ describe('pointer and keyboard helpers', () => {
     expect(stepRadius(2, -1, true)).toBe(0);
     expect(stepRadius(0.2, -1, false)).toBe(0);
     expect(stepRadius(1.2, 1, false)).toBe(1.5); // snaps onto the 0.5′ grid
+  });
+});
+
+describe('hover areas follow the drawn line', () => {
+  test('a rounded corner trims the straight part of its sides', () => {
+    const s = straightPart(sq, 0, [2, 0, 0, 0]); // side 0: (0,0)→(10,0), corner 0 rounded by 2
+    expect(s[0].x).toBeCloseTo(2, 9); expect(s[1].x).toBeCloseTo(10, 9);
+    expect(straightPart(sq, 3, [2, 0, 0, 0])[1].y).toBeCloseTo(2, 9); // side 3 ends 2 short of corner 0
+  });
+  test('distance to the line near a corner: the arc when rounded, the corner when sharp', () => {
+    expect(distToCorner(sq, 0, undefined, P(-1, -1))).toBeCloseTo(Math.SQRT2, 9);
+    // The arc's middle is at 2 − √2 from the corner along the diagonal: (0.586, 0.586).
+    const m = 2 - Math.SQRT2;
+    expect(distToCorner(sq, 0, [2, 0, 0, 0], P(m, m))).toBeCloseTo(0, 2);
+    expect(distToCorner(sq, 0, [2, 0, 0, 0], P(0, 0))).toBeGreaterThan(0.8);
   });
 });
