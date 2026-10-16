@@ -15,6 +15,7 @@ import {
   wasInvited,
   type AuthGate,
   type AuthState,
+  classifyInviteError,
   type InviteCheck,
 } from './auth';
 
@@ -26,8 +27,9 @@ async function checkInvite(email: string): Promise<InviteCheck> {
     return snap.exists() ? 'invited' : 'not-invited';
   } catch (e) {
     const code = (e as { code?: string }).code;
-    if (code === 'permission-denied') return 'not-invited';
-    return 'offline'; // unavailable / network / anything else we cannot confirm
+    const { check, log } = classifyInviteError(code);
+    if (log) console.error('invite check failed', e);
+    return check;
   }
 }
 
@@ -35,16 +37,23 @@ export class FirebaseAuthGate implements AuthGate {
   private cb: ((s: AuthState) => void) | null = null;
   private user: User | null = null;
   private seq = 0;
+  private last: AuthState = { kind: 'loading' };
 
   watch(cb: (s: AuthState) => void): () => void {
     this.cb = cb;
-    cb({ kind: 'loading' });
+    this.last = { kind: 'loading' };
+    cb(this.last);
+    const onOnline = () => {
+      if (this.last.kind === 'signed-out' && this.last.offline && this.user) void this.evaluate();
+    };
+    window.addEventListener('online', onOnline);
     const off = onAuthStateChanged(getFirebase().auth, (user) => {
       this.user = user;
       void this.evaluate();
     });
     return () => {
       off();
+      window.removeEventListener('online', onOnline);
       if (this.cb === cb) this.cb = null;
     };
   }
@@ -56,10 +65,18 @@ export class FirebaseAuthGate implements AuthGate {
   private async evaluate(): Promise<void> {
     const user = this.user;
     const n = ++this.seq;
-    const emit = (s: AuthState) => { if (n === this.seq) this.cb?.(s); };
+    const emit = (s: AuthState) => {
+      if (n !== this.seq) return;
+      this.last = s;
+      this.cb?.(s);
+    };
     if (!user) return emit({ kind: 'signed-out' });
     const email = user.email ?? '';
-    if (!email) return emit({ kind: 'not-invited', email });
+    if (!email || !user.emailVerified) {
+      forgetInvite(user.uid);
+      return emit({ kind: 'not-invited', email });
+    }
+    emit({ kind: 'loading' });
     const verdict = resolveInvite(await checkInvite(email), wasInvited(user.uid));
     if (verdict === 'invited') {
       rememberInvite(user.uid);
@@ -77,6 +94,7 @@ export class FirebaseAuthGate implements AuthGate {
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
       await signInWithPopup(getFirebase().auth, provider);
+      void this.evaluate(); // onAuthStateChanged does not fire for an unchanged uid
     } catch (e) {
       const code = (e as { code?: string }).code ?? '';
       if (POPUP_CODES.has(code)) throw new SignInError('popup', e);

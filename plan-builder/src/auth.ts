@@ -20,6 +20,13 @@ export function resolveInvite(check: InviteCheck, remembered: boolean): 'invited
   return check;
 }
 
+/** Firestore error code -> invite check result; `log` marks unexpected errors worth surfacing. */
+export function classifyInviteError(code: string | undefined): { check: InviteCheck; log: boolean } {
+  if (code === 'permission-denied') return { check: 'not-invited', log: false };
+  if (code === 'unavailable' || code === 'deadline-exceeded') return { check: 'offline', log: false };
+  return { check: 'offline', log: true };
+}
+
 export class SignInError extends Error {
   constructor(readonly reason: 'popup' | 'offline', cause?: unknown) {
     super(`sign-in failed: ${reason}`, { cause });

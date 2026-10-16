@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DevAuthGate, forgetInvite, rememberInvite, resolveInvite, wasInvited } from './auth';
+import { DevAuthGate, classifyInviteError, forgetInvite, rememberInvite, resolveInvite, wasInvited } from './auth';
 
 function stubStorage(): Map<string, string> {
   const m = new Map<string, string>();
@@ -46,5 +46,17 @@ describe('DevAuthGate', () => {
     const off = new DevAuthGate().watch(cb);
     expect(cb).toHaveBeenCalledWith({ kind: 'ready', uid: 'dev', email: 'dev@localhost' });
     expect(() => off()).not.toThrow();
+  });
+});
+
+describe('classifyInviteError', () => {
+  it('permission-denied is not-invited', () => expect(classifyInviteError('permission-denied')).toEqual({ check: 'not-invited', log: false }));
+  it('unavailable and deadline-exceeded are quietly offline', () => {
+    expect(classifyInviteError('unavailable')).toEqual({ check: 'offline', log: false });
+    expect(classifyInviteError('deadline-exceeded')).toEqual({ check: 'offline', log: false });
+  });
+  it('anything else is offline but logged', () => {
+    expect(classifyInviteError('internal')).toEqual({ check: 'offline', log: true });
+    expect(classifyInviteError(undefined)).toEqual({ check: 'offline', log: true });
   });
 });
