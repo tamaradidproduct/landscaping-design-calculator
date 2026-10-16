@@ -10,6 +10,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 const check = (name, ok, detail = '') => results.push([name, ok ? 'pass' : 'FAIL', detail]);
+try {
 await page.goto(url); await page.waitForTimeout(3500);
 await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
@@ -23,7 +24,7 @@ await page.click('#outlines [data-act=close]');
 const labels = () => page.$$eval('.overlay .label.feature', ts => ts.map(t => t.textContent).join(', '));
 check('House outlined', (await labels()).includes('House'), await labels());
 const bytes = await page.evaluate(() => window.__planBytes());
-check('Saved document under 800 000 bytes', bytes < 800000, `${bytes} bytes`);
+check('Saved document is 100..800 000 bytes', bytes > 100 && bytes < 800000, `${bytes} bytes`);
 await page.waitForTimeout(1500);
 
 await page.click('#back-to-plans');
@@ -32,10 +33,10 @@ await row.first().waitFor();
 const text = await row.first().innerText();
 check('Row shows address and "Edited just now"', text.includes('Riesberg test') && text.includes('Edited just now'), text.replace(/\s+/g, ' '));
 
+await page.evaluate(() => { document.getElementById('toast').textContent = ''; });
 await row.first().locator('.plan-open').click();
-await page.waitForSelector('#page');
-await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'), null, { timeout: 60000 });
-await page.waitForTimeout(500);
+await page.waitForFunction(() => { const t = document.getElementById('toast'); return !t.hidden && t.textContent.startsWith('Opened'); }, null, { timeout: 60000 });
+await page.waitForFunction(() => [...document.querySelectorAll('.overlay .label.feature')].some(t => t.textContent.includes('House')), null, { timeout: 10000 });
 check('Reopened plan has the House label', (await labels()).includes('House'), await labels());
 
 await page.click('#back-to-plans');
@@ -52,6 +53,9 @@ await page.waitForSelector('.plans-empty');
 const empty = await page.innerText('.plans-empty');
 check('Empty state copy shown', empty === 'No plans yet. Start one for your next job.', empty);
 
+} catch (e) {
+  check('Script completed', false, String(e).split('\n')[0].slice(0, 160));
+}
 console.table(results.map(([check, result, detail]) => ({ check, result, detail })));
 await browser.close();
 if (results.some(r => r[1] !== 'pass')) process.exit(1);

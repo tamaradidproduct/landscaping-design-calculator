@@ -52,7 +52,9 @@ results.push(['Two-finger drag pans', `zoom ${sc(before)} -> ${sc(after)} (same 
 results.push(['Sharp when zoomed', `transform ${zoom} · sharp layer shown: ${sharpShown}`]);
 
 // Offline: service worker must be controlling, then reload with the network off and open the PDF again.
-await page.evaluate(() => navigator.serviceWorker.ready);
+const swReady = await Promise.race([page.evaluate(() => navigator.serviceWorker.ready.then(() => true)), new Promise(r => setTimeout(() => r(false), 5000))]);
+if (!swReady) results.push(['Works offline', "SKIP offline section: needs a built preview (service worker isn't registered on the dev server)"]);
+else {
 await page.reload(); await page.waitForSelector('#new-plan');
 const controlled = await page.evaluate(() => !!navigator.serviceWorker.controller);
 await context.setOffline(true);
@@ -61,6 +63,7 @@ const offlineLoaded = await page.waitForSelector('#new-plan', { timeout: 5000 })
 let offlineOpen = 'not tried';
 if (offlineLoaded) { const o = await openPdf().catch(e => ({ wall: NaN, toast: String(e).slice(0, 80) })); offlineOpen = `${o.wall.toFixed(2)} s · "${o.toast}"`; }
 results.push(['Works offline', `SW controlling: ${controlled} · app loads offline: ${offlineLoaded} · opens PDF offline: ${offlineOpen}`]);
+}
 
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();
