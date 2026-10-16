@@ -34,10 +34,10 @@ export function visibleShapes(outlines: Outline[]): Map<string, Shape> {
       let shape: Shape = lot ? clip.intersection(drawn, [ring(lot)]) : [drawn];
       if (above.length && shape.length) shape = clip.difference(shape, ...above);
       out.set(o.id, shape);
+      above.push(drawn);
     } catch {
       out.set(o.id, [drawn]); // a shape the clipper can't read (e.g. badly self-crossing): show it as drawn
     }
-    above.push(drawn);
   }
   return out;
 }
