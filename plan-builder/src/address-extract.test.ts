@@ -21,8 +21,32 @@ describe('extractAddress', () => {
     expect(extractAddress(t)).toBeNull();
   });
   test('capped at 200 chars', () => {
-    const long = `12 Oak Ln, ${'Averyveryverylongcity '.repeat(20)}, CO 80202`;
-    expect(extractAddress(long)!.length).toBeLessThanOrEqual(200);
+    const r = extractAddress(`12 Oak Ln, ${'A'.repeat(300)}, CO 80202`)!;
+    expect(r.startsWith('12 Oak Ln')).toBe(true);
+    expect(r.length).toBe(200);
+  });
+  test.each([
+    '3 of 5 Drive', '1 inch = 20 ft Way', 'Property line 25 ft setback Rd', '24 x 36 Plan Way', 'Drawn 2024 by John Court',
+  ])('measurement or note text is not an address: %j', t => {
+    expect(extractAddress(t)).toBeNull();
+  });
+  test('lot number is not the house number', () => {
+    expect(extractAddress('Lot 5 12 Oak Ln')).toBe('12 Oak Ln');
+  });
+  test('keeps city tail when no comma after street', () => {
+    expect(extractAddress('12 Oak Ln Denver, CO 80202')).toBe('12 Oak Ln Denver, CO 80202');
+    expect(extractAddress('12 Oak St. Denver, CO 80202')).toBe('12 Oak St. Denver, CO 80202');
+  });
+  test('other real forms still match', () => {
+    expect(extractAddress('12 oak lane')).toBe('12 oak lane');
+    expect(extractAddress('5678 W Maple Ave')).toBe('5678 W Maple Ave');
+    expect(extractAddress('9 N. Main St.')).toBe('9 N. Main St.');
+  });
+  test('label on the preceding line', () => {
+    expect(extractAddress('Surveyor: 99 Office Park Dr\nSite Address:\n12 Oak Ln')).toBe('12 Oak Ln');
+  });
+  test('"Property line" is not a label', () => {
+    expect(extractAddress('1 Aa St\nProperty line\n34 Elm St')).toBe('1 Aa St');
   });
 });
 
