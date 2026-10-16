@@ -9,7 +9,7 @@ import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
-import { startShell, type Shell } from './app-shell';
+import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
 
@@ -192,19 +192,26 @@ const zoomBy = (k: number) => { if (page) applyView(zoomAt(view, k, { x: stageSi
 $('zoom-in').onclick = () => zoomBy(ZOOM_STEP);
 $('zoom-out').onclick = () => zoomBy(1 / ZOOM_STEP);
 
-/** Shows the PDF in the editor; `name` labels the plot plan layer (the plan's address). False if it can't be read. */
-async function openBytes(bytes: ArrayBuffer, name: string): Promise<boolean> {
-  const t0 = performance.now();
-  $('loading').hidden = false; pageEl.hidden = true; sharp.hidden = true;
+let openVersion = 0; // bumped by every open and by leaving the editor: a stale open stops quietly
+/**
+ * Shows the PDF in the editor; `name` labels the plot plan layer (the plan's address). 'failed' leaves
+ * whatever was open before (a failed Replace keeps the current plot plan) and says nothing: the caller does.
+ */
+async function openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult> {
+  const t0 = performance.now(), v = ++openVersion;
+  if (!page) $('loading').hidden = false;
+  let swapped = false; // the page state now describes the new document
   try {
     const mark = (label: string) => console.debug(`[open] ${label}: ${Math.round(performance.now() - t0)} ms`);
     const opened = await pdf.open(bytes);
+    if (v !== openVersion) return 'stale';
     mark('document loaded');
     pageSize = opened.pageSize;
-    page = true;
+    page = true; swapped = true;
     measureStage();
     fitToStage(false);
     await renderBase();
+    if (v !== openVersion) return 'stale';
     mark('page drawn');
     $('loading').hidden = true; pageEl.hidden = false;
     $('name').textContent = name;
@@ -212,12 +219,13 @@ async function openBytes(bytes: ArrayBuffer, name: string): Promise<boolean> {
     renderSharpSoon(0);
     const pages = opened.pageCount > 1 ? ` Showing page 1 of ${opened.pageCount}.` : '';
     toast(`Opened in ${((performance.now() - t0) / 1000).toFixed(1)} s.${pages}`);
-    return true;
+    return 'ok';
   } catch (err) {
+    if (v !== openVersion) return 'stale';
     console.error(err);
-    page = false; $('loading').hidden = true; pageEl.hidden = true; sharp.hidden = true;
-    toast('That file could not be opened as a PDF. Pick the plot plan PDF from the closing documents.');
-    return false;
+    $('loading').hidden = true;
+    if (swapped || !page) { page = false; pageEl.hidden = true; sharp.hidden = true; }
+    return 'failed';
   }
 }
 
@@ -397,7 +405,7 @@ shell = startShell({
   tool,
   openBytes,
   closePage() {
-    page = false; pageEl.hidden = true; sharp.hidden = true; $('loading').hidden = true;
+    openVersion++; page = false; pageEl.hidden = true; sharp.hidden = true; $('loading').hidden = true;
     clearTimeout(toastTimer); $('toast').hidden = true; // an editor message doesn't follow you to Plans
   },
   toast,

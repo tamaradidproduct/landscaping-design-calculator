@@ -3,18 +3,19 @@ import { DevAuthGate, type AuthGate, type AuthState } from './auth';
 import { Autosave } from './autosave';
 import { MemoryPlanStore } from './memory-plan-store';
 import { PlanFormatError, type PlanState } from './plan-model';
-import { AccessDeniedError, PdfUnavailableError, PlanInputError, SizeWarning, type PlanStore } from './plan-store';
+import { AccessDeniedError, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
 import { armFilePicker, planInputMessage, PlansScreen, renderLoading, renderNotInvited, renderSignIn } from './plans-ui';
 
 /** What the shell needs from the editor in main.ts. */
 export interface Editor {
   tool: { load(state: PlanState): void; state(): PlanState };
-  /** Shows the PDF; `name` labels the plot plan layer. False when it can't be read (and it has said so). */
-  openBytes(bytes: ArrayBuffer, name: string): Promise<boolean>;
+  /** Shows the PDF; `name` labels the plot plan layer. 'failed' keeps what was open and shows no message; 'stale': a later open or leaving the editor overtook it. */
+  openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult>;
   /** Hides the plot plan (nothing open) and any editor message. */
   closePage(): void;
   toast(msg: string): void;
 }
+export type OpenResult = 'ok' | 'failed' | 'stale';
 export interface Shell {
   /** ToolHost.changed(): called on every editor update. */
   changed(): void;
@@ -37,7 +38,7 @@ export function startShell(ed: Editor): Shell {
   let openSeq = 0;
 
   const autosave = new Autosave(id => {
-    // Every plan switch flushes first, so the editor still shows this plan
+    // State belongs only to the open plan, and every plan switch flushes first, so any other id is dropped
     if (session && current?.id === id) session.store.save(id, tool.state());
     else console.error('autosave for a plan that is no longer open', id);
   }, 1000);
@@ -73,7 +74,10 @@ export function startShell(ed: Editor): Shell {
       tool.load(state);
       lastSaved = JSON.stringify(tool.state());
       current = { id, address: meta.address };
-      if (!(await ed.openBytes(bytes, meta.address)) && seq === openSeq) backToPlans();
+      if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
+        backToPlans(); // clears the editor's messages, so say why after it
+        toast("This plan's PDF couldn't be opened. Replace the plot plan from a working copy.");
+      }
     } catch (e) {
       if (seq !== openSeq || session?.store !== store) return;
       plans.setOpening(null);
@@ -100,16 +104,18 @@ export function startShell(ed: Editor): Shell {
     armFilePicker(async file => {
       armFilePicker(null);
       if (current !== plan) return;
+      try { checkPdf(file); } catch (e) { if (e instanceof PlanInputError) { toast(planInputMessage(e)); return; } throw e; }
+      // Open it before saving it, so a file that won't render never replaces a working plot plan
+      const opened = await ed.openBytes(await file.arrayBuffer(), plan.address);
+      if (opened === 'stale' || current !== plan) return;
+      if (opened === 'failed') { toast("That file couldn't be opened as a PDF. Pick the plot plan PDF."); return; }
+      $('replace-confirm').hidden = true;
       try {
         await store.replacePdf(plan.id, file);
       } catch (e) {
         if (e instanceof PlanInputError) toast(planInputMessage(e));
         else routeStoreError(e as Error);
-        return;
       }
-      $('replace-confirm').hidden = true;
-      const bytes = await file.arrayBuffer();
-      if (current === plan && !(await ed.openBytes(bytes, plan.address)) && current === plan) backToPlans();
     }).click();
   };
 
