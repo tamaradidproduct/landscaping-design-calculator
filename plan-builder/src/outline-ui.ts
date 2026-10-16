@@ -488,6 +488,7 @@ export class OutlineTool {
       // No corner selected on a surface: the arrows move the whole zone (consecutive nudges undo as one step).
       const now = performance.now(), ln = this.lastNudge;
       if (!(ln && ln.id === z.id && ln.i === -1 && now - ln.t < 1500)) this.record();
+      else this.revision++;
       this.lastNudge = { t: now, id: z.id, i: -1 };
       const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
       z.pts = translate(z.pts, b.x - a.x, b.y - a.y); this.update(); return;
@@ -496,6 +497,7 @@ export class OutlineTool {
     // Consecutive nudges of the same corner undo as one step.
     const now = performance.now(), ln = this.lastNudge;
     if (!(ln && ln.id === c.id && ln.i === c.i && now - ln.t < 1500)) this.record();
+    else this.revision++;
     this.lastNudge = { t: now, id: c.id, i: c.i };
     const s = this.host.toScreen(o.pts[c.i]); // one screen px, whatever the plan's stretch
     o.pts[c.i] = this.host.toPage({ x: s.x + dx, y: s.y + dy });
@@ -509,14 +511,14 @@ export class OutlineTool {
     if (!d) return;
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {
       this.hideTip();
-      if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
+      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       this.dragBefore = null;
       if (!d.moved && d.type === 'side') this.selectedEdge = { id: d.id, i: d.i, fixed: d.fixed }; // a tap opens the side
       if (!d.moved && d.type === 'move') { this.tap(d.start); return; }
       this.update(); return;
     }
     if (d.type === 'bend') {
-      if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
+      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       else this.selectedEdge = { id: d.id, i: d.i, fixed: 0 }; // a tap on the handle opens the edge
       this.dragBefore = null; this.dragAt = null; this.snapped = null; this.update(); return;
     }
@@ -529,7 +531,7 @@ export class OutlineTool {
       if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs))) {
         this.lastTap = null; this.dragAt = null; this.close(); return;
       }
-      if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
+      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       this.dragBefore = null;
       this.dragAt = null; this.snapped = null; this.update(); return;
     }
@@ -795,6 +797,7 @@ export class OutlineTool {
     const t = performance.now(), ln = this.lastNudge, key = -2 - i;
     if (!(steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500)) this.record();
     if (steps) this.lastNudge = { t, id, i: key };
+    if (steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500) this.revision++;
     o.radii = o.pts.map((_, k) => k === i ? feet / c.ftPerPt : o.radii?.[k] ?? 0);
     this.update();
   }
