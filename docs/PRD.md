@@ -23,7 +23,7 @@
 ## 4. Workflow
 1. **Open the plot plan** — contractor picks the PDF on site. 🔨 Step 1
 2. **Outline, then set the scale** — trace the plot boundary or a structure, type one printed edge length; other edges and the lot area confirm it. 🔨 Steps 2a–2c
-3. **Draw the design** — fill zones with materials (lot starts as one default material; zones carve into it), drop plants/objects from the library, mark existing features, edging/walls as lines, plant-spacing fill, dimension labels. ❓ to be defined step by step
+3. **Draw the design** — fill zones with materials (🔨 Step 4: Surfaces, stage 1 — see §6.8; 📝 later: the lot starts as one default material and zones carve into it), drop plants/objects from the library, mark existing features, edging/walls as lines, plant-spacing fill, dimension labels. ❓ to be defined step by step
 4. **Price** from the contractor's own price list. ⏸ deferred
 5. **Present** — plan sheet first, then the price. **Send a PDF.**
 - After the first proposal (versions, tiers, crew sheets): 📝 later.
@@ -37,7 +37,9 @@
 | — | Undo/redo (⌘Z / ⇧⌘Z, toolbar buttons), including dots of an unfinished outline | 🔨 done | `feat/plan-builder` |
 | 2c | Curved edges: drag an edge's middle handle to bend it into an arc; "Make straight"; lengths and area follow the curve | 🔨 done, in review | `feat/plan-builder-2c-curves` |
 | 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
-| 4+ | Material zones, plant symbols, edging/walls… | ❓ | — |
+| 4 | Surfaces, stage 1: material zones (hardscape + softscape), solid fills, resize by typed edge length | 🔨 done, in review | `feat/material-zones` |
+| 4b | Surfaces stage 2 (Width × Depth for rectangles), stage 3 (move one corner) | 📝 next | — |
+| 5+ | Plant symbols, objects, edging/walls… | ❓ | — |
 
 ## 6. Current requirements, by area
 ### 6.1 Viewing the plan ✅🔨
@@ -45,8 +47,9 @@
 - Opens in about a second once the app has warmed up. Rendering uses **PDFium** (WebAssembly): PDF.js took ~12 s on a real plan whose text is drawn as shapes.
 - Pinch/scroll-pinch zooms; one finger or two-finger trackpad drag pans; **panning is free** (not limited to the page). Double-tap zooms in / back to fit.
 - Works **offline** after the first load.
-- 🔨 **Plot plan layer** at the bottom of the Layers panel: **eye** shows/hides the plan (hidden = no snapping to its lines), the **file name** with a pencil opens a different plot plan, and an **opacity** slider (10–100%). Resets to shown, 100% on opening a file. ("Open another" removed.)
+- 🔨 **Plot plan layer** at the end of the **Outlines** section (it collapses with it): **eye** shows/hides the plan (hidden = no snapping to its lines), the **file name** with a pencil opens a different plot plan, and an **opacity** slider (10–100%). Resets to shown, 100% on opening a file. ("Open another" removed.)
 - 🔨 **Side panel** on the right (always docked, 280 px), top to bottom: **Undo / Redo** · **zoom − / + / Fit page** · **Layers**. Layers has an **Outlines** section: one row per outline (tap a feature's row to select it), then suggestions while missing — **Plot boundary**, **House**, **Custom outline…** (quick picks: Driveway, Patio, Porch, Walk, Deck, Garage, Shed, Pool, or type a name). Sections by trade come later.
+- 🔨 **Collapsible Layers sections:** **Surfaces** (above) and **Outlines** each have a header with a chevron; collapsed, it shows the count (Outlines = the plot boundary + features, not the plot plan; Surfaces = zones). Open/closed is remembered on the device. Selecting a layer on the plan or starting to draw one opens its section; it can be collapsed again while still selected.
 - 🔨 **Snap toggle** sits in the floating bar at the bottom of the plan (beside Freehand | Rectangle), shown only while drawing an outline or with a finished outline's corner, edge or feature selected.
 - 🔨 **Rectangle tool.** While an outline is being drawn, a floating bar at the bottom of the plan offers **Freehand | Rectangle** (with the Snap toggle beside it); **X** switches; the choice is remembered on the device. The pointer shows which tool is on: Freehand = a dot; Rectangle = a ⌐ corner mark and dashed guide lines across the plan through the pointer (also while dragging, so they show where the edges will run); the cursor is a crosshair while drawing. **Rectangle:** drag from one corner to the opposite one (or tap one corner, then the other); the result is square to the plan and closes itself as a normal 4-corner outline (editable, bendable, Square works). Each end snaps like any corner; Shift makes it a square. Switching tools after starting starts the outline over (⌘Z brings the corners back). Angled shapes: use Freehand.
 - 🔨 **Overlapping layers cut each other by layer order.** A layer higher in Layers cuts the ones below it: each layer keeps the shape as drawn, but is shown, tapped and (later) measured by its **visible part** only. New layers go to the bottom, so a porch rectangle drawn after the house loses the part under the house — except one drawn **wholly inside** another, which goes just above it so it isn't hidden. **Layer order ↑ ↓** in the card changes it. A selected layer also shows its whole drawn outline dashed. A layer wholly under another can't be tapped on the plan; select it from its row. Most overlaps are meant this way; 📝 later: layers that sit over others without cutting them (a raised deck or balcony over hardscape/softscape).
@@ -104,12 +107,26 @@
 - 🔨 Undo/redo covers naming, renaming, deleting and redrawing.
 - 📝 Small features: at low zoom the edge-bend handles can cover the middle, so a tap bends/opens an edge instead of selecting — zoom in, or revisit hit priority later.
 
+### 6.8 Surfaces (Step 4) ✅🔨
+- The contractor adds the **new work** as zones filled with a material. Stage 1 is **visual only** (no quantities yet).
+- **Materials:** a built-in starter list, each with a flat colour + simple pattern — Hardscape: Gravel, Pavers, Flagstone, Brushed concrete, Stamped concrete, Decking; Softscape: Sod, Artificial turf, Mulch, River rock, Decorative rock. Kept as data so library textures can replace the look later.
+- **Layers:** a **Surfaces** section (hardscape and softscape together) **above Outlines**; Objects & plants will sit between them later.
+- **Clipping:** the plot boundary clips zones; **existing features (Outlines) always cut zones**, whatever was drawn first; within Surfaces a higher zone cuts lower ones; Layer order ↑ ↓ stays within the section; a zone drawn wholly inside another zone goes just above it.
+- **Starting a zone:** only once the plot boundary is closed. **Add surface…** → pick a material → draw with Freehand or Rectangle (same tool, snapping, curves, Square, undo). Zones also snap to other outlines' **edges**, so a bed can share the lawn's edge.
+- **Card:** rename in place (default name = material), **change material** (renames only a zone still named after its material), Square all corners, Redo outline, Delete, Layer order.
+- **Look:** **solid** fill when unselected; **see-through** while selected or being drawn. **No name label on the plan** (the fill says what it is; the row names it). The plot boundary is drawn as its line only — no tint — so the plan shows through untouched.
+- **Edge lengths are reversed for zones:** typing a length on a zone edge **resizes the zone** — it stretches along that edge from the end that stays put (the corner nearer the tap, marked on the plan; Swap switches). A rectangle stays square; on a curved edge the length is along the curve; sizes are true sizes on a stretched plan. Zones never change the scale; before a scale exists the popover says to set it on an outline edge first.
+- 🔨 **Editing a selected zone:** drag **inside** to move it (arrow keys too, when no corner is selected); drag a **side** to push it in or out (its neighbours follow, so a rectangle stays a rectangle); the middle square still **curves** the side. **Round corners:** select a corner and type a radius in its chip, or drag the round handle on the corner; **Round all corners** in the card. A side shows a two-way arrow pointer across it (like design tools); hovering near a corner's drawn line (its arc, once rounded) shows its round handle, which then sits on the arc; a side reacts only along its drawn straight part, and the corner dots take a tighter area; with the corner's radius field focused, ↑ ↓ step it by 0.5′ (Shift 2′), and a run of steps undoes as one. The card shows the material as one line with **Change**, which opens the picker in place. Hovering says what a drag would do ("Drag to move", "Drag to move the side · 12.00′", "Drag to curve the side", "Drag to round the corner"). The zone's name in its card shows as an underlined field with a pencil, so it's clearly renameable.
+- 🔨 **Snap is off by default for surfaces** (designed, not traced) and on for outlines; the Snap toggle switches the one for what's being drawn or edited.
+- 📝 Next: **Width × Depth** fields for Rectangle zones (stage 2); **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, library textures, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
+
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')
 - Scale from the 116.45′ top edge → left edge **138.30′** vs printed 138.31′ (−0.01%).
 - Street curve bent onto the drawing → **62.03′** vs printed L = 62.02′.
 - Lot area with the curve → **13,597 sq ft** vs printed 13,504 (+0.7%).
 - Snapping: taps ~9 px off the three test corners landed 0.4–1.8 px from the drawn corner; ~79% of 24 real-pixel samples land within 2.5 px (misses in dense hatching).
 - Step 3: house (10 corners), driveway and porch marked; porch inside the house selects on tap; rename, delete, undo/redo and redraw-then-cancel all behave (`scripts/check-step3.mjs`).
+- Surfaces (`scripts/check-surfaces.mjs`): a 12′ pavers edge typed to 16′ → 16.00′ with the fixed corner unmoved and the far side unchanged; ⌘Z back to 12′; a house drawn after the sod cuts a hole in it; a material change is one undo step; the boundary's 100′ reference edge still reads 100.00′ after resizing zones.
 - Not yet tested with real touch on a tablet.
 
 ## 8. Open questions

@@ -4,7 +4,8 @@
 // panel over the plan).
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerOrder, layerRow, nudgePad, splitRow, suggestRow } from './ui';
+import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
+import { button, caption, chips, esc, hint, input, label, layerCard, layerForm, layerRow, nudgePad, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
   private naming = false; // the custom-feature name form is open
@@ -18,7 +19,7 @@ export class OutlinesSection {
     const s = outlineSuggestions(all);
     const ordered = [...all.filter(o => o.kind === 'boundary'), ...all.filter(o => o.kind === 'feature')];
     const rows = ordered.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o) : layerRow(o.name, {
-      swatch: o.kind, data: { layer: o.id },
+      swatch: swatchOf(o), data: { layer: o.id },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
     const scaleHint = !t.cal && all.some(o => o.closed) && !t.drawing
@@ -62,55 +63,21 @@ export class OutlinesSection {
 
   /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, nudge, Square all, Redo, Delete. */
   private card(o: Outline): string {
-    const t = this.tool, compact = ['compact'], nudge = t.cornerSelected ? nudgePad() : '';
-    if (o.id === t.drawing) {
-      const n = o.pts.length, what = `<b>${esc(o.kind === 'boundary' ? 'plot boundary' : o.name)}</b>`;
-      const step = t.shape === 'rect'
-        ? (n ? 'Now drag or tap to the opposite corner.' : `Drag from one corner of the ${what} to the opposite corner.`)
-        : n >= 3 ? `${n} corners. Tap the first corner or double-tap to finish.` : `Tap each corner of the ${what} · ${n} placed`;
-      return layerCard({ id: o.id, swatch: o.kind, name: o.name, meta: 'Drawing…', body: `${hint(step)}${nudge}${layerActions(
-        t.shape === 'rect' ? '' : button('Close shape', { variant: 'primary', mods: compact, disabled: n < 3, data: { act: 'close' } }),
-        button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
-    }
+    const t = this.tool;
+    if (o.id === t.drawing) return drawingCard(t, o, swatchOf(o), o.kind === 'boundary' ? 'plot boundary' : o.name);
+    const feature = o.kind === 'feature';
     return layerCard({
-      id: o.id, swatch: o.kind, name: o.name, done: true, rename: o.kind === 'feature',
+      id: o.id, swatch: swatchOf(o), name: o.name, done: true, rename: feature,
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
-      body: `${nudge}${layerActions(
-        button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
-        button('Redo outline', { mods: compact, data: { act: 'redraw' } }),
-        o.kind === 'feature' ? button('Delete', { variant: 'danger', mods: compact, data: { act: 'delete' } }) : '')}${o.kind === 'feature' ? this.order(o.id) : ''}`,
+      body: `${t.cornerSelected ? nudgePad() : ''}${editActions(feature)}${feature ? orderControl(t, o.id) : ''}`,
     });
-  }
-  /** Layer order ↑ ↓: higher layers cut the ones below them. */
-  private order(id: string): string {
-    const p = this.tool.layerPosition(id);
-    return p.first && p.last ? '' : layerOrder(p.first, p.last);
   }
   private wireCard() {
-    const t = this.tool, card = this.el.querySelector<HTMLElement>('[data-card]'); if (!card) return;
-    const id = card.dataset.card!;
-    const act: Record<string, () => void> = {
-      close: () => t.close(), cancel: () => t.cancel(), collapse: () => t.selectOutline(null),
-      'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteFeature(id),
-      up: () => t.moveLayer(id, -1), down: () => t.moveLayer(id, 1),
-    };
-    card.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(b => { b.onclick = act[b.dataset.act!]; });
-    card.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(b => {
-      b.onclick = () => { const [dx, dy] = b.dataset.nudge!.split(',').map(Number); t.nudge(dx, dy); };
-    });
-    // Tapping the head (not its name field or buttons) closes the card, like tapping a row again.
-    card.querySelector<HTMLElement>('.layer-head')!.onclick = e => {
-      if (!(e.target as Element).closest('input, button') && !t.drawing) t.selectOutline(null);
-    };
-    const rename = card.querySelector<HTMLInputElement>('#outline-rename');
-    if (rename) {
-      rename.onchange = () => t.renameFeature(id, rename.value);
-      rename.onkeydown = e => {
-        if (e.key === 'Enter') rename.blur();
-        else if (e.key === 'Escape') { rename.value = t.outlines[id]?.name ?? rename.value; rename.blur(); }
-      };
-    }
+    const card = this.el.querySelector<HTMLElement>('[data-card]');
+    if (card) wireLayerCard(card, this.tool);
   }
 }
 
+/** A row's swatch: the outline kind, or a surface's material. */
+const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material! } : o.kind;
 const areaText = (sqft: number | null) => sqft === null ? undefined : formatArea(sqft);

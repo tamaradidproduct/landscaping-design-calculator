@@ -47,23 +47,35 @@
         </section>
         <section class="side-section layers">
           <h2 class="side-title">Layers</h2>
-          <h3 class="side-subtitle">Outlines</h3>
-          <div class="layer-list" id="outlines"></div>
-          <div class="plan-layer">
-            <h3 class="side-subtitle">Plot plan</h3>
-            <div class="layer-item">
-              <button type="button" class="icon" id="plan-visible" aria-pressed="true" aria-label="Hide the plot plan" title="Hide the plot plan">
-                <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
-              </button>
-              <button type="button" class="layer-row" id="file-button" title="Open a different plot plan">
-                <span class="layer-name" id="name"></span>
-                <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg>
-              </button>
-            </div>
-            <div class="field-row">
-              <label class="text-label" for="plan-opacity">Opacity</label>
-              <input type="range" id="plan-opacity" min="10" max="100" step="5" value="100" />
-              <span class="text-figure" id="plan-opacity-value">100%</span>
+          <button type="button" class="group-head" data-group="surfaces" aria-expanded="true" aria-controls="group-surfaces">
+            <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+            <span class="group-title">Surfaces</span><span class="group-count" hidden></span>
+          </button>
+          <div class="group-body" id="group-surfaces">
+            <div class="layer-list" id="surfaces"></div>
+          </div>
+          <button type="button" class="group-head" data-group="outlines" aria-expanded="true" aria-controls="group-outlines">
+            <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+            <span class="group-title">Outlines</span><span class="group-count" hidden></span>
+          </button>
+          <div class="group-body" id="group-outlines">
+            <div class="layer-list" id="outlines"></div>
+            <div class="plan-layer">
+              <h3 class="side-subtitle">Plot plan</h3>
+              <div class="layer-item">
+                <button type="button" class="icon" id="plan-visible" aria-pressed="true" aria-label="Hide the plot plan" title="Hide the plot plan">
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+                </button>
+                <button type="button" class="layer-row" id="file-button" title="Open a different plot plan">
+                  <span class="layer-name" id="name"></span>
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg>
+                </button>
+              </div>
+              <div class="field-row">
+                <label class="text-label" for="plan-opacity">Opacity</label>
+                <input type="range" id="plan-opacity" min="10" max="100" step="5" value="100" />
+                <span class="text-figure" id="plan-opacity-value">100%</span>
+              </div>
             </div>
           </div>
         </section>

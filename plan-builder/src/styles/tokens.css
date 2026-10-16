@@ -25,6 +25,18 @@
   --color-feature-ink: #1e2422; /* Feature name on its fill (6.8:1 light, 5.4:1 dark). */
   --color-snap: #d0349a; /* The point being placed: ring, crosshair, magnifier crosshair, snap marks and their labe… */
   --color-guide: #0b8f6a; /* Hints that never snap: 90° corner mark, "Straight", dashed alignment lines. */
+  --color-material-sod: #7fae5b; /* Sod surface fill (with its pattern). */
+  --color-material-turf: #4fae3e; /* Artificial turf surface fill (with its pattern). */
+  --color-material-mulch: #8a5a3b; /* Mulch surface fill (with its pattern). */
+  --color-material-river-rock: #8d9ba8; /* River rock surface fill (with its pattern). */
+  --color-material-decorative-rock: #c7b28b; /* Decorative rock surface fill (with its pattern). */
+  --color-material-gravel: #bcb9b1; /* Gravel surface fill (with its pattern). */
+  --color-material-pavers: #a68d7b; /* Pavers surface fill (with its pattern). */
+  --color-material-flagstone: #c9a676; /* Flagstone surface fill (with its pattern). */
+  --color-material-concrete-brushed: #d4d4cf; /* Brushed concrete surface fill (with its pattern). */
+  --color-material-concrete-stamped: #cdbfa8; /* Stamped concrete surface fill (with its pattern). */
+  --color-material-decking: #9a6a44; /* Decking surface fill (with its pattern). */
+  --color-material-shade: #000000; /* Mixed into a material colour (at mix-material-edge) for its pattern marks and a zone's… */
 
   /* ---------- Type scale ---------- */
   --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -46,7 +58,7 @@
 
   /* ---------- Space ---------- */
   --space-1: 2px; /* Focus-ring offset. */
-  --space-2: 4px; /* Smallest step of the spacing scale (nothing uses it right now). */
+  --space-2: 4px; /* Smallest step of the spacing scale: the gap between a material chip's swatch and name. */
   --space-3: 6px; /* Chip and nudge gaps; label-to-field gap; tip vertical padding. */
   --space-4: 8px; /* Default row gap; layer-list and layer-card gaps; layer-card top padding. */
   --space-5: 10px; /* Card inner gap; tip horizontal padding; layer-row and layer-card side padding; layer-fo… */
@@ -81,6 +93,7 @@
   --width-card: 320px; /* Popover width (capped to the screen). */
   --width-sidebar: 280px; /* Side panel on the right (history, view, layers). */
   --width-swatch: 14px; /* Colour swatch at the start of a layer row. */
+  --width-field-inline: 60px; /* A short field inside a chip (a corner's radius, "Round [ 2 ]"). */
   --width-icon: 16px; /* Inline line icon (the eye and pencil on the Plot plan layer). */
 
   /* ---------- Plan overlay: strokes ---------- */
@@ -97,8 +110,9 @@
   --opacity-feature-fill-selected: 0.7; /* Selected existing feature. */
   --opacity-edge-highlight: 0.55; /* Edge highlight. */
   --opacity-handle: 0.85; /* Bend handles. */
-  --mix-shape-fill: 10%; /* Tint inside a closed boundary (its colour mixed with transparent). */
   --mix-snap-halo: 18%; /* Disc behind a snapped point. */
+  --mix-material-edge: 65%; /* How much of the material colour stays when shading it with color-material-shade for pat… */
+  --opacity-surface-editing: 0.5; /* Fill of the selected surface or the one being drawn, so the plan shows through. */
 
   /* ---------- Layout and misc ---------- */
   --z-toast: 5; /* Toast: above the plan, the panel and popovers (it never takes taps). */

@@ -3,6 +3,9 @@ import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
+import { SurfacesSection } from './surfaces-ui';
+import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
+import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
@@ -12,6 +15,8 @@ registerSW({ immediate: true });
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage'), pageEl = $('page'), base = $<HTMLCanvasElement>('base'), sharp = $<HTMLCanvasElement>('sharp');
 const fileInput = $<HTMLInputElement>('file');
+// Surface fill patterns, defined once for the plan overlay and the Layers swatches.
+document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs></svg>`);
 const pdf = new PdfClient();
 pdf.warmup();
 
@@ -30,6 +35,7 @@ const shown = (): Size => ({ w: pageSize.w * correction.a, h: pageSize.h * corre
 const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale });
 
 // ---------- Outline tool (Step 2a) ----------
+let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
@@ -62,8 +68,11 @@ const tool = new OutlineTool({
     ($('redo') as HTMLButtonElement).disabled = !canRedo;
   },
   changed() {
+    surfaces?.render();
     outlines?.render();
+    updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
+    showSnap();
     $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
     stage.classList.toggle('drawing', !!tool.drawing);
     $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === tool.shape)));
@@ -96,8 +105,35 @@ const tool = new OutlineTool({
     return out;
   },
 }, stage);
+// Collapsible Layers sections: the open/closed state is remembered on this device; a collapsed header shows its count.
+const GROUPS_KEY = 'plan-builder.sections';
+const groupsOpen = readOpen((() => { try { return localStorage.getItem(GROUPS_KEY); } catch { return null; } })());
+let activeLayer: string | null = null; // the layer being drawn, else selected — its section opens when it changes
+function setGroupOpen(g: Group, open: boolean) {
+  groupsOpen[g] = open;
+  try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ }
+  updateGroups();
+}
+function updateGroups() {
+  const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
+  activeLayer = next;
+  if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
+  const counts = groupCounts(Object.values(tool.outlines));
+  document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
+    const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
+    b.setAttribute('aria-expanded', String(isOpen));
+    $(`group-${g}`).hidden = !isOpen;
+    count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
+  });
+}
+document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
+  b.onclick = () => setGroupOpen(b.dataset.group as Group, !groupsOpen[b.dataset.group as Group]);
+});
+surfaces = new SurfacesSection($('surfaces'), tool);
+surfaces.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
+updateGroups();
 
 // Dev only: lets scripts capture what snapping sees, to turn real plans into regression tests.
 if (import.meta.env.DEV) (window as unknown as { __sample: unknown }).__sample = (x: number, y: number, n: number) => Array.from(tool['host'].sampleLuminance({ x, y }, n) ?? []);
@@ -125,12 +161,12 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); pickShape(tool.shape === 'rect' ? 'freehand' : 'rect');
 });
 
-$('snap').onclick = () => {
-  tool.snapOn = !tool.snapOn;
+// Snap is kept separately for tracing outlines (on by default) and designing surfaces (off by default).
+const showSnap = () => {
   $('snap').setAttribute('aria-pressed', String(tool.snapOn));
   $('snap').textContent = tool.snapOn ? 'Snap on' : 'Snap off';
-  tool.update();
 };
+$('snap').onclick = () => { tool.snapOn = !tool.snapOn; showSnap(); tool.update(); };
 
 const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 

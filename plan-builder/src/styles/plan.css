@@ -8,7 +8,7 @@
 /* Overlay. Shapes take their colour from --c (set per outline kind: --color-boundary / --color-feature). */
 .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .overlay .shape { fill: none; stroke: var(--c); stroke-width: var(--stroke-bold); stroke-linejoin: round; }
-.overlay .shape.closed { fill: color-mix(in srgb, var(--c) var(--mix-shape-fill), transparent); fill-rule: evenodd; }
+.overlay .shape.closed { fill: none; fill-rule: evenodd; } /* the plot boundary is only its line: the plan shows through untouched */
 /* The whole drawn outline of a selected layer, where higher layers or the lot edge hide part of it */
 .overlay .shape.drawn { fill: none; stroke: var(--color-feature); stroke-width: var(--stroke-hairline); stroke-dasharray: var(--dash-guide); }
 .overlay .shape.feature.closed { fill: var(--color-feature-fill); fill-opacity: var(--opacity-feature-fill); stroke: var(--color-feature-stroke); stroke-width: var(--stroke-hairline); }
@@ -42,3 +42,10 @@
 /* Hints (never snap): right angle, straight on, aligned with another corner */
 .overlay .guide-angle { fill: none; stroke: var(--color-guide); stroke-width: var(--stroke-regular); }
 .overlay .guide-line { stroke: var(--color-guide); stroke-width: var(--stroke-hairline); stroke-dasharray: var(--dash-guide); }
+.overlay .fixed-end { fill: none; stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
+/* Surfaces: solid material fill (colour + pattern, set inline) with a darker edge; see-through while selected or drawn. */
+.overlay .shape.surface { stroke: color-mix(in srgb, var(--c) var(--mix-material-edge), var(--color-material-shade)); stroke-width: var(--stroke-hairline); }
+.overlay .shape.surface.closed { fill-opacity: 1; }
+.overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
+/* Surfaces: the round-corner handle on the selected corner's bisector */
+.overlay .round-handle { fill: var(--color-paper); stroke: var(--color-accent); stroke-width: var(--stroke-bold); }

@@ -5,7 +5,7 @@
 import type * as Clip from 'polygon-clipping';
 // The package ships a default export; its types only declare the named functions, so cast once here.
 import clipDefault from 'polygon-clipping';
-import { areaPt2, insidePolygon, labelPoint, outlinePath, type Outline } from './outline';
+import { areaPt2, cutOrder, insidePolygon, labelPoint, outlinePath, sectionOf, type Outline } from './outline';
 import type { Point } from './view';
 
 const clip = clipDefault as typeof Clip;
@@ -14,14 +14,17 @@ const clip = clipDefault as typeof Clip;
 export type Shape = Clip.MultiPolygon;
 
 const ring = (o: Outline): Clip.Ring => {
-  const pts = outlinePath(o.pts, o.bulges, true).map((p): Clip.Pair => [p.x, p.y]);
+  const pts = outlinePath(o.pts, o.bulges, true, o.radii).map((p): Clip.Pair => [p.x, p.y]);
   return [...pts, pts[0]];
 };
 const toPoints = (r: Clip.Ring): Point[] => r.slice(0, -1).map(([x, y]) => ({ x, y }));
 
-/** The visible part of every closed layer but the boundary, by id, in layer order (`outlines` listed top first). */
+/**
+ * The visible part of every closed layer but the boundary, by id, in cutting order: existing features (Outlines)
+ * cut every surface; within a section, a layer listed earlier (higher) cuts later ones.
+ */
 export function visibleShapes(outlines: Outline[]): Map<string, Shape> {
-  const closed = outlines.filter(o => o.closed && o.pts.length >= 3);
+  const closed = cutOrder(outlines).filter(o => o.closed && o.pts.length >= 3);
   const lot = closed.find(o => o.kind === 'boundary');
   const out = new Map<string, Shape>(), above: Clip.Polygon[] = [];
   for (const o of closed) {
@@ -40,12 +43,12 @@ export function visibleShapes(outlines: Outline[]): Map<string, Shape> {
 }
 
 /**
- * The ids of the layers (not the boundary) whose drawn shape wholly contains `o`'s, in layer order. A new layer
+ * The ids of the layers of `o`'s own section whose drawn shape wholly contains `o`'s, in layer order. A new layer
  * drawn inside one of these goes above it, so it isn't hidden the moment it's finished.
  */
 export function containers(o: Outline, outlines: Outline[]): string[] {
   const inner: Clip.Polygon = [ring(o)];
-  return outlines.filter(c => c.id !== o.id && c.kind !== 'boundary' && c.closed && c.pts.length >= 3).filter(c => {
+  return outlines.filter(c => c.id !== o.id && c.kind !== 'boundary' && sectionOf(c.kind) === sectionOf(o.kind) && c.closed && c.pts.length >= 3).filter(c => {
     try { return shapeArea(clip.difference(inner, [ring(c)])) < 1e-6 * Math.max(1, shapeArea([inner])); } catch { return false; }
   }).map(c => c.id);
 }

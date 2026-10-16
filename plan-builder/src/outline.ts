@@ -1,8 +1,10 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
+import type { MaterialId } from './materials';
+import { cornerArc } from './shape-edit';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
-export type OutlineKind = 'boundary' | 'feature';
+export type OutlineKind = 'boundary' | 'feature' | 'surface';
 /** Common existing features, offered as one-tap names; the contractor can type any name. */
 export const FEATURE_PRESETS = ['House', 'Driveway', 'Patio', 'Porch', 'Walk', 'Deck', 'Garage', 'Shed', 'Pool'];
 /** Presets suggested on their own row in the Layers panel (the rest are quick picks behind "Custom outline…"). */
@@ -13,7 +15,33 @@ const SUGGESTED_FEATURES = ['House'];
  * bulges[i] bends edge i into a circular arc: the arc's midpoint sits bulges[i] PDF points off the
  * chord's midpoint, along the chord's left normal. 0 or missing = straight.
  */
-export interface Outline { id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; }
+export interface Outline {
+  id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId;
+  /** Corner radii in page points (surfaces only; 0 or missing = sharp). */
+  radii?: number[];
+}
+
+/** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
+export type Section = 'lot' | 'outlines' | 'surfaces';
+export const sectionOf = (kind: OutlineKind): Section => kind === 'boundary' ? 'lot' : kind === 'feature' ? 'outlines' : 'surfaces';
+const SECTION_RANK: Record<Section, number> = { lot: 0, outlines: 1, surfaces: 2 };
+
+/** The order layers cut each other in: the boundary, then every outline, then every surface (each in its own order). */
+export const cutOrder = (outlines: Outline[]): Outline[] =>
+  outlines.map((o, k) => ({ o, k })).sort((a, b) => SECTION_RANK[sectionOf(a.o.kind)] - SECTION_RANK[sectionOf(b.o.kind)] || a.k - b.k).map(x => x.o);
+
+/** `ids` with `id` swapped with its nearest neighbour of the same section (dir −1 = up); null at the section's end. */
+export function moveInSection(ids: string[], outlines: Record<string, Outline>, id: string, dir: -1 | 1): string[] | null {
+  const o = outlines[id]; if (!o || o.kind === 'boundary') return null;
+  const same = ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind));
+  const at = same.indexOf(id), other = same[at + dir]; if (at < 0 || !other) return null;
+  return ids.map(k => k === id ? other : k === other ? id : k);
+}
+/** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
+export function sectionPosition(ids: string[], outlines: Record<string, Outline>, id: string) {
+  const o = outlines[id], same = o ? ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)) : [];
+  return { first: same[0] === id, last: same[same.length - 1] === id };
+}
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 /** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,
@@ -79,10 +107,17 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
   return out;
 }
 
-/** The outline as a dense polyline (arcs sampled). */
-export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean): Point[] {
-  const out: Point[] = [], edges = closed ? pts.length : pts.length - 1;
-  for (let i = 0; i < edges; i++) out.push(...edgePoints(pts[i], pts[(i + 1) % pts.length], bulges?.[i] ?? 0));
+/**
+ * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points); a
+ * corner next to a bent edge stays sharp.
+ */
+export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean, radii?: number[]): Point[] {
+  const out: Point[] = [], n = pts.length, edges = closed ? n : n - 1;
+  for (let i = 0; i < edges; i++) {
+    const arc = closed && radii?.[i] && !bulges?.[i] && !bulges?.[(i - 1 + n) % n] ? cornerArc(pts, i, radii[i]) : null;
+    const edge = edgePoints(pts[i], pts[(i + 1) % n], bulges?.[i] ?? 0);
+    out.push(...(arc ?? [pts[i]]), ...edge.slice(1));
+  }
   if (!closed && pts.length) out.push(pts[pts.length - 1]);
   return out;
 }
@@ -193,3 +228,30 @@ export function labelPoint(pts: Point[]): Point {
   for (let i = 0; i + 1 < xs.length; i += 2) if (xs[i + 1] - xs[i] > w) { w = xs[i + 1] - xs[i]; best = { x: (xs[i] + xs[i + 1]) / 2, y: c.y }; }
   return best;
 }
+
+/** The closest point to p on a closed ring of points (its closing edge included), and how far it is. */
+export function nearestOnRing(ring: Point[], p: Point): { point: Point; d: number } {
+  let best = { point: ring[0], d: Infinity };
+  ring.forEach((a, k) => {
+    const b = ring[(k + 1) % ring.length], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+    const q = { x: a.x + t * dx, y: a.y + t * dy }, d = dist(q, p);
+    if (d < best.d) best = { point: q, d };
+  });
+  return best;
+}
+
+/**
+ * The order an edge tap tries layers in: the selected layer first, then outlines (they sit on top), then
+ * surfaces from the top, then the plot boundary — so a zone edge lying on the lot line opens the zone's edge.
+ */
+export function edgeTapOrder(outlines: Outline[], selected: string | null): Outline[] {
+  const order = cutOrder(outlines), lot = order.filter(o => o.kind === 'boundary');
+  const rest = [...order.filter(o => o.kind !== 'boundary'), ...lot];
+  return [...rest.filter(o => o.id === selected), ...rest.filter(o => o.id !== selected)];
+}
+/** What a point being placed may snap to: tracing the boundary or a feature ignores designed surfaces. */
+export const snapSources = (outlines: Outline[], editing: OutlineKind | null): Outline[] =>
+  editing === 'boundary' || editing === 'feature' ? outlines.filter(o => o.kind !== 'surface') : outlines;
+/** A corner radius typed in feet: empty or zero means a sharp corner (0); null when it can't be read. */
+export const parseRadius = (v: string): number | null => /^\s*0*\.?0*\s*['′]?\s*$/.test(v) ? 0 : parseFeet(v);
