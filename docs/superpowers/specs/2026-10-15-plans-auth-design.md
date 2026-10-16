@@ -18,6 +18,7 @@
 | Who sees what | Each user sees **only their own plans**; no sharing |
 | Offline | Full offline: open, edit and create plans offline after one online sign-in on that device |
 | Plan storage | **One Firestore doc per plan** (state) + the plot plan PDF in **Cloud Storage** |
+| Replacing the PDF | Allowed from the editor (e.g. a revised survey). Outlines, surfaces and typed lengths are **kept as they are**; the contractor re-checks them against the new plan |
 | Saving | Autosave ~1 s after each change; no Save button |
 | Conflicts | Last write wins per plan (single owner; only bites when one plan is edited offline on two devices) |
 | Environments | One Firebase project for local dev, staging and production |
@@ -36,7 +37,7 @@
 | `address` | string | The job's address; the plan's name in the list (1–200 chars) |
 | `createdAt` | number | Client ms epoch |
 | `updatedAt` | number | Client ms epoch; the list sorts on it (works offline, unlike server timestamps) |
-| `pdf` | map | `{ name: string, size: number, uploaded: boolean }` |
+| `pdf` | map | `{ name: string, size: number, rev: number, uploaded: boolean }` — `rev` goes up by 1 on each replace |
 | `outlines` | map | `Record<id, Outline>` — boundary, features and surfaces, exactly the editor's model |
 | `refs` | array | `Reference[]` — typed edge lengths; the scale and stretch correction are recomputed from them on open |
 
@@ -45,11 +46,11 @@
 - Doc limit is 1 MB. The Riesberg fixture is measured in the plan; the editor shows a warning toast above 800 KB.
 
 ### 3.2 Cloud Storage
-- `users/{uid}/plans/{planId}/plan.pdf` — written once when the plan is created; never replaced (a different PDF = a new plan).
+- `users/{uid}/plans/{planId}/plan.pdf` — written when the plan is created and overwritten when the PDF is replaced; only the latest PDF is kept.
 
 ### 3.3 On-device
 - Firestore persistent cache (IndexedDB, multi-tab) holds plan docs and queued writes.
-- `pdf-cache` (own small IndexedDB store, keyed by `planId`) holds PDF bytes: filled on create and on first download, so a plan opened once opens offline.
+- `pdf-cache` (own small IndexedDB store, keyed by `planId`) holds `{ rev, bytes }`: filled on create, replace and first download, so a plan opened once opens offline. A cached `rev` older than the doc's → download again.
 - `localStorage` remembers "this uid was invited" so an offline start skips the invite check.
 
 ## 4. Security rules
@@ -59,7 +60,7 @@
   - `users/{uid}/plans/{planId}`: read/write only when `invited()` and `uid == request.auth.uid`; writes must carry `v == 1` and a string `address` of 1–200 chars (Firestore enforces the 1 MB doc limit itself).
   - Everything else denied.
 - **Storage** (`storage.rules`):
-  - `users/{uid}/plans/{planId}/plan.pdf`: read/write only for the owner, when `firestore.exists` finds their invite; `contentType == 'application/pdf'`, size ≤ 25 MB; no overwrite (create only) and delete allowed.
+  - `users/{uid}/plans/{planId}/plan.pdf`: read/write only for the owner, when `firestore.exists` finds their invite; `contentType == 'application/pdf'`, size ≤ 25 MB; create, overwrite and delete allowed.
 - `firebase.json` + `.firebaserc` at the repo root; deployed by hand: `npx firebase-tools deploy --only firestore:rules,storage`.
 
 ## 5. Screens and flow
@@ -72,9 +73,10 @@
   - Empty state: "No plans yet. Start one for your next job."
   - Account menu: email + Sign out (warns if anything isn't synced yet).
 - **New plan:** a short form — address (required) → "Pick plot plan PDF" → creates the doc, caches + uploads the PDF, opens the editor. Works offline (upload waits).
-- **Editor:** today's screen, plus "← Plans" at the top of the side panel; the plot plan layer row shows the address instead of the file name and no longer opens a different file.
+- **Editor:** today's screen, plus "← Plans" at the top of the side panel; the plot plan layer row shows the address.
+- **Replace plot plan:** the plot plan layer row's edit button (today's "open a different file") → in-page confirm "Replace the plot plan for <address>? Your outlines and surfaces stay where they are." → pick PDF → `rev` + 1, cache, upload (waits if offline). Undo does not cover it.
 - **Open a plan:** PDF from `pdf-cache`, else download from Storage (offline and not cached → "This plan's PDF isn't on this device yet. Connect to the internet to open it.").
-- **Pending uploads:** on start and on `online`, any plan with `pdf.uploaded == false` whose bytes are in `pdf-cache` is uploaded, then the flag is set.
+- **Pending uploads:** on start and on `online`, any plan with `pdf.uploaded == false` whose cached `rev` matches the doc is uploaded, then the flag is set. (Replacing on a device where an older upload is still pending just uploads the newest.)
 
 ## 6. Code structure (`plan-builder/src/`)
 | Unit | Job | Depends on |
@@ -82,7 +84,7 @@
 | `firebase-config.ts` | Web config object | — |
 | `firebase.ts` | Init app, Auth (local persistence), Firestore (persistent multi-tab cache), Storage | config |
 | `plan-model.ts` | Pure: `PlanDoc` type, `toDoc(outlines, refs, meta)`, `fromDoc(doc)` with validation, size estimate, list sort | outline, scale types |
-| `plan-store.ts` | `PlanStore` interface (list/watch, create, save, rename, delete, getPdf, flushUploads) + `FirebasePlanStore` + `MemoryPlanStore` | firebase, plan-model, pdf-cache |
+| `plan-store.ts` | `PlanStore` interface (list/watch, create, save, rename, replacePdf, delete, getPdf, flushUploads) + `FirebasePlanStore` + `MemoryPlanStore` | firebase, plan-model, pdf-cache |
 | `pdf-cache.ts` | IndexedDB get/put/delete of PDF bytes by planId | — |
 | `auth.ts` | `watchAuth` → signed-out / not-invited / ready(user); sign in/out; invite check with offline memory | firebase |
 | `autosave.ts` | Debounce (1 s) + flush on `pagehide`/"← Plans"; pure scheduling, testable with fake timers | — |
@@ -95,7 +97,7 @@
 ## 7. Error handling
 - Every Firestore/Storage failure shows a toast that says what failed and what to do; edits stay on the device.
 - `permission-denied` on any call → re-run the invite check (invite revoked → Not invited screen).
-- Storage quota/size errors → "This PDF is over 25 MB. Export a smaller copy and start a new plan."
+- Storage quota/size errors → "This PDF is over 25 MB. Export a smaller copy and try again."
 - Corrupt or newer-version plan doc → "This plan was saved by a newer version of Plan Builder. Reload to update." (no write back).
 - Popup blocked/closed → stay on Sign-in with a one-line hint.
 
