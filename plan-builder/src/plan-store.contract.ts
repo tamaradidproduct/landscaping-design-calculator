@@ -11,12 +11,15 @@ const state = (): PlanState => ({
 });
 const tick = (ms = 1000) => vi.setSystemTime(Date.now() + ms);
 
-function list(store: PlanStore): Promise<PlanMeta[]> {
+/** Resolves with the first emission satisfying pred; always unsubscribes. */
+function waitForPlans(store: PlanStore, pred: (plans: PlanMeta[]) => boolean, timeoutMs = 2000): Promise<PlanMeta[]> {
   return new Promise((resolve, reject) => {
-    let off = () => {};
-    let done = false;
-    off = store.watchPlans(p => { done = true; queueMicrotask(() => off()); resolve(p); }, reject);
-    if (done) off();
+    let off: (() => void) | null = null;
+    let finished = false;
+    const finish = (fn: () => void) => { if (finished) return; finished = true; clearTimeout(timer); if (off) off(); fn(); };
+    const timer = setTimeout(() => finish(() => reject(new Error('waitForPlans timed out'))), timeoutMs);
+    off = store.watchPlans(p => { if (pred(p)) finish(() => resolve(p)); }, e => finish(() => reject(e)));
+    if (finished) off();
   });
 }
 const inputReason = async (p: Promise<unknown>) => { try { await p; } catch (e) { return e instanceof PlanInputError ? e.reason : e; } return null; };
@@ -24,12 +27,13 @@ const inputReason = async (p: Promise<unknown>) => { try { await p; } catch (e) 
 export function runPlanStoreContract(make: () => PlanStore) {
   describe('PlanStore contract', () => {
     afterEach(() => { vi.useRealTimers(); });
+    // Fake Date: stores stamp updatedAt with client Date.now() (spec 3.1), not server timestamps.
     const fresh = () => { vi.useFakeTimers({ toFake: ['Date'] }); return make(); };
 
     it('create then list', async () => {
       const s = fresh();
       const id = await s.create('12 Elm St', pdfFile());
-      const plans = await list(s);
+      const plans = await waitForPlans(s, p => p.some(m => m.id === id));
       expect(plans).toHaveLength(1);
       expect(plans[0]).toMatchObject({ id, address: '12 Elm St', pdf: { rev: 1, name: 'plan.pdf', size: 4 } });
     });
@@ -41,13 +45,13 @@ export function runPlanStoreContract(make: () => PlanStore) {
       const big = pdfFile(4);
       Object.defineProperty(big, 'size', { value: MAX_PDF_BYTES + 1 });
       expect(await inputReason(s.create('x', big))).toBe('too-big');
-      expect(await list(s)).toHaveLength(0);
+      expect(await waitForPlans(s, p => p.length === 0)).toHaveLength(0);
     });
 
     it('accepts a .pdf name with an empty type', async () => {
       const s = fresh();
-      await s.create('x', pdfFile(4, 'Plan.PDF', ''));
-      expect(await list(s)).toHaveLength(1);
+      const id = await s.create('x', pdfFile(4, 'Plan.PDF', ''));
+      expect(await waitForPlans(s, p => p.some(m => m.id === id))).toHaveLength(1);
     });
 
     it('save then load returns the state', async () => {
@@ -58,6 +62,16 @@ export function runPlanStoreContract(make: () => PlanStore) {
       const { meta, state: loaded } = await s.load(id);
       expect(loaded).toEqual(state());
       expect(meta.id).toBe(id);
+    });
+
+    it('save bumps updatedAt', async () => {
+      const s = fresh();
+      const id = await s.create('x', pdfFile());
+      const before = (await waitForPlans(s, p => p.some(m => m.id === id)))[0];
+      tick();
+      s.save(id, state());
+      const after = (await waitForPlans(s, p => p.some(m => m.id === id && m.updatedAt > before.updatedAt)))[0];
+      expect(after.updatedAt).toBeGreaterThan(before.updatedAt);
     });
 
     it('load returns a copy', async () => {
@@ -71,10 +85,10 @@ export function runPlanStoreContract(make: () => PlanStore) {
     it('rename updates address and updatedAt', async () => {
       const s = fresh();
       const id = await s.create('old', pdfFile());
-      const before = (await list(s))[0];
+      const before = (await waitForPlans(s, p => p.some(m => m.id === id)))[0];
       tick();
       await s.rename(id, '  34   Oak Ave ');
-      const after = (await list(s))[0];
+      const after = (await waitForPlans(s, p => p.some(m => m.address === '34 Oak Ave')))[0];
       expect(after.address).toBe('34 Oak Ave');
       expect(after.updatedAt).toBeGreaterThan(before.updatedAt);
       expect(await inputReason(s.rename(id, ' '))).toBe('address');
@@ -83,9 +97,12 @@ export function runPlanStoreContract(make: () => PlanStore) {
     it('replacePdf bumps rev and getPdf returns the new bytes; outlines unchanged', async () => {
       const s = fresh();
       const id = await s.create('x', pdfFile([1, 2, 3]));
+      const before = (await waitForPlans(s, p => p.some(m => m.id === id)))[0];
       s.save(id, state());
+      tick();
       await s.replacePdf(id, pdfFile([9, 8], 'new.pdf'));
-      const meta = (await list(s))[0];
+      const meta = (await waitForPlans(s, p => p[0]?.pdf.rev === 2))[0];
+      expect(meta.updatedAt).toBeGreaterThan(before.updatedAt);
       expect(meta.pdf).toMatchObject({ rev: 2, name: 'new.pdf', size: 2 });
       expect([...new Uint8Array(await s.getPdf(id))]).toEqual([9, 8]);
       expect((await s.load(id)).state).toEqual(state());
@@ -102,7 +119,7 @@ export function runPlanStoreContract(make: () => PlanStore) {
       const s = fresh();
       const id = await s.create('x', pdfFile());
       await s.remove(id);
-      expect(await list(s)).toHaveLength(0);
+      expect(await waitForPlans(s, p => !p.some(m => m.id === id))).toHaveLength(0);
       await expect(s.getPdf(id)).rejects.toBeInstanceOf(PdfUnavailableError);
     });
 
@@ -120,10 +137,10 @@ export function runPlanStoreContract(make: () => PlanStore) {
       const a = await s.create('A', pdfFile());
       tick();
       const b = await s.create('B', pdfFile());
-      expect((await list(s)).map(p => p.id)).toEqual([b, a]);
+      expect((await waitForPlans(s, p => p.length === 2)).map(p => p.id)).toEqual([b, a]);
       tick();
       await s.rename(a, 'A2');
-      expect((await list(s)).map(p => p.id)).toEqual([a, b]);
+      expect((await waitForPlans(s, p => p[0]?.id === a)).map(p => p.id)).toEqual([a, b]);
     });
 
     it('watchPlans emits again after changes until unsubscribed', async () => {

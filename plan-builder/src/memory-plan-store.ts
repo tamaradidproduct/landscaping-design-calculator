@@ -18,7 +18,7 @@ export class MemoryPlanStore implements PlanStore {
     return e;
   }
   private list = () => sortPlans([...this.plans.values()].map(e => copy(e.meta)));
-  private notify() { const l = this.list(); this.watchers.forEach(w => w(l)); }
+  private notify() { this.watchers.forEach(w => w(this.list())); }
 
   watchPlans(onPlans: (plans: PlanMeta[]) => void): () => void {
     this.watchers.add(onPlans);
