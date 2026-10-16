@@ -1,4 +1,38 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
+
+const triggerRing = [
+  [999, 999],
+  [1009, 999],
+  [1009, 1009],
+  [999, 1009],
+  [999, 999],
+] as const;
+
+const ringMatches = (ring: unknown): boolean =>
+  Array.isArray(ring) &&
+  ring.length === triggerRing.length &&
+  ring.every((pt, i) => Array.isArray(pt) && pt[0] === triggerRing[i][0] && pt[1] === triggerRing[i][1]);
+
+const containsTriggerRing = (value: unknown): boolean =>
+  Array.isArray(value) && value.some(item => ringMatches(item) || containsTriggerRing(item));
+
+vi.mock('polygon-clipping', async () => {
+  const actual = await vi.importActual<any>('polygon-clipping');
+  return {
+    default: {
+      ...actual.default,
+      intersection: (...args: Parameters<typeof actual.default.intersection>) => {
+        if (containsTriggerRing(args[0])) throw new Error('forced clipper failure');
+        return actual.default.intersection(...args);
+      },
+      difference: (...args: Parameters<typeof actual.default.difference>) => {
+        if (args.slice(1).some(containsTriggerRing)) throw new Error('forced clipper failure');
+        return actual.default.difference(...args);
+      },
+    },
+  };
+});
+
 import { containers, insideShape, shapeArea, shapeLabelPoint, visibleShapes } from './overlap';
 import { rectCorners, type Outline } from './outline';
 
@@ -29,6 +63,14 @@ describe('visibleShapes', () => {
   test('a feature entirely under another has nothing visible', () => {
     const v = visibleShapes([house, rect('shed', 'feature', 10, 10, 20, 20)]);
     expect(shapeArea(v.get('shed')!)).toBe(0);
+  });
+  test('a clipper failure does not poison later layers', () => {
+    const lot = rect('boundary', 'boundary', 0, 0, 200, 200);
+    const cutter = rect('patio', 'feature', 20, 20, 60, 60);
+    const glitch = rect('glitch', 'feature', 999, 999, 1009, 1009);
+    const deck = rect('deck', 'feature', 40, 40, 90, 90);
+    const v = visibleShapes([lot, cutter, glitch, deck]);
+    expect(shapeArea(v.get('deck')!)).toBeCloseTo(2500 - 400, 6);
   });
   test('open outlines (still being drawn) take no part', () => {
     const v = visibleShapes([{ ...house, closed: false }, porch]);
