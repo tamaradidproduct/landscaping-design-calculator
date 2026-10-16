@@ -2,7 +2,7 @@
 import { SignInError, type AuthGate } from './auth';
 import { cleanAddress, editedAgo, type PlanMeta } from './plan-model';
 import { PlanInputError, type PlanStore } from './plan-store';
-import { button, error, esc, field, hint, input } from './ui';
+import { button, card, emptyNote, error, esc, field, formStack, hint, input, listRow, row, screenPanel, screenText, splitRow } from './ui';
 
 /** The shared `#file` picker, reused for New plan and Replace plot plan: whoever armed it last gets the file. */
 export function armFilePicker(onFile: ((file: File) => void) | null): HTMLInputElement {
@@ -19,14 +19,14 @@ const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
 
-const panel = (html: string) => `<div class="auth-panel card"><h1 class="screen-title">Plan Builder</h1>${html}</div>`;
+const panel = (html: string) => screenPanel('Plan Builder', html);
 
 export function renderLoading(root: HTMLElement): void {
   root.innerHTML = panel(hint('Signing in…'));
 }
 
 export function renderSignIn(root: HTMLElement, gate: AuthGate, opts: { offline?: boolean } = {}): void {
-  root.innerHTML = panel('<button type="button" class="primary large" id="sign-in">Sign in with Google</button>'
+  root.innerHTML = panel(button('Sign in with Google', { variant: 'primary', mods: ['large'], id: 'sign-in' })
     + error('', true));
   const btn = root.querySelector<HTMLButtonElement>('#sign-in')!, msg = root.querySelector<HTMLElement>('.text-error')!;
   const say = (text: string) => { msg.textContent = text; msg.hidden = false; };
@@ -46,8 +46,8 @@ export function renderSignIn(root: HTMLElement, gate: AuthGate, opts: { offline?
 }
 
 export function renderNotInvited(root: HTMLElement, email: string, gate: AuthGate): void {
-  root.innerHTML = panel(`<p class="screen-text">This Google account (${esc(email)}) hasn't been invited to Plan Builder. Ask Tamara for an invite.</p>`
-    + '<button type="button" id="use-another">Use another account</button>');
+  root.innerHTML = panel(screenText(`This Google account (${esc(email)}) hasn't been invited to Plan Builder. Ask Tamara for an invite.`)
+    + button('Use another account', { id: 'use-another' }));
   root.querySelector<HTMLButtonElement>('#use-another')!.onclick = () => { void gate.signOut(); };
 }
 
@@ -127,32 +127,27 @@ export class PlansScreen {
     // Keep what's being typed (and focus) across list updates from the store
     const active = document.activeElement instanceof HTMLInputElement && this.root.contains(document.activeElement) ? document.activeElement.id : null;
     const values = new Map([...this.root.querySelectorAll('input')].map(i => [i.id, i.value]));
-    const account = `<div class="account">`
-      + `<button type="button" class="account-toggle" id="account" aria-expanded="${this.menuOpen}">${esc(this.opts.email)}</button>`
-      + (this.menuOpen ? `<div class="account-menu card">`
-        + `<p class="text-hint">${esc(this.opts.email)}</p>`
+    const menu = this.menuOpen
+      ? card(hint(esc(this.opts.email))
         + (this.signOutWarn
-          ? `<p class="text-error">Some changes haven't synced yet. They'll sync when you sign back in on this device.</p>`
-            + `<div class="row split">${button('Sign out anyway', { variant: 'danger', data: { act: 'sign-out-anyway' } })}${button('Cancel', { data: { act: 'menu-close' } })}</div>`
-          : `<button type="button" id="sign-out">Sign out</button>`)
-        + `</div>` : '')
-      + `</div>`;
+          ? error("Some changes haven't synced yet. They'll sync when you sign back in on this device.", false)
+            + splitRow(button('Sign out anyway', { variant: 'danger', data: { act: 'sign-out-anyway' } }), button('Cancel', { data: { act: 'menu-close' } }))
+          : button('Sign out', { id: 'sign-out' })), 'account-menu')
+      : '';
+    const account = `<div class="account">${button(esc(this.opts.email), { mods: ['account-toggle'], id: 'account', expanded: this.menuOpen })}${menu}</div>`;
     const head = `<header class="plans-head"><h1 class="screen-title">Plans</h1>${account}</header>`;
     const create = this.newOpen
-      ? `<form class="new-plan card stack" novalidate>`
-        + `<strong>New plan</strong>`
-        + field('new-address', "Job's address", input('new-address', { placeholder: '123 Main St' }).replace('<input', '<input required'))
-        + `<div class="row">`
-        + `<button type="button" class="primary" id="new-pdf"${this.creating ? ' disabled' : ''}>${this.creating ? 'Creating…' : 'Pick plot plan PDF'}</button>`
-        + button('Cancel', { data: { act: 'new-cancel' } }) + `</div>`
-        + error(esc(this.newError), !this.newError)
-        + `</form>`
-      : `<button type="button" class="primary" id="new-plan">New plan</button>`;
+      ? formStack(`<strong>New plan</strong>`
+        + field('new-address', "Job's address", input('new-address', { placeholder: '123 Main St', required: true }))
+        + row(button(this.creating ? 'Creating…' : 'Pick plot plan PDF', { variant: 'primary', id: 'new-pdf', disabled: this.creating }),
+          button('Cancel', { data: { act: 'new-cancel' } }))
+        + error(esc(this.newError), !this.newError), 'new-plan card stack', true)
+      : button('New plan', { variant: 'primary', id: 'new-plan' });
     const now = Date.now();
     const rows = this.plans.map(p => this.row(p, now)).join('');
     const list = !this.loaded ? hint('Loading plans…')
       : rows ? `<div class="plan-list">${rows}</div>`
-        : `<p class="plans-empty">No plans yet. Start one for your next job.</p>`;
+        : emptyNote('No plans yet. Start one for your next job.');
     this.root.innerHTML = `<div class="plans">${head}${create}${list}</div>`;
     for (const [id, v] of values) { const el = this.root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`); if (el && id) el.value = v; }
     if (active) this.root.querySelector<HTMLInputElement>(`#${CSS.escape(active)}`)?.focus();
@@ -160,26 +155,30 @@ export class PlansScreen {
 
   private row(p: PlanMeta, now: number): string {
     const id = esc(p.id);
+    const compact = ['compact'];
     if (this.inline?.id === p.id && this.inline.kind === 'rename') {
-      return `<div class="plan-row editing" data-id="${id}">`
-        + `<input id="rename-${id}" class="plan-rename" aria-label="Address" autocomplete="off" value="${esc(p.address)}" />`
-        + button('Save', { mods: ['compact'], variant: 'primary', data: { act: 'rename-save' } })
-        + button('Cancel', { mods: ['compact'], data: { act: 'inline-cancel' } })
-        + error('', true) + `</div>`;
+      return listRow(p.id, [
+        input(`rename-${p.id}`, { cls: 'plan-rename', ariaLabel: 'Address', value: p.address }),
+        button('Save', { mods: compact, variant: 'primary', data: { act: 'rename-save' } }),
+        button('Cancel', { mods: compact, data: { act: 'inline-cancel' } }),
+        error('', true),
+      ], 'editing');
     }
     if (this.inline?.id === p.id && this.inline.kind === 'delete') {
-      return `<div class="plan-row confirming" data-id="${id}">`
-        + `<p class="plan-confirm">Delete ${esc(p.address)}? This can't be undone.</p>`
-        + button('Delete', { mods: ['compact'], variant: 'danger', data: { act: 'delete-confirm' } })
-        + button('Cancel', { mods: ['compact'], data: { act: 'inline-cancel' } }) + `</div>`;
+      return listRow(p.id, [
+        `<p class="plan-confirm">Delete ${esc(p.address)}? This can't be undone.</p>`,
+        button('Delete', { mods: compact, variant: 'danger', data: { act: 'delete-confirm' } }),
+        button('Cancel', { mods: compact, data: { act: 'inline-cancel' } }),
+      ], 'confirming');
     }
     const meta = this.opening === p.id ? 'Opening…' : editedAgo(p.updatedAt, now);
-    return `<div class="plan-row" data-id="${id}">`
-      + `<button type="button" class="plan-open" data-act="open">`
-      + `<span class="plan-address">${esc(p.address)}</span>`
-      + `<span class="plan-meta">${esc(meta)}${p.pending ? ' · <span class="plan-pending">Not synced yet</span>' : ''}</span></button>`
-      + button('Rename', { mods: ['compact'], data: { act: 'rename' } })
-      + button('Delete', { mods: ['compact'], variant: 'danger', data: { act: 'delete' } }) + `</div>`;
+    return listRow(p.id, [
+      button(`<span class="plan-address">${esc(p.address)}</span>`
+        + `<span class="plan-meta">${esc(meta)}${p.pending ? ' · <span class="plan-pending">Not synced yet</span>' : ''}</span>`,
+      { mods: ['plan-open'], data: { act: 'open' } }),
+      button('Rename', { mods: compact, data: { act: 'rename' } }),
+      button('Delete', { mods: compact, variant: 'danger', data: { act: 'delete' } }),
+    ]);
   }
 
   private onClick(e: Event) {
