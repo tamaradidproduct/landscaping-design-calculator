@@ -165,9 +165,9 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .group-body { display: flex; flex-direction: column; gap: var(--space-4); }
 /* Corner chip on a surface: the radius field ("Round 3′") */
 .chip-field { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-base); color: var(--color-muted); }
-.chip-field input { width: var(--control-xl); flex: none; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); }
+.chip-field input { width: var(--width-field-inline); flex: none; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); }
 /* "Round all corners [ 2′ ] Apply" in a surface's card */
 .round-all .row { flex-wrap: nowrap; }
 .round-all input { min-height: var(--control-md); font-size: var(--text-base); }
-/* A zone's material in its card: swatch + name + Change (the picker opens in place) */
-.material-current { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }
+/* Choice line: one chosen value (swatch + name) and the action that opens the choices, e.g. a zone's material */
+.choice-line { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }

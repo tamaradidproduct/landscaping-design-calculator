@@ -4,7 +4,8 @@
 import { material, materialsByTrade, type MaterialId, type Trade } from './materials';
 import { parseRadius, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, caption, chips, esc, hint, input, label, layerActions, row, layerCard, layerForm, layerOrder, layerRow, nudgePad, suggestRow, swatch } from './ui';
+import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
+import { button, caption, choiceLine, chips, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
 
 const TRADES: [Trade, string][] = [['hardscape', 'Hardscape'], ['softscape', 'Softscape']];
 
@@ -43,9 +44,8 @@ export class SurfacesSection {
     // The picker's chips start a new zone; the card's chips change that zone's material.
     this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
-    card?.querySelector<HTMLButtonElement>('[data-act=change-material]')?.addEventListener('click', () => { this.changing = card.dataset.card!; this.render(); });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
-    if (card) this.wireCard(card);
+    if (card) wireLayerCard(card, t, { 'change-material': () => { this.changing = card.dataset.card!; this.render(); } });
     const round = this.el.querySelector<HTMLFormElement>('form.round-all');
     if (round && card) round.onsubmit = e => {
       e.preventDefault();
@@ -54,50 +54,18 @@ export class SurfacesSection {
     };
   }
 
-  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, material, tidy, order. */
+  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, material, rounding, tidy, order. */
   private card(o: Outline): string {
-    const t = this.tool, compact = ['compact'], nudge = t.cornerSelected ? nudgePad() : '', sw = { material: o.material! };
-    if (o.id === t.drawing) {
-      const n = o.pts.length, what = `<b>${esc(o.name.toLowerCase())}</b>`;
-      const step = t.shape === 'rect'
-        ? (n ? 'Now drag or tap to the opposite corner.' : `Drag from one corner of the ${what} to the opposite corner.`)
-        : n >= 3 ? `${n} corners. Tap the first corner or double-tap to finish.` : `Tap each corner of the ${what} · ${n} placed`;
-      return layerCard({ id: o.id, swatch: sw, name: o.name, meta: 'Drawing…', body: `${hint(step)}${nudge}${layerActions(
-        t.shape === 'rect' ? '' : button('Close shape', { variant: 'primary', mods: compact, disabled: n < 3, data: { act: 'close' } }),
-        button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
-    }
-    const p = t.layerPosition(o.id);
+    const t = this.tool, sw = { material: o.material! };
+    if (o.id === t.drawing) return drawingCard(t, o, sw, o.name.toLowerCase());
+    // The material shows as one line; Change opens the picker in place.
+    const mat = this.changing === o.id ? picker(o.material)
+      : choiceLine(swatch(sw), material(o.material!).name, button('Change', { mods: ['compact'], data: { act: 'change-material' } }));
+    const round = t.cal ? formStack(field('round-all', 'Round all corners', row(
+      input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      // The material shows as one line; Change opens the picker in place.
-      body: `${caption('Material')}${this.changing === o.id ? picker(o.material)
-        : `<div class="material-current">${swatch(sw)}<span class="layer-name">${esc(material(o.material!).name)}</span>${button('Change', { mods: compact, data: { act: 'change-material' } })}</div>`}${nudge}${t.cal ? `<form class="field round-all">${label('round-all', 'Round all corners')}${row(input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: compact, type: 'submit' }))}</form>` : ''}${layerActions(
-        button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
-        button('Redo outline', { mods: compact, data: { act: 'redraw' } }),
-        button('Delete', { variant: 'danger', mods: compact, data: { act: 'delete' } }))}${p.first && p.last ? '' : layerOrder(p.first, p.last)}`,
+      body: `${caption('Material')}${mat}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
     });
-  }
-  private wireCard(card: HTMLElement) {
-    const t = this.tool, id = card.dataset.card!;
-    const act: Record<string, () => void> = {
-      close: () => t.close(), cancel: () => t.cancel(), collapse: () => t.selectOutline(null),
-      'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteLayer(id),
-      up: () => t.moveLayer(id, -1), down: () => t.moveLayer(id, 1),
-    };
-    card.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(b => { if (act[b.dataset.act!]) b.onclick = act[b.dataset.act!]; });
-    card.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(b => {
-      b.onclick = () => { const [dx, dy] = b.dataset.nudge!.split(',').map(Number); t.nudge(dx, dy); };
-    });
-    card.querySelector<HTMLElement>('.layer-head')!.onclick = e => {
-      if (!(e.target as Element).closest('input, button') && !t.drawing) t.selectOutline(null);
-    };
-    const rename = card.querySelector<HTMLInputElement>('#surface-rename');
-    if (rename) {
-      rename.onchange = () => t.renameLayer(id, rename.value);
-      rename.onkeydown = e => {
-        if (e.key === 'Enter') rename.blur();
-        else if (e.key === 'Escape') { rename.value = t.outlines[id]?.name ?? rename.value; rename.blur(); }
-      };
-    }
   }
 }

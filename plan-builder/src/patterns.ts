@@ -2,7 +2,7 @@
 // overlay and the Layers swatches alike. Drawn in screen pixels, so they don't grow with zoom.
 import { MATERIALS, type MaterialId, type PatternId } from './materials';
 
-/** Tile size and marks per pattern; marks use `currentColor` (a darker shade of the material; mixed with black, not ink, since the plan stays white in dark mode). */
+/** Tile size and marks per pattern; marks use `currentColor` (the material shaded with color-material-shade at mix-material-edge). */
 const TILES: Record<PatternId, { w: number; h: number; marks: string }> = {
   plain: { w: 8, h: 8, marks: '' },
   lines: { w: 6, h: 6, marks: '<path d="M0 3H6" stroke="currentColor" stroke-width="0.6"/>' },
@@ -20,7 +20,7 @@ export function patternDefs(): string {
   return MATERIALS.map(m => {
     const t = TILES[m.pattern], c = `var(--${m.color})`;
     return `<pattern id="material-${m.id}" patternUnits="userSpaceOnUse" width="${t.w}" height="${t.h}"`
-      + ` style="color: color-mix(in srgb, ${c} 65%, black); fill: currentColor">`
+      + ` style="color: color-mix(in srgb, ${c} var(--mix-material-edge), var(--color-material-shade)); fill: currentColor">`
       + `<rect width="${t.w}" height="${t.h}" style="fill: ${c}"/>${t.marks}</pattern>`;
   }).join('');
 }

@@ -30,6 +30,8 @@ export function button(label: string, o: ButtonOptions = {}): string {
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
 export const hint = (html: string) => `<p class="text-hint">${html}</p>`;
+/** A hint inside a row (beside buttons), rather than a paragraph of its own. */
+export const inlineHint = (html: string) => `<span class="text-hint">${html}</span>`;
 export const error = (html: string, hidden = true) => `<p class="text-error"${hidden ? ' hidden' : ''}>${html}</p>`;
 export const label = (forId: string, text: string) => `<label class="text-label" for="${forId}">${text}</label>`;
 /** A figure line (measurement, angle): tabular numbers. */
@@ -49,6 +51,18 @@ export function input(id: string, o: InputOptions = {}): string {
     + `${o.value !== undefined ? ` value="${esc(o.value)}"` : ''} />`;
 }
 
+/** Field: a label stacked over its control(s) — pass `row(...)` for a field with an action beside it. */
+export const field = (id: string, labelText: string, control: string, cls = '') =>
+  `<div class="field${cls ? ` ${cls}` : ''}">${label(id, labelText)}${control}</div>`;
+/** A form whose children stack (fields, actions, its error line). */
+export const formStack = (html: string, cls = 'stack') => `<form class="${cls}">${html}</form>`;
+/** Inline field inside a chip: a muted label before a short input ("Round [ 2 ]"). */
+export const chipField = (id: string, labelText: string, o: InputOptions & { title?: string } = {}) =>
+  `<label class="chip-field" hidden${o.title ? ` title="${esc(o.title)}"` : ''}>${labelText} ${input(id, o)}</label>`;
+/** One chosen value shown as a line — swatch, name and an action that opens the choices (e.g. a zone's material). */
+export const choiceLine = (swatchHtml: string, name: string, action: string) =>
+  `<div class="choice-line">${swatchHtml}<span class="layer-name">${esc(name)}</span>${action}</div>`;
+
 /** Card header: a title and a small close button (data-act="close"). */
 export const cardHead = (titleHtml: string) =>
   `<div class="card-head"><strong>${titleHtml}</strong>${button('×', { mods: ['icon', 'small'], ariaLabel: 'Close', data: { act: 'close' } })}</div>`;
@@ -56,7 +70,7 @@ export const cardHead = (titleHtml: string) =>
 /** Arrow pad that nudges the selected corner by one screen pixel (data-nudge="dx,dy"). */
 export function nudgePad(): string {
   const arrow = (glyph: string, dir: string, d: string) => button(glyph, { mods: ['icon'], ariaLabel: `Nudge ${dir}`, data: { nudge: d } });
-  return `<div class="nudge"><span class="text-hint">Nudge corner</span>`
+  return `<div class="nudge">${inlineHint('Nudge corner')}`
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
@@ -108,7 +122,7 @@ export function layerCard(o: LayerCardOptions): string {
 export function layerOrder(first: boolean, last: boolean): string {
   const arrow = (glyph: string, dir: 'up' | 'down', disabled: boolean) =>
     button(glyph, { mods: ['icon', 'small'], ariaLabel: `Move ${dir} (higher layers cut the ones below)`, disabled, data: { act: dir } });
-  return `<div class="layer-order"><span class="text-hint">Layer order</span>${arrow('↑', 'up', first)}${arrow('↓', 'down', last)}</div>`;
+  return `<div class="layer-order">${inlineHint('Layer order')}${arrow('↑', 'up', first)}${arrow('↓', 'down', last)}</div>`;
 }
 /** Wrapping group of compact actions inside a layer card. */
 export const layerActions = (...buttons: string[]) => `<div class="layer-actions">${buttons.join('')}</div>`;

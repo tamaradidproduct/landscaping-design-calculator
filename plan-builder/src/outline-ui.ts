@@ -7,14 +7,14 @@ import {
 } from './outline';
 import { History } from './history';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
-import { MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
+import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { stretchEdge } from './stretch';
 import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
 import { materialFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
-import { button, cardHead, error, esc, figure, hint, input, label, row, token } from './ui';
+import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, row, token } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -36,19 +36,6 @@ export interface ToolHost {
   sampleLuminance(c: Point, n: number): Float32Array | null;
 }
 
-const CORNER_HIT = 24;      // screen px
-const EDGE_HIT = 16;        // screen px
-const TOUCH_OFFSET = 56;    // when dragging to place on touch, the point rises this far above the finger
-const DOUBLE_TAP_MS = 350;
-const HOLD_MS = 450;        // touch: press and hold this long without moving to place freely
-const HOLD_SLOP = 6;        // screen px of finger jitter still counted as holding still
-const RECT_MIN = 8;         // screen px: a rectangle narrower or shorter than this wasn't meant
-const BEND_HIT = 20;        // screen px around an edge's middle handle
-const OWN_SNAP = 22;        // screen px: snap to the outlines' own corners first
-const RELEASE = 34;         // screen px: once snapped, the point stays put until the pointer moves this far away
-const ROUND_REVEAL = 24;    // screen px from the drawn line at a selected surface's corner (the arc, once rounded): shows its round handle
-const ZONE_SIDE_HIT = 10;
-const ZONE_CORNER_HIT = 14; // screen px around a selected surface's corner dot   // screen px from the straight part of a selected surface's side: push it
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
 const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's material fill (colour + pattern), as an inline style addition. */
@@ -122,7 +109,7 @@ export class OutlineTool {
     this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
     this.squareChip = Object.assign(document.createElement('div'), { className: 'card square-chip', hidden: true });
     this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } })
-      + `<label class="chip-field" hidden title="↑ ↓ to adjust (Shift: 2′)">Round ${input('corner-radius', { inputmode: 'decimal', placeholder: '0′' })}</label>`;
+      + chipField('corner-radius', 'Round', { inputmode: 'decimal', placeholder: '0′', title: '↑ ↓ to adjust (Shift: 2′)' });
     this.squareChip.querySelector<HTMLButtonElement>('[data-act=square]')!.onclick = () => this.squareSelectedCorner();
     const radius = this.squareChip.querySelector<HTMLInputElement>('#corner-radius')!;
     radius.onchange = () => {
@@ -259,7 +246,7 @@ export class OutlineTool {
         if (this.drag?.type !== 'place' && this.drag?.type !== 'corner') return;
         this.bypassHold = true;
         if (this.rawAt) this.applyDrag();
-      }, HOLD_MS);
+      }, GESTURE.holdMs);
     }
     // The selected surface corner's round handle sits inside the corner, so it goes before the corner itself.
     const round = this.roundHandleAt(p);
@@ -330,13 +317,13 @@ export class OutlineTool {
   pointerMove(p: Point) {
     const d = this.drag; if (!d) return;
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {
-      if (!d.moved && dist(p, d.start) < HOLD_SLOP) return; // still a tap
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
       d.moved = true; this.editZone(d, p); return;
     }
-    if (this.downFinger && dist(p, this.downFinger) > HOLD_SLOP && !this.bypassHold) clearTimeout(this.holdTimer);
+    if (this.downFinger && dist(p, this.downFinger) > GESTURE.holdSlop && !this.bypassHold) clearTimeout(this.holdTimer);
     if (d.type === 'place') {
       d.finger = p;
-      if (d.touch) d.offsetY = Math.max(d.offsetY, Math.min(TOUCH_OFFSET, (dist(p, d.start) - HOLD_SLOP) * 1.5));
+      if (d.touch) d.offsetY = Math.max(d.offsetY, Math.min(GESTURE.touchOffset, (dist(p, d.start) - GESTURE.holdSlop) * 1.5));
       this.rawAt = { x: p.x, y: p.y - d.offsetY };
     }
     else { this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true; }
@@ -398,7 +385,7 @@ export class OutlineTool {
     if (!this.snapOn || this.bypass) return c;
     const len = dist(anchor, c); if (len < 1) return c;
     const ux = (c.x - anchor.x) / len, uy = (c.y - anchor.y) / len;
-    let best: Point | null = null, bd = OWN_SNAP;
+    let best: Point | null = null, bd: number = GESTURE.ownSnap;
     for (const o of this.snapTargets(exclude)) o?.pts.forEach((pt, i) => {
       if (exclude && exclude.id === o.id && exclude.i === i) return;
       const s = this.host.toScreen(pt), t = (s.x - anchor.x) * ux + (s.y - anchor.y) * uy;
@@ -433,7 +420,7 @@ export class OutlineTool {
     if (this.stick) {
       const s = this.host.toScreen(this.stick.page), ds = dist(s, raw);
       const better = found && dist(found, raw) < ds - 3;
-      if (ds < RELEASE && !better) { this.snapped = this.stick.kind; return s; }
+      if (ds < GESTURE.release && !better) { this.snapped = this.stick.kind; return s; }
       this.stick = null;
     }
     this.snapped = foundKind;
@@ -453,7 +440,7 @@ export class OutlineTool {
       this.snapped = 'line';
       return { x: raw.x - n / 2 + hit.x, y: raw.y - n / 2 + hit.y };
     }
-    let best: Point | null = null, bd = OWN_SNAP;
+    let best: Point | null = null, bd: number = GESTURE.ownSnap;
     for (const o of this.snapTargets(exclude)) {
       o?.pts.forEach((pt, i) => {
         if (exclude && exclude.id === o.id && exclude.i === i) return;
@@ -521,7 +508,7 @@ export class OutlineTool {
       // corner just placed is a double-tap, which also closes it.
       const o = this.current(), now = performance.now();
       const tapped = !d.moved && o && d.id === o.id;
-      if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS))) {
+      if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs))) {
         this.lastTap = null; this.dragAt = null; this.close(); return;
       }
       if (d.moved && this.dragBefore) this.history.record(this.dragBefore);
@@ -531,11 +518,11 @@ export class OutlineTool {
     const o = this.current(); if (!o || !this.dragAt) return;
     if (this.shape === 'rect') {
       // A tap on the first corner leaves it waiting for the opposite one; a drag (or the second tap) finishes.
-      if (d.rectStart && dist(d.finger, d.start) < HOLD_SLOP) { this.dragAt = null; this.snapped = null; this.update(); return; }
+      if (d.rectStart && dist(d.finger, d.start) < GESTURE.holdSlop) { this.dragAt = null; this.snapped = null; this.update(); return; }
       this.finishRect(this.dragAt); return;
     }
     const now = performance.now();
-    const isDouble = this.lastTap && now - this.lastTap.t < DOUBLE_TAP_MS && dist(this.lastTap.finger, d.finger) < 30;
+    const isDouble = this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < 30;
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
     this.record();
     o.pts.push(this.host.toPage(this.dragAt));
@@ -549,7 +536,7 @@ export class OutlineTool {
   private finishRect(at: Point) {
     const o = this.current()!, a = this.host.toScreen(o.pts[0]);
     this.dragAt = null; this.snapped = null;
-    if (Math.abs(at.x - a.x) < RECT_MIN || Math.abs(at.y - a.y) < RECT_MIN) {
+    if (Math.abs(at.x - a.x) < GESTURE.rectMin || Math.abs(at.y - a.y) < GESTURE.rectMin) {
       this.host.toast('Drag to the opposite corner to draw a rectangle.'); this.update(); return;
     }
     this.record();
@@ -644,7 +631,7 @@ export class OutlineTool {
     this.hoverEdge = edge;
     // Near a corner of the selected surface, show that corner's round handle.
     const z = p && !this.drag ? this.selectedZone : null;
-    let near: number | null = null, nd = ROUND_REVEAL;
+    let near: number | null = null, nd: number = HIT.roundReveal;
     if (z && p) {
       const pp = this.host.toPage(p), k = this.host.pxPerPt();
       z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp) * k; if (d < nd) { nd = d; near = i; } });
@@ -677,7 +664,7 @@ export class OutlineTool {
   }
   /** The side of a surface whose drawn straight part is under p (screen); curved sides use their whole arc. */
   private zoneSideAt(o: Outline, p: Point): number | null {
-    const pp = this.host.toPage(p), tol = ZONE_SIDE_HIT / this.host.pxPerPt();
+    const pp = this.host.toPage(p), tol = HIT.zoneSide / this.host.pxPerPt();
     let best: number | null = null, bd = tol;
     o.pts.forEach((_, i) => {
       const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp);
@@ -696,22 +683,21 @@ export class OutlineTool {
     // The corner the pointer is near shows its handle; otherwise the selected corner does.
     const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
     if (!o || c?.id !== o.id || !o.pts[c.i] || o.bulges?.[c.i] || o.bulges?.[(c.i - 1 + o.pts.length) % o.pts.length]) return null;
-    const { dir, half } = cornerBisector(o.pts, c.i), k = this.host.pxPerPt();
     // On the arc's middle once rounded (on the drawn line, even when the radius is clamped to the sides); a sharp
     // corner's handle sits just inside it.
     const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0);
     if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]) };
-    const d = MARK.roundHandleMin;
+    const { dir } = cornerBisector(o.pts, c.i), d = MARK.roundHandleMin;
     const s = this.host.toScreen(o.pts[c.i]), t = this.host.toScreen({ x: o.pts[c.i].x + dir.x, y: o.pts[c.i].y + dir.y });
     const u = { x: t.x - s.x, y: t.y - s.y }, l = Math.hypot(u.x, u.y) || 1;
     return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d } };
   }
   private roundHandleAt(p: Point) {
     const h = this.drawing ? null : this.roundHandlePos();
-    return h && dist(h.at, p) < MARK.roundHandleHit ? h : null;
+    return h && dist(h.at, p) < HIT.roundHandle ? h : null;
   }
   private bendHandleAt(p: Point): { id: string; i: number } | null {
-    let best: { id: string; i: number } | null = null, bd = BEND_HIT;
+    let best: { id: string; i: number } | null = null, bd: number = HIT.bend;
     for (const o of Object.values(this.outlines)) {
       if (!o?.closed || o.id !== this.selected) continue; // only the selected outline can be bent
       o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
@@ -719,7 +705,7 @@ export class OutlineTool {
     return best;
   }
   private cornerAt(p: Point): { id: string; i: number } | null {
-    let best: { id: string; i: number } | null = null, bd = CORNER_HIT;
+    let best: { id: string; i: number } | null = null, bd: number = HIT.corner;
     for (const o of Object.values(this.outlines)) {
       // While drawing, other outlines' corners are snap targets (a shared corner places a new point
       // there), not handles to drag.
@@ -727,13 +713,13 @@ export class OutlineTool {
       // Otherwise only the selected outline's corners can be dragged: select first, then edit.
       if (!this.drawing && o.id !== this.selected) continue;
       // A selected surface's corners take a tighter area, so its sides and round handles stay easy to reach.
-      const hit = o === this.selectedZone ? ZONE_CORNER_HIT : CORNER_HIT;
+      const hit = o === this.selectedZone ? HIT.zoneCorner : HIT.corner;
       o.pts.forEach((pt, i) => { const d = dist(this.host.toScreen(pt), p); if (d < Math.min(bd, hit)) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
   }
   private edgeAt(p: Point): { id: string; i: number } | null {
-    const tol = EDGE_HIT / this.host.pxPerPt(), pp = this.host.toPage(p);
+    const tol = HIT.edge / this.host.pxPerPt(), pp = this.host.toPage(p);
     for (const o of edgeTapOrder(Object.values(this.outlines), this.selected)) {
       if (!o?.closed) continue;
       const i = nearestEdge(o.pts, pp, tol, o.bulges);
@@ -1029,13 +1015,11 @@ export class OutlineTool {
       ${cardHead(`${esc(o.name)} edge`)}
       ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
       ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it.')}
-      <form class="stack">
-        <div class="field">${label('edge-len', 'Printed length on the plan')}
-        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' }))}</div>
+      ${formStack(`
+        ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
         ${ref ? button('Remove this length', { variant: 'danger', data: { act: 'unref' } })
           : this.cal ? hint('Lengths on edges running across and down also correct a stretched plan.') : ''}
-        ${error(`Type a length in feet, like 116.45 or 116' 5".`)}
-      </form>`;
+        ${error(`Type a length in feet, like 116.45 or 116' 5".`)}`)}`;
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
@@ -1058,12 +1042,10 @@ export class OutlineTool {
       ${cardHead(`${esc(o.name)} edge`)}
       ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
       ${curved ? button('Make straight', { data: { act: 'straighten' } }) : ''}
-      ${ft === null ? hint('Set the scale on an outline edge first.') : `<form class="stack">
-        <div class="field">${label('edge-len', 'Length')}
-        ${row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' }))}</div>
-        ${row(`<span class="text-hint">Stays put: the marked end</span>`, button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
-        ${error(`Type a length in feet, like 16 or 16' 6".`)}
-      </form>`}`;
+      ${ft === null ? hint('Set the scale on an outline edge first.') : formStack(`
+        ${field('edge-len', 'Length', row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' })))}
+        ${row(inlineHint('Stays put: the marked end'), button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
+        ${error(`Type a length in feet, like 16 or 16' 6".`)}`)}`;
     this.popover.hidden = false;
     this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');

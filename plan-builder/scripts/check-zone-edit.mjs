@@ -53,11 +53,11 @@ try {
   results.push(['Hover near the bottom-right corner (not selected)', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
   await page.mouse.move(...await toScreen([330, 300])); await page.waitForTimeout(150);
   results.push(['Pointer back in the middle', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
-  results.push(['Material in the card', `${(await page.textContent('#surfaces .material-current')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Material in the card', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
   await page.click('#surfaces [data-act=change-material]');
   results.push(['Change', `chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
   await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(150);
-  results.push(['Pick Flagstone', `${(await page.textContent('#surfaces .material-current')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Pick Flagstone', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
 
   const before = await shape('s1');
   await drag([330, 320], [345, 330]);

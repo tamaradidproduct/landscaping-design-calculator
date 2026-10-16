@@ -36,6 +36,7 @@
   --color-material-concrete-brushed: #d4d4cf; /* Brushed concrete surface fill (with its pattern). */
   --color-material-concrete-stamped: #cdbfa8; /* Stamped concrete surface fill (with its pattern). */
   --color-material-decking: #9a6a44; /* Decking surface fill (with its pattern). */
+  --color-material-shade: #000000; /* Mixed into a material colour (at mix-material-edge) for its pattern marks and a zone's… */
 
   /* ---------- Type scale ---------- */
   --font-sans: "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -92,6 +93,7 @@
   --width-card: 320px; /* Popover width (capped to the screen). */
   --width-sidebar: 280px; /* Side panel on the right (history, view, layers). */
   --width-swatch: 14px; /* Colour swatch at the start of a layer row. */
+  --width-field-inline: 60px; /* A short field inside a chip (a corner's radius, "Round [ 2 ]"). */
   --width-icon: 16px; /* Inline line icon (the eye and pencil on the Plot plan layer). */
 
   /* ---------- Plan overlay: strokes ---------- */
@@ -109,6 +111,7 @@
   --opacity-edge-highlight: 0.55; /* Edge highlight. */
   --opacity-handle: 0.85; /* Bend handles. */
   --mix-snap-halo: 18%; /* Disc behind a snapped point. */
+  --mix-material-edge: 65%; /* How much of the material colour stays when shading it with color-material-shade for pat… */
   --opacity-surface-editing: 0.5; /* Fill of the selected surface or the one being drawn, so the plan shows through. */
 
   /* ---------- Layout and misc ---------- */

@@ -44,7 +44,7 @@
 .overlay .guide-line { stroke: var(--color-guide); stroke-width: var(--stroke-hairline); stroke-dasharray: var(--dash-guide); }
 .overlay .fixed-end { fill: none; stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
 /* Surfaces: solid material fill (colour + pattern, set inline) with a darker edge; see-through while selected or drawn. */
-.overlay .shape.surface { stroke: color-mix(in srgb, var(--c) 65%, black); stroke-width: var(--stroke-hairline); }
+.overlay .shape.surface { stroke: color-mix(in srgb, var(--c) var(--mix-material-edge), var(--color-material-shade)); stroke-width: var(--stroke-hairline); }
 .overlay .shape.surface.closed { fill-opacity: 1; }
 .overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
 /* Surfaces: the round-corner handle on the selected corner's bisector */
