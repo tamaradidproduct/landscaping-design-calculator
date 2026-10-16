@@ -29,3 +29,11 @@ export function checkPdf(file: File): void {
   if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) throw new PlanInputError('not-pdf');
   if (file.size > MAX_PDF_BYTES) throw new PlanInputError('too-big');
 }
+/** Sent to onError when a saved doc nears Firestore's 1 MB limit; the save still goes ahead. */
+export class SizeWarning extends Error {
+  constructor(public bytes: number) { super(`Plan is ${Math.round(bytes / 1000)} KB; the limit is 1 MB`); this.name = 'SizeWarning'; }
+}
+/** Firestore `permission-denied` / Storage `storage/unauthorized`: re-run the invite check. */
+export class AccessDeniedError extends Error {
+  constructor(options?: ErrorOptions) { super('Access denied', options); this.name = 'AccessDeniedError'; }
+}
