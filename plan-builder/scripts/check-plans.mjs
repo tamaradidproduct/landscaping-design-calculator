@@ -1,5 +1,8 @@
 // Saved-plans flow on Riesberg (memory store): create → outline House → back to Plans → reopen → rename → delete.
 // Usage: node scripts/check-plans.mjs <riesberg.pdf> [url]
+// Needs test-fixtures/address-text.pdf (committed; `node scripts/make-text-fixture.mjs` regenerates it).
+import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
 
@@ -10,7 +13,67 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 const check = (name, ok, detail = '') => results.push([name, ok ? 'pass' : 'FAIL', detail]);
+const TEXT_PDF = fileURLToPath(new URL('../test-fixtures/address-text.pdf', import.meta.url)), EXTRACTED = '12 Oak Ln, Denver, CO 80202';
+const FILE_TITLE = basename(pdf).replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim(); // "riesberg plot plan"
+const fresh = async () => { await page.goto(url); await page.waitForTimeout(3500); await page.click('#new-plan'); };
+// Race checks need a proven-warm engine: extract once here (waits for the address), then reopen the form.
+const freshWarm = async () => {
+  await fresh();
+  await page.setInputFiles('#file', TEXT_PDF);
+  await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 30000 });
+  await page.click('[data-act=new-cancel]');
+  await page.click('#new-plan');
+};
+const addr = () => page.inputValue('#new-address');
 try {
+// New plan form: pick first, name from the PDF text or file name, nothing created until Create plan
+await fresh();
+check('Address field is optional', !(await page.$eval('#new-address', e => e.required)));
+await page.setInputFiles('#file', pdf);
+await page.waitForSelector('#create-plan');
+check('File name prefills the field', (await addr()) === FILE_TITLE, await addr());
+check('Button now reads Change PDF', (await page.innerText('#new-pdf')) === 'Change PDF');
+
+await fresh();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 30000 })
+  .then(() => check('PDF text address replaces the file name', true), async () => check('PDF text address replaces the file name', false, await addr()));
+
+await freshWarm();
+await page.fill('#new-address', 'Typed Name');
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForTimeout(2000); // warm engine: extraction has long resolved
+check('Typed text is never overwritten', (await addr()) === 'Typed Name', await addr());
+
+await freshWarm();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 5000 });
+await page.fill('#new-address', '');
+await page.click('#create-plan');
+await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'), null, { timeout: 60000 });
+await page.click('#back-to-plans');
+await page.waitForSelector('.plan-row');
+const created = await page.locator('.plan-address').first().innerText().catch(() => '');
+check('Cleared field still creates a plan named from the PDF text', created === EXTRACTED, created);
+
+await fresh();
+await page.setInputFiles('#file', 'package.json');
+await page.waitForSelector('.text-error:not([hidden])');
+check('Non-PDF shows the error and no Create plan', (await page.innerText('.new-plan .text-error')) === "That file isn't a PDF. Pick the plot plan PDF."
+  && !(await page.$('#create-plan')));
+
+await fresh();
+await page.setInputFiles('#file', pdf);
+await page.waitForSelector('#create-plan');
+await page.click('[data-act=new-cancel]');
+check('Cancel closes the form and creates nothing', !(await page.$('.new-plan')) && !(await page.$('.plan-row')));
+
+await freshWarm();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.setInputFiles('#file', pdf);
+await page.waitForTimeout(2000); // warm engine: A's extraction has long resolved
+check('Change PDF mid-extraction keeps the new file name', (await addr()) === FILE_TITLE, await addr());
+
 await page.goto(url); await page.waitForTimeout(3500);
 await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => {

@@ -128,7 +128,7 @@
 - **Offline:** full offline (open, edit, create) after one online sign-in on that device; syncs when back online. Plans not yet uploaded show "Not synced yet".
 - **Storage:** Firebase (Auth, Firestore `nam5`, Cloud Storage `us-central1`, Blaze plan). One doc per plan (outlines, surfaces, typed lengths); the plot plan PDF in Cloud Storage and cached on the device.
 - **Saving:** autosave about 1 s after each change; no Save button. Last write wins per plan.
-- **Plans screen:** newest-edited first; New plan (address + PDF), rename address, delete (inline confirm). "← Plans" in the editor.
+- **Plans screen:** newest-edited first; New plan (pick the PDF, then confirm: the address is optional and the plan is named from the address found in the PDF's text, else the file name, else "Untitled plan"; typed text always wins), rename address (name required), delete (inline confirm). "← Plans" in the editor.
 - **Replace plot plan:** allowed from the plot plan row (e.g. a revised survey); **outlines, surfaces and typed lengths are kept** as they are, for the contractor to re-check. Undo doesn't cover it.
 - Not saved: undo history, selection, zoom/pan, plot plan visibility.
 - ✅ Local testing without Google: dev builds only, `?store=memory`.

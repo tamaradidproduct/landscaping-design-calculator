@@ -49,6 +49,22 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       const size = { w: m._FPDF_GetPageWidthF(page) as number, h: m._FPDF_GetPageHeightF(page) as number };
       m._FPDF_ClosePage(page);
       post({ type: 'opened', id: req.id, pageCount: doc.getPageCount(), pageSize: size });
+    } else if (req.type === 'text') {
+      await engine();
+      // Its own temporary document: the one the viewer has open stays untouched
+      const tmp = await lib!.loadDocument(new Uint8Array(req.bytes));
+      try {
+        const page = tmp.getPage(0);
+        try {
+          post({ type: 'text', id: req.id, text: page.getText() });
+        } finally {
+          // destroy() doesn't close the page getPage loaded: ~4 MB of WASM heap leaks per pick otherwise
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          raw()._FPDF_ClosePage((page as any).pageIdx);
+        }
+      } finally {
+        tmp.destroy();
+      }
     } else if (req.type === 'render') {
       if (!doc) throw new Error('No document open');
       const pixels = render(req.width, req.height, req.matrix);

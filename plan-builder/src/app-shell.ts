@@ -14,6 +14,8 @@ export interface Editor {
   /** Hides the plot plan (nothing open) and any editor message. */
   closePage(): void;
   toast(msg: string): void;
+  /** Page-1 text of a PDF, for naming a new plan ('' on failure). Takes ownership of the buffer. */
+  readPdfText(bytes: ArrayBuffer): Promise<string>;
 }
 export type OpenResult = 'ok' | 'failed' | 'stale';
 export interface Shell {
@@ -162,6 +164,7 @@ export function startShell(ed: Editor): Shell {
       onOpen: id => void openPlan(id),
       onSignOut: () => { void gate.signOut(); },
       onError: route,
+      readPdfText: ed.readPdfText,
     });
     session = { uid, store, plans };
     showScreen('plans');

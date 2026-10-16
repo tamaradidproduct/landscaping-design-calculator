@@ -1,7 +1,8 @@
 // Screens outside the editor: Sign-in, Not invited, and Plans (list + New plan form).
 import { SignInError, type AuthGate } from './auth';
+import { extractAddress, fileNameToTitle, suggestName } from './address-extract';
 import { cleanAddress, editedAgo, type PlanMeta } from './plan-model';
-import { PlanInputError, type PlanStore } from './plan-store';
+import { checkPdf, PlanInputError, type PlanStore } from './plan-store';
 import { button, card, emptyNote, error, esc, field, formStack, hint, input, listRow, row, screenPanel, screenText, splitRow } from './ui';
 
 /** The shared `#file` picker, reused for New plan and Replace plot plan: whoever armed it last gets the file. */
@@ -57,6 +58,8 @@ export interface PlansScreenOptions {
   email: string;
   /** Store failures with no inline place to show them: 'load' for the list itself, 'save' for rename, delete, create. */
   onError?(e: Error, what: 'load' | 'save'): void;
+  /** Page-1 text of a picked PDF, to find an address ('' when none or it can't be read). Takes ownership of the buffer. */
+  readPdfText?(bytes: ArrayBuffer): Promise<string>;
 }
 
 type Inline = { kind: 'rename'; id: string } | { kind: 'delete'; id: string } | null;
@@ -68,6 +71,10 @@ export class PlansScreen {
   private newOpen = false;
   private newError = '';
   private creating = false;
+  private picked: File | null = null;  // the plot plan held by the New plan form until Create plan
+  private userEdited = false;          // the user typed in the address field: nothing overwrites it
+  private extractSeq = 0;              // bumped per pick, Cancel and close: a late extraction result is ignored
+  private extracted: string | null = null;
   private menuOpen = false;
   private signOutWarn = false;
   private opening: string | null = null;
@@ -78,6 +85,7 @@ export class PlansScreen {
   constructor(private root: HTMLElement, private store: PlanStore, private opts: PlansScreenOptions) {
     root.addEventListener('click', e => this.onClick(e));
     root.addEventListener('keydown', e => this.onKey(e));
+    root.addEventListener('input', e => { if ((e.target as HTMLElement).id === 'new-address') this.userEdited = true; });
     root.addEventListener('submit', e => e.preventDefault());
   }
 
@@ -119,6 +127,7 @@ export class PlansScreen {
 
   private closeNew() {
     this.newOpen = false; this.newError = ''; this.creating = false;
+    this.picked = null; this.userEdited = false; this.extracted = null; this.extractSeq++;
     armFilePicker(null);
   }
 
@@ -138,8 +147,9 @@ export class PlansScreen {
     const head = `<header class="plans-head"><h1 class="screen-title">Plans</h1>${account}</header>`;
     const create = this.newOpen
       ? formStack(`<strong>New plan</strong>`
-        + field('new-address', "Job's address", input('new-address', { placeholder: '123 Main St', required: true }))
-        + row(button(this.creating ? 'Creating…' : 'Pick plot plan PDF', { variant: 'primary', id: 'new-pdf', disabled: this.creating }),
+        + field('new-address', "Job's address (optional)", input('new-address', { placeholder: '123 Main St' }))
+        + row(button(this.picked ? 'Change PDF' : 'Pick plot plan PDF', { variant: this.picked ? undefined : 'primary', id: 'new-pdf', disabled: this.creating }),
+          this.picked ? button(this.creating ? 'Creating…' : 'Create plan', { variant: 'primary', id: 'create-plan', disabled: this.creating }) : '',
           button('Cancel', { data: { act: 'new-cancel' } }))
         + error(esc(this.newError), !this.newError), 'new-plan card stack', true)
       : button('New plan', { variant: 'primary', id: 'new-plan' });
@@ -190,11 +200,8 @@ export class PlansScreen {
     switch (act) {
       case 'new-plan': this.newOpen = true; this.armNew(); this.render(); this.root.querySelector<HTMLInputElement>('#new-address')?.focus(); return;
       case 'new-cancel': this.closeNew(); this.render(); return;
-      case 'new-pdf': {
-        const address = this.root.querySelector<HTMLInputElement>('#new-address')!.value;
-        if (!cleanAddress(address)) { this.newError = INPUT_MESSAGES.address; this.render(); return; }
-        this.armNew().click(); return;
-      }
+      case 'new-pdf': this.armNew().click(); return;
+      case 'create-plan': void this.create(); return;
       case 'account': this.menuOpen = !this.menuOpen; this.signOutWarn = false; this.render(); return;
       case 'menu-close': this.menuOpen = false; this.signOutWarn = false; this.render(); return;
       case 'sign-out':
@@ -222,7 +229,7 @@ export class PlansScreen {
       if (e.key === 'Enter') { e.preventDefault(); void this.saveRename(id); }
       if (e.key === 'Escape') { this.inline = null; this.render(); }
     } else if (t.id === 'new-address' && e.key === 'Enter') {
-      e.preventDefault(); this.root.querySelector<HTMLButtonElement>('#new-pdf')?.click();
+      e.preventDefault(); this.root.querySelector<HTMLButtonElement>('#create-plan')?.click();
     }
   }
 
@@ -247,17 +254,49 @@ export class PlansScreen {
     this.render();
   }
 
-  /** While the New plan form is open, a picked file creates the plan. */
+  /** While the New plan form is open, a picked file is held until Create plan. */
   private armNew(): HTMLInputElement {
-    return armFilePicker(file => void this.create(file));
+    return armFilePicker(file => this.pick(file));
   }
 
-  private async create(file: File) {
+  private setAddress(text: string) {
+    const el = this.root.querySelector<HTMLInputElement>('#new-address');
+    if (el) el.value = text; // render() restores field values from the DOM, so this survives list updates
+  }
+
+  private pick(file: File) {
     if (!this.newOpen || this.creating) return;
-    const address = this.root.querySelector<HTMLInputElement>('#new-address')?.value ?? '';
+    try {
+      checkPdf(file);
+    } catch (err) {
+      if (err instanceof PlanInputError) { this.newError = INPUT_MESSAGES[err.reason]; this.render(); return; }
+      throw err;
+    }
+    this.picked = file; this.newError = ''; this.extracted = null;
+    const seq = ++this.extractSeq;
+    if (!this.userEdited) this.setAddress(fileNameToTitle(file.name));
+    this.render();
+    void this.extract(file, seq);
+  }
+
+  private async extract(file: File, seq: number) {
+    try {
+      const text = await this.opts.readPdfText?.(await file.arrayBuffer());
+      if (seq !== this.extractSeq || !text) return;
+      const found = extractAddress(text);
+      if (!found) return;
+      this.extracted = found;
+      if (!this.userEdited) this.setAddress(found);
+    } catch { /* the file name stays */ }
+  }
+
+  private async create() {
+    const file = this.picked;
+    if (!this.newOpen || this.creating || !file) return;
+    const typed = this.root.querySelector<HTMLInputElement>('#new-address')?.value ?? '';
     this.creating = true; this.newError = ''; this.render();
     try {
-      const id = await this.store.create(address, file);
+      const id = await this.store.create(suggestName({ typed, extracted: this.extracted, fileName: file.name }), file);
       this.closeNew();
       this.opts.onOpen(id);
     } catch (err) {

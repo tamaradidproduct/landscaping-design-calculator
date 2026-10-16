@@ -414,4 +414,5 @@ shell = startShell({
     clearTimeout(toastTimer); $('toast').hidden = true; // an editor message doesn't follow you to Plans
   },
   toast,
+  readPdfText: bytes => pdf.text(bytes),
 });

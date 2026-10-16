@@ -72,7 +72,7 @@
   - Each row: open (tap), rename address, delete (inline "Delete <address>? This can't be undone." confirm in the page).
   - Empty state: "No plans yet. Start one for your next job."
   - Account menu: email + Sign out (warns if anything isn't synced yet).
-- **New plan:** a short form — address (required) → "Pick plot plan PDF" → creates the doc, caches + uploads the PDF, opens the editor. Works offline (upload waits).
+- **New plan:** a two-step form — "Pick plot plan PDF" (address field optional; prefilled from the file name, then from an address found in the PDF's first-page text, never over what was typed) → "Create plan" (name: typed, else extracted, else file name, else "Untitled plan") → creates the doc, caches + uploads the PDF, opens the editor. Works offline (upload waits).
 - **Editor:** today's screen, plus "← Plans" at the top of the side panel; the plot plan layer row shows the address.
 - **Replace plot plan:** the plot plan layer row's edit button (today's "open a different file") → in-page confirm "Replace the plot plan for <address>? Your outlines and surfaces stay where they are." → pick PDF → `rev` + 1, cache, upload (waits if offline). Undo does not cover it.
 - **Open a plan:** PDF from `pdf-cache`, else download from Storage (offline and not cached → "This plan's PDF isn't on this device yet. Connect to the internet to open it.").
