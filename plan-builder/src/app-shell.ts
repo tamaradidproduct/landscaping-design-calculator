@@ -76,7 +76,7 @@ export function startShell(ed: Editor): Shell {
       current = { id, address: meta.address };
       if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it
-        toast("This plan's PDF couldn't be opened. Replace the plot plan from a working copy.");
+        toast("This plan's PDF couldn't be opened. Delete it and start a new plan with a working PDF.");
       }
     } catch (e) {
       if (seq !== openSeq || session?.store !== store) return;
