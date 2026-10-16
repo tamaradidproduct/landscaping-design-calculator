@@ -38,6 +38,11 @@ describe('stretchEdge', () => {
     close(edgeMid(r.pts, 2, r.bulges), P(mid.x * k, mid.y), 6);
     expect(r.bulges![1]).toBe(0);
   });
+  test('a very large curved edge still converges', () => {
+    const bulges = [3, 0, -2, 0];
+    const r = stretchEdge(patio, bulges, 0, 0, 24000, IDENTITY);
+    expect(trueEdgeLength(r.pts, r.bulges, 0, IDENTITY)).toBeCloseTo(24000, 3);
+  });
   test('a slanted edge: the fixed corner stays, the rest move along the edge away from it or toward it', () => {
     const shape = [P(0, 0), P(30, 40), P(10, 60), P(-20, 20)];
     const r = stretchEdge(shape, undefined, 0, 0, 100, IDENTITY); // edge 0 is 50 long → doubles along (0.6, 0.8)

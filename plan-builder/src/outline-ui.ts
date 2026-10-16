@@ -116,8 +116,14 @@ export class OutlineTool {
     this.squareChip.querySelector<HTMLButtonElement>('[data-act=square]')!.onclick = () => this.squareSelectedCorner();
     const radius = this.squareChip.querySelector<HTMLInputElement>('#corner-radius')!;
     radius.onchange = () => {
-      const c = this.selectedCorner, ft = parseRadius(radius.value);
-      if (c && ft !== null) this.setCornerRadius(c.id, c.i, ft);
+      const c = this.selectedCorner, o = c && this.outlines[c.id], ft = parseRadius(radius.value);
+      if (!c || !o || !this.cal) return;
+      if (ft === null) {
+        const r = o.radii?.[c.i] ?? 0;
+        radius.value = r > 0 ? String(Math.round(r * this.cal.ftPerPt * 10) / 10) : '';
+        return;
+      }
+      this.setCornerRadius(c.id, c.i, ft);
     };
     radius.onkeydown = e => {
       if (e.key === 'Enter') { radius.blur(); return; }

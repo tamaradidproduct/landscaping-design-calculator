@@ -32,10 +32,11 @@ export function stretchEdge(pts: Point[], bulges: number[] | undefined, i: numbe
   };
   if (!bulges?.[i]) return at(length / chord);
   // Bent edge: its arc length grows with k, so bisect for the k that gives the typed length.
-  let lo = 1e-3, hi = 1e3;
-  for (let step = 0; step < 200 && hi - lo > 1e-12 * hi; step++) {
-    const mid = (lo + hi) / 2, r = at(mid);
-    if (trueEdgeLength(r.pts, r.bulges, i, m) < length) lo = mid; else hi = mid;
+  const lo = 1e-3, hi0 = length / chord;
+  let hi = Math.max(lo * 2, hi0), low = lo;
+  for (let step = 0; step < 200 && hi - low > 1e-12 * hi; step++) {
+    const mid = (low + hi) / 2, r = at(mid);
+    if (trueEdgeLength(r.pts, r.bulges, i, m) < length) low = mid; else hi = mid;
   }
-  return at((lo + hi) / 2);
+  return at((low + hi) / 2);
 }
