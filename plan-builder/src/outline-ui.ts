@@ -94,6 +94,7 @@ export class OutlineTool {
   private history = new History<Snapshot>();
   private dragBefore: Snapshot | null = null;
   private lastNudge: { t: number; id: string; i: number } | null = null;
+  private revision = 0;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -141,13 +142,14 @@ export class OutlineTool {
     };
   }
   /** Call right before every change the user may want to undo. */
-  private record() { this.history.record(this.snapshot()); this.lastNudge = null; }
+  private record() { this.history.record(this.snapshot()); this.lastNudge = null; this.revision++; }
   private restore(s: Snapshot) {
     this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
     this.selected = s.selected; this.replaced = s.replaced;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
+    this.revision++;
     this.update();
     if (this.hoverAt) this.hover(this.hoverAt);
   }
@@ -159,10 +161,12 @@ export class OutlineTool {
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
     this.history.clear();
+    this.revision++;
     this.update();
   }
   /** What to save: outlines and references, minus any outline still being drawn. */
   state(): PlanState { return { outlines: committedOutlines(this.outlines, this.drawing, this.replaced), refs: structuredClone(this.refs) }; }
+  get saveRevision() { return this.revision; }
   undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
   redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
 
@@ -563,11 +567,12 @@ export class OutlineTool {
   cancelPointer() {
     clearTimeout(this.holdTimer); this.downFinger = null; this.bypassHold = false;
     // A rectangle's first corner, placed by the finger that turned out to be the start of a pinch: take it back.
-    if (this.drag?.type === 'place' && this.drag.rectStart) this.current()?.pts.pop();
+    if (this.drag?.type === 'place' && this.drag.rectStart) { this.current()?.pts.pop(); this.revision++; }
     if (this.drag && this.drag.type !== 'place' && this.drag.moved && this.dragBefore) {
       // Put a corner or bend back where it was before the accidental drag.
       const before = this.dragBefore;
       this.outlines = before.outlines; this.refs = before.refs;
+      this.revision++;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
     this.drag = null; this.magnifier.hidden = true; this.dragAt = null;
