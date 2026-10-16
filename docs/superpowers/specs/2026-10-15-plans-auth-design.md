@@ -98,7 +98,7 @@
 - Every Firestore/Storage failure shows a toast that says what failed and what to do; edits stay on the device.
 - `permission-denied` on any call → re-run the invite check (invite revoked → Not invited screen).
 - Storage quota/size errors → "This PDF is over 25 MB. Export a smaller copy and try again."
-- Corrupt or newer-version plan doc → "This plan was saved by a newer version of Plan Builder. Reload to update." (no write back).
+- Newer-version plan doc → "This plan was saved by a newer version of Plan Builder. Reload to update."; corrupt plan doc → "This plan couldn't be read. Delete it and start a new plan." (no write back either way; saves that would write an unreadable doc are refused).
 - Popup blocked/closed → stay on Sign-in with a one-line hint.
 
 ## 8. Testing

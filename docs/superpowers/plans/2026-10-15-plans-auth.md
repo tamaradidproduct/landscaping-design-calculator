@@ -251,8 +251,11 @@
 
 - [ ] **Step 1: Ask Tamara** to confirm the console checklist is done (Storage bucket `us-central1`, budget alert, `invites/tamara.did.product@gmail.com`) and to approve deploying rules.
 - [ ] **Step 2: Deploy** from repo root: `npx firebase-tools deploy --only firestore:rules,storage` → "Deploy complete!".
+- [ ] **Step 2b: Bucket CORS** (the browser's `getBytes` needs it), from repo root, before any testing: `gsutil cors set cors.json gs://landscaping-design-calculator.firebasestorage.app` (or `gcloud storage buckets update gs://landscaping-design-calculator.firebasestorage.app --cors-file=cors.json`). Check with `gsutil cors get gs://landscaping-design-calculator.firebasestorage.app`.
 - [ ] **Step 3: Manual check on `npm run dev` (no `?store`)**, signed in as `tamara.did.product@gmail.com`: create plan → doc appears in Firestore console and `plan.pdf` in Storage; reload → plan listed; rename, replace PDF (`pdf.rev` 2), delete → doc and file gone.
 - [ ] **Step 4: Offline check:** DevTools → Network → Offline; edit plan + create plan → "Not synced yet" shown; back online → marker clears, PDF uploaded.
+- [ ] **Step 4b: Second device check:** a second browser profile (or cleared site data) → sign in → the plan is listed and its PDF downloads.
+- [ ] **Step 4c: Offline cold start:** `npm run build && npm run preview` (port 5181); sign in online once, open a plan; then DevTools → Offline, close the tab and reload → reaches Plans and opens the cached plan.
 - [ ] **Step 5: Not-invited check:** sign in with an account that has no invite → Not invited screen; nothing readable (console shows `permission-denied` only).
 - [ ] **Step 6:** Record results in the commit body of Task 11's commit (no code change here).
 

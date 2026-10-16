@@ -39,8 +39,8 @@
 | 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
 | 4 | Surfaces, stage 1: material zones (hardscape + softscape), solid fills, resize by typed edge length | 🔨 done, in review | `feat/material-zones` |
 | 4b | Surfaces stage 2 (Width × Depth for rectangles), stage 3 (move one corner) | 📝 next | — |
-| 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 | 5+ | Plant symbols, objects, edging/walls… | ❓ | — |
+| 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
 ### 6.1 Viewing the plan ✅🔨
@@ -131,8 +131,8 @@
 - **Plans screen:** newest-edited first; New plan (address + PDF), rename address, delete (inline confirm). "← Plans" in the editor.
 - **Replace plot plan:** allowed from the plot plan row (e.g. a revised survey); **outlines, surfaces and typed lengths are kept** as they are, for the contractor to re-check. Undo doesn't cover it.
 - Not saved: undo history, selection, zoom/pan, plot plan visibility.
-- 📝 Local testing without Google: dev builds only, `?store=memory`.
-- ⏸ Later: Firestore rules emulator tests; automated offline check (needs a built preview); contractor profile; sharing/teams; in-app invite admin; version history.
+- ✅ Local testing without Google: dev builds only, `?store=memory`.
+- ⏸ Later: Firestore rules emulator tests; automated offline check (needs a built preview); contractor profile; sharing/teams; in-app invite admin; version history; importing old local-only work.
 - Spec: `docs/superpowers/specs/2026-10-15-plans-auth-design.md`.
 
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')

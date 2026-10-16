@@ -1,6 +1,6 @@
 # Plan Builder: Saved plans + invite-only sign-in (2026-10-15)
 
-Distilled summary of the design session behind this PR. Current requirements: `docs/PRD.md` §6.9. Spec: `docs/superpowers/specs/2026-10-15-plans-auth-design.md`.
+Distilled summary of the design session behind this branch. Current requirements: `docs/PRD.md` §6.9. Spec: `docs/superpowers/specs/2026-10-15-plans-auth-design.md`.
 
 ## Backend
 - **Supabase was considered, then dropped for Firebase:** Firestore's built-in offline cache covers the offline requirement.
@@ -26,3 +26,4 @@ Distilled summary of the design session behind this PR. Current requirements: `d
 - Automated offline check (needs a built preview).
 - Contractor profile.
 - Sharing.
+- Importing old local-only work.

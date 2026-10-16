@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://tamaradidproduct.github.io", "http://localhost:5180", "http://localhost:5181"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
