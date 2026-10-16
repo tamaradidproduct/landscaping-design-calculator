@@ -4,6 +4,7 @@ import { Autosave } from './autosave';
 import { MemoryPlanStore } from './memory-plan-store';
 import { PlanFormatError, type PlanState } from './plan-model';
 import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
+import { PlanHead } from './plan-head-ui';
 import { armFilePicker, planInputMessage, PlansScreen, renderLoading, renderNotInvited, renderSignIn } from './plans-ui';
 
 /** What the shell needs from the editor in main.ts. */
@@ -35,7 +36,7 @@ export function startShell(ed: Editor): Shell {
   let session: { uid: string; store: Store; plans: PlansScreen } | null = null;
   let sessionUid: string | null = null; // set as soon as `ready` arrives, before the store has loaded
   let sessionSeq = 0;
-  let current: { id: string; address: string } | null = null; // the plan open in the editor
+  let current: { id: string; address: string; archived: boolean } | null = null; // the plan open in the editor
   let lastSavedRevision = -1;
   let openSeq = 0;
 
@@ -58,6 +59,7 @@ export function startShell(ed: Editor): Shell {
   function closeEditor() {
     autosave.flush();
     current = null; openSeq++;
+    head.show(null);
     ed.closePage();
     $('replace-confirm').hidden = true; armFilePicker(null);
     tool.load({ outlines: {}, refs: [] });
@@ -75,7 +77,8 @@ export function startShell(ed: Editor): Shell {
       showScreen('editor');
       tool.load(state);
       lastSavedRevision = tool.saveRevision;
-      current = { id, address: meta.address };
+      current = { id, address: meta.address, archived: meta.archived };
+      head.show(current);
       if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it
         toast("This plan's PDF couldn't be opened. Delete it and start a new plan with a working PDF.");
@@ -92,7 +95,36 @@ export function startShell(ed: Editor): Shell {
   }
 
   function backToPlans() { closeEditor(); showScreen('plans'); }
-  $('back-to-plans').onclick = backToPlans;
+  const head = new PlanHead($('plan-head'), {
+    back: backToPlans,
+    async rename(address) {
+      const plan = current, store = session?.store;
+      if (!plan || !store) return true;
+      try {
+        await store.rename(plan.id, address);
+      } catch (e) {
+        if (e instanceof PlanInputError) return false;
+        routeStoreError(e as Error); return true;
+      }
+      if (current === plan) { plan.address = address; $('name').textContent = address; } // the plot plan layer is named after the plan
+      return true;
+    },
+    setArchived(archived) {
+      const plan = current, store = session?.store;
+      if (!plan || !store) return;
+      plan.archived = archived;
+      store.setArchived(plan.id, archived).catch(e => routeStoreError(e as Error));
+      // Archiving is putting the plan away: back to the list, saying where it went
+      if (archived) { backToPlans(); toast(`Archived ${plan.address}. Find it under Archived.`); }
+    },
+    remove() {
+      const plan = current, store = session?.store;
+      if (!plan || !store) return;
+      backToPlans(); // flushes the last edits first; the delete follows them
+      store.remove(plan.id).catch(e => routeStoreError(e as Error));
+      toast(`Deleted ${plan.address}.`);
+    },
+  });
 
   // Replace plot plan: confirm in the side panel, then pick a PDF; outlines and surfaces stay.
   $('file-button').onclick = () => {

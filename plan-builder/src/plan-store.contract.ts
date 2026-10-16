@@ -108,6 +108,23 @@ export function runPlanStoreContract(make: () => PlanStore) {
       expect(await inputReason(s.rename(id, ' '))).toBe('address');
     });
 
+    it('setArchived flags the plan, keeps it listed and leaves updatedAt alone', async () => {
+      const s = fresh();
+      const id = await s.create('x', pdfFile());
+      const before = (await waitForPlans(s, p => p.some(m => m.id === id)))[0];
+      expect(before.archived).toBe(false);
+      tick();
+      await s.setArchived(id, true);
+      const after = (await waitForPlans(s, p => p[0]?.archived === true))[0];
+      expect(after.updatedAt).toBe(before.updatedAt);
+      expect((await s.load(id)).meta.archived).toBe(true);
+      s.save(id, state());
+      await s.flushUploads();
+      expect((await s.load(id)).meta.archived).toBe(true); // an edit doesn't unarchive
+      await s.setArchived(id, false);
+      expect(await waitForPlans(s, p => p[0]?.archived === false)).toHaveLength(1);
+    });
+
     it('replacePdf bumps rev and getPdf returns the new bytes; outlines unchanged', async () => {
       const s = fresh();
       const id = await s.create('x', pdfFile([1, 2, 3]));

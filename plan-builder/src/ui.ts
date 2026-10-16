@@ -84,9 +84,9 @@ export const screenText = (html: string) => `<p class="screen-text">${html}</p>`
 export const emptyNote = (text: string) => `<p class="plans-empty">${esc(text)}</p>`;
 /**
  * List row: a bordered strip holding a main part and its actions (a plan: open, Rename, Delete). `state` swaps the
- * contents for an inline edit ('editing') or an inline confirm ('confirming') and outlines the row.
+ * contents for an inline edit ('editing') or an inline confirm ('confirming') and outlines the row; 'archived' mutes it.
  */
-export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming') =>
+export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming' | 'archived') =>
   `<div class="plan-row${state ? ` ${state}` : ''}" data-id="${esc(id)}">${children.join('')}</div>`;
 
 /** Card header: a title and a small close button (data-act="close"). */

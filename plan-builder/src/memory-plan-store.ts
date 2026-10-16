@@ -34,7 +34,7 @@ export class MemoryPlanStore implements PlanStore {
     const id = crypto.randomUUID();
     const now = Date.now();
     this.plans.set(id, {
-      meta: { id, address: clean, createdAt: now, updatedAt: now, pdf: { name: pdf.name, size: bytes.byteLength, rev: 1, uploaded: true }, pending: false },
+      meta: { id, address: clean, createdAt: now, updatedAt: now, pdf: { name: pdf.name, size: bytes.byteLength, rev: 1, uploaded: true }, pending: false, archived: false },
       state: { outlines: {}, refs: [] },
       bytes,
     });
@@ -63,6 +63,11 @@ export class MemoryPlanStore implements PlanStore {
     if (!clean) throw new PlanInputError('address');
     e.meta.address = clean;
     e.meta.updatedAt = Date.now();
+    this.notify();
+  }
+
+  async setArchived(id: string, archived: boolean): Promise<void> {
+    this.get(id).meta.archived = archived;
     this.notify();
   }
 

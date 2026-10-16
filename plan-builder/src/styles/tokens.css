@@ -92,6 +92,7 @@
   --focus-ring: 3px; /* Focus outline width, in color-accent. */
   --width-card: 320px; /* Popover width (capped to the screen). */
   --width-sidebar: 280px; /* Side panel on the right (history, view, layers). */
+  --width-plan-head: 300px; /* Editor header, top left of the plan (back, plan name, actions); the name truncates to fit. */
   --width-swatch: 14px; /* Colour swatch at the start of a layer row. */
   --width-field-inline: 60px; /* A short field inside a chip (a corner's radius, "Round [ 2 ]"). */
   --width-icon: 16px; /* Inline line icon (the eye and pencil on the Plot plan layer). */

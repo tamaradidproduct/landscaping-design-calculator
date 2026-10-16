@@ -4,8 +4,9 @@ import type { Reference } from './scale';
 
 export interface PdfInfo { name: string; size: number; rev: number; uploaded: boolean }
 export interface PlanState { outlines: Record<string, Outline>; refs: Reference[] }
-export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo }
-export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean }
+/** `archived` is absent on plans that were never archived. */
+export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; archived?: boolean }
+export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean; archived: boolean }
 
 export const SIZE_WARN_BYTES = 800_000;
 const ADDRESS_MAX = 200;
@@ -49,6 +50,7 @@ export function fromDoc(data: unknown): PlanDoc {
   if (data.v !== 1) invalid('version');
   if (typeof data.address !== 'string' || !data.address) invalid('address');
   num(data.createdAt, 'createdAt'); num(data.updatedAt, 'updatedAt');
+  if (data.archived !== undefined && typeof data.archived !== 'boolean') invalid('archived');
   const pdf = data.pdf;
   if (!isObj(pdf) || typeof pdf.name !== 'string' || typeof pdf.uploaded !== 'boolean') return invalid('pdf');
   num(pdf.size, 'pdf size'); num(pdf.rev, 'pdf rev');
