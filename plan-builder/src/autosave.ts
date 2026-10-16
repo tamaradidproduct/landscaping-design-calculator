@@ -1,5 +1,6 @@
 // Debounced autosave. On save failure pending is cleared (no retry loop):
-// flush() rethrows; the timer path logs with console.error.
+// flush() rethrows; the timer path and the plan-switch flush in changed() log
+// with console.error and never throw.
 export class Autosave {
   private planId: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -14,7 +15,13 @@ export class Autosave {
   }
 
   changed(planId: string): void {
-    if (this.planId !== null && this.planId !== planId) this.flush();
+    if (this.planId !== null && this.planId !== planId) {
+      try {
+        this.flush();
+      } catch (e) {
+        console.error('autosave failed', e);
+      }
+    }
     this.planId = planId;
     this.clearTimer();
     this.timer = setTimeout(() => {

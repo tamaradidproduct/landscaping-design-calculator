@@ -84,4 +84,20 @@ describe('Autosave', () => {
     expect(a.pending).toBe(false);
     err.mockRestore();
   });
+
+  it('a failed save of the previous plan still schedules the new plan', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const save = vi.fn((id: string) => {
+      if (id === 'a') throw new Error('boom');
+    });
+    const a = new Autosave(save);
+    a.changed('a');
+    expect(() => a.changed('b')).not.toThrow();
+    expect(err).toHaveBeenCalled();
+    expect(a.pending).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(save).toHaveBeenLastCalledWith('b');
+    expect(a.pending).toBe(false);
+    err.mockRestore();
+  });
 });
