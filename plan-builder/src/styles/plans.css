@@ -1,0 +1,50 @@
+/* Screens outside the editor: Sign-in / Not invited (auth panel) and Plans (list, New plan form, account menu). */
+.screen {
+  flex: 1; min-width: 0; overflow-y: auto; touch-action: pan-y; /* the list scrolls; body blocks all other touch gestures */
+  padding: calc(var(--space-10) + env(safe-area-inset-top, 0px)) var(--space-8) calc(var(--space-10) + env(safe-area-inset-bottom, 0px));
+}
+.screen input { -webkit-user-select: text; user-select: text; }
+.screen-title { margin: 0; font-size: var(--text-display); font-weight: var(--weight-strong); }
+.screen-text { margin: 0; font-size: var(--text-lg); line-height: var(--leading-body); max-width: var(--measure-body); }
+
+/* Auth panel: the app name and one action, centred */
+#screen-auth { display: grid; place-content: center; }
+.auth-panel { align-items: center; text-align: center; gap: var(--space-8); padding: var(--space-10); }
+
+/* Plans: one column, the width of two cards */
+.plans { display: flex; flex-direction: column; gap: var(--space-8); max-width: calc(var(--width-card) * 2); margin: 0 auto; }
+.plans-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); }
+.plans > #new-plan { align-self: flex-start; }
+.plans-empty { margin: 0; color: var(--color-muted); font-size: var(--text-lg); }
+
+/* Account menu: the email as a button; the menu drops below it */
+.account { position: relative; min-width: 0; }
+button.account-toggle { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-base); color: var(--color-muted); }
+.account-menu { position: absolute; right: 0; top: calc(100% + var(--space-3)); z-index: var(--z-toast); width: min(var(--width-card), 90vw); }
+
+/* New plan form: a card in place of the New plan button */
+.new-plan .row > .primary { flex: 1; }
+
+/* Plan row: open (address over "Edited …"), Rename, Delete; or an inline rename field / delete confirm */
+.plan-list { display: flex; flex-direction: column; gap: var(--space-3); }
+.plan-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-3);
+  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md);
+}
+.plan-row.editing, .plan-row.confirming { border-color: var(--color-accent); }
+button.plan-open {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--space-1);
+  min-height: var(--control-lg); padding: var(--space-3) var(--space-5); text-align: left; background: transparent; border-color: transparent;
+}
+button.plan-open:hover { background: var(--color-bg); }
+.plan-address { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--weight-strong); }
+.plan-meta { font-size: var(--text-sm); color: var(--color-muted); }
+.plan-pending { color: var(--color-warn); }
+input.plan-rename { flex: 1 1 12em; }
+.plan-confirm { flex: 1 1 12em; margin: 0 var(--space-3); font-size: var(--text-base); }
+.plan-row > .text-error { flex-basis: 100%; padding: 0 var(--space-3); }
+
+/* Editor: "← Plans" and the Replace plot plan confirm in the side panel */
+#back-to-plans { align-self: flex-start; }
+.replace-confirm { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
+.replace-text { margin: 0; font-size: var(--text-base); line-height: var(--leading-body); }
