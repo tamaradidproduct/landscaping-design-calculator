@@ -17,7 +17,7 @@ const isDenied = (e: unknown) => code(e) === 'permission-denied' || code(e) === 
 const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)));
 
 const toMeta = (id: string, d: PlanDoc, hasPendingWrites: boolean): PlanMeta =>
-  ({ id, address: d.address, createdAt: d.createdAt, updatedAt: d.updatedAt, pdf: { ...d.pdf }, pending: hasPendingWrites || !d.pdf.uploaded });
+  ({ id, address: d.address, createdAt: d.createdAt, updatedAt: d.updatedAt, pdf: { ...d.pdf }, pending: hasPendingWrites || !d.pdf.uploaded, archived: d.archived === true });
 
 export class FirebasePlanStore implements PlanStore {
   private db: Firestore;
@@ -84,7 +84,7 @@ export class FirebasePlanStore implements PlanStore {
           // Listed so it can be opened (load shows the format error) or deleted
           const num = (v: unknown) => (typeof v === 'number' ? v : 0);
           const raw = data as Record<string, unknown>;
-          list.push({ id: s.id, address, createdAt: num(raw.createdAt), updatedAt: num(raw.updatedAt), pdf: { name: '', size: 0, rev: 0, uploaded: true }, pending: s.metadata.hasPendingWrites });
+          list.push({ id: s.id, address, createdAt: num(raw.createdAt), updatedAt: num(raw.updatedAt), pdf: { name: '', size: 0, rev: 0, uploaded: true }, pending: s.metadata.hasPendingWrites, archived: raw.archived === true });
         }
       });
       onPlans(sortPlans(list));
@@ -125,7 +125,7 @@ export class FirebasePlanStore implements PlanStore {
   save(id: string, state: PlanState): void {
     const prev = this.known.get(id);
     if (!prev) { this.emit(new Error(NOT_FOUND)); return; }
-    const next = toDoc(state, { address: prev.address, createdAt: prev.createdAt, updatedAt: Date.now(), pdf: prev.pdf });
+    const next = toDoc(state, { address: prev.address, createdAt: prev.createdAt, updatedAt: Date.now(), pdf: prev.pdf, archived: prev.archived });
     // Never write what load couldn't read back (e.g. a NaN point becomes null): that would lock the plan
     try { fromDoc(next); } catch (e) { this.emit(asError(e)); return; }
     const bytes = docBytes(next);
@@ -145,6 +145,13 @@ export class FirebasePlanStore implements PlanStore {
     updateDoc(this.docRef(id), { address: clean, updatedAt }).catch(this.report);
     const prev = this.known.get(id);
     if (prev) this.known.set(id, { ...prev, address: clean, updatedAt });
+  }
+
+  async setArchived(id: string, archived: boolean): Promise<void> {
+    // By id, without fromDoc, like rename; updatedAt stays so "Edited …" still means an edit
+    updateDoc(this.docRef(id), { archived }).catch(this.report);
+    const prev = this.known.get(id);
+    if (prev) this.known.set(id, { ...prev, archived });
   }
 
   async replacePdf(id: string, pdf: File): Promise<void> {

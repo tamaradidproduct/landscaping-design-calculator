@@ -128,11 +128,12 @@
 - **Offline:** full offline (open, edit, create) after one online sign-in on that device; syncs when back online. Plans not yet uploaded show "Not synced yet".
 - **Storage:** Firebase (Auth, Firestore `nam5`, Cloud Storage `us-central1`, Blaze plan). One doc per plan (outlines, surfaces, typed lengths); the plot plan PDF in Cloud Storage and cached on the device.
 - **Saving:** autosave about 1 s after each change; no Save button. Last write wins per plan.
-- **Plans screen:** newest-edited first; New plan (pick the PDF, then confirm: the address is optional and the plan is named from the address found in the PDF's text, else the file name, else "Untitled plan"; typed text always wins), rename address (name required), delete (inline confirm). "← Plans" in the editor.
+- **Plans screen:** newest-edited first; New plan (pick the PDF, then confirm: the address is optional and the plan is named from the address found in the PDF's text, else the file name, else "Untitled plan"; typed text always wins), rename address (name required), **archive** (archived plans leave the list for a collapsed "Archived (n)" section below it, with Unarchive; archiving doesn't count as an edit), delete (inline confirm).
+- 🔨 **Editor header:** top left of the plan, ← (back to Plans) · the plan's name · ⋯ menu with **Rename**, **Archive** and **Delete** (inline confirm). Capped at 300 px; a long name is cut with "…". Archive and Delete return to Plans with a message. The plot plan row's icon is a "replace" icon (it replaces the PDF; it doesn't rename).
 - **Replace plot plan:** allowed from the plot plan row (e.g. a revised survey); **outlines, surfaces and typed lengths are kept** as they are, for the contractor to re-check. Undo doesn't cover it.
 - Not saved: undo history, selection, zoom/pan, plot plan visibility.
 - ✅ Local testing without Google: dev builds only, `?store=memory`.
-- ⏸ Later: Firestore rules emulator tests; automated offline check (needs a built preview); contractor profile; sharing/teams; in-app invite admin; version history; importing old local-only work.
+- ⏸ Later: Google Maps address search in the address field (Finding #7); Firestore rules emulator tests; automated offline check (needs a built preview); contractor profile; sharing/teams; in-app invite admin; version history; importing old local-only work.
 - Spec: `docs/superpowers/specs/2026-10-15-plans-auth-design.md`.
 
 ## 7. Validation so far (Riesberg plot plan, 1" = 30')

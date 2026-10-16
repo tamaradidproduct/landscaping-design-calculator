@@ -8,6 +8,8 @@ export interface PlanStore {
   /** Fire-and-forget; failures go to onError. */
   save(id: string, state: PlanState): void;
   rename(id: string, address: string): Promise<void>;
+  /** Archived plans stay in the list (meta.archived) and keep their updatedAt. */
+  setArchived(id: string, archived: boolean): Promise<void>;
   replacePdf(id: string, pdf: File): Promise<void>;
   remove(id: string): Promise<void>;
   getPdf(id: string): Promise<ArrayBuffer>;

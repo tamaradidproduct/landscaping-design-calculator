@@ -76,6 +76,7 @@ export class PlansScreen {
   private extractSeq = 0;              // bumped per pick, Cancel and close: a late extraction result is ignored
   private extracted: string | null = null;
   private menuOpen = false;
+  private archivedOpen = false;
   private signOutWarn = false;
   private opening: string | null = null;
   private unwatch: (() => void) | null = null;
@@ -156,11 +157,17 @@ export class PlansScreen {
         + error(esc(this.newError), !this.newError), 'new-plan card stack', true)
       : button('New plan', { variant: 'primary', id: 'new-plan' });
     const now = Date.now();
-    const rows = this.plans.map(p => this.row(p, now)).join('');
+    const current = this.plans.filter(p => !p.archived), archived = this.plans.filter(p => p.archived);
+    const rows = current.map(p => this.row(p, now)).join('');
     const list = !this.loaded ? hint('Loading plans…')
       : rows ? `<div class="plan-list">${rows}</div>`
-        : emptyNote('No plans yet. Start one for your next job.');
-    this.root.innerHTML = `<div class="plans">${head}${create}${list}</div>`;
+        : emptyNote(archived.length ? 'No active plans. Archived plans are below.' : 'No plans yet. Start one for your next job.');
+    const archive = archived.length
+      ? `<section class="plans-archived">${button(`<svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>Archived (${archived.length})`,
+        { mods: ['archived-toggle'], id: 'archived-toggle', expanded: this.archivedOpen })}`
+        + (this.archivedOpen ? `<div class="plan-list">${archived.map(p => this.row(p, now)).join('')}</div>` : '') + '</section>'
+      : '';
+    this.root.innerHTML = `<div class="plans">${head}${create}${list}${archive}</div>`;
     for (const [id, v] of values) { const el = this.root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`); if (el) el.value = v; }
     if (active) this.root.querySelector<HTMLInputElement>(`#${CSS.escape(active)}`)?.focus();
   }
@@ -189,8 +196,9 @@ export class PlansScreen {
         + `<span class="plan-meta">${esc(meta)}${p.pending ? ' · <span class="plan-pending">Not synced yet</span>' : ''}</span>`,
       { mods: ['plan-open'], data: { act: 'open' } }),
       button('Rename', { mods: compact, data: { act: 'rename' } }),
+      p.archived ? button('Unarchive', { mods: compact, data: { act: 'unarchive' } }) : button('Archive', { mods: compact, data: { act: 'archive' } }),
       button('Delete', { mods: compact, variant: 'danger', data: { act: 'delete' } }),
-    ]);
+    ], p.archived ? 'archived' : undefined);
   }
 
   private onClick(e: Event) {
@@ -213,6 +221,9 @@ export class PlansScreen {
       case 'open': if (!this.opening) this.opts.onOpen(id); return;
       case 'rename': this.inline = { kind: 'rename', id }; this.render(); this.focusRename(); return;
       case 'rename-save': void this.saveRename(id); return;
+      case 'archive': case 'unarchive':
+        this.store.setArchived(id, act === 'archive').catch(err => this.opts.onError?.(err, 'save')); return;
+      case 'archived-toggle': this.archivedOpen = !this.archivedOpen; this.render(); return;
       case 'delete': this.inline = { kind: 'delete', id }; this.render(); return;
       case 'delete-confirm': {
         this.inline = null;

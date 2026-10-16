@@ -44,7 +44,37 @@ input.plan-rename { flex: 1 1 12em; }
 .plan-confirm { flex: 1 1 12em; margin: 0 var(--space-3); font-size: var(--text-base); }
 .plan-row > .text-error { flex-basis: 100%; padding: 0 var(--space-3); }
 
-/* Editor: "← Plans" and the Replace plot plan confirm in the side panel */
-#back-to-plans { align-self: flex-start; }
+/* Archived: a collapsed section under the list; its rows are muted */
+.plans-archived { display: flex; flex-direction: column; gap: var(--space-4); }
+button.archived-toggle {
+  align-self: flex-start; display: flex; align-items: center; gap: var(--space-4); min-height: var(--control-md); padding: 0 var(--space-3);
+  font-size: var(--text-base); font-weight: var(--weight-strong); color: var(--color-muted); background: transparent; border-color: transparent;
+}
+button.archived-toggle:hover { color: var(--color-ink); }
+button.archived-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
+.plan-row.archived .plan-address { color: var(--color-muted); }
+
+/* Editor header, top left of the plan: "← Plans", the plan's name and its ⋯ menu */
+.plan-head {
+  position: absolute; z-index: var(--z-chip); left: calc(var(--space-6) + env(safe-area-inset-left, 0px)); top: calc(var(--space-6) + env(safe-area-inset-top, 0px));
+  width: min(var(--width-plan-head), calc(100% - 2 * var(--space-6))); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
+}
+.plan-bar {
+  display: flex; align-items: center; width: 100%; box-sizing: border-box; padding: var(--space-2);
+  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+}
+.plan-bar > button { flex: none; }
+.plan-bar > #back-to-plans { border-color: transparent; }
+/* Dividers either side of the name */
+.plan-title { flex: 1; min-width: 0; margin: 0 var(--space-2); padding: 0 var(--space-5); border-inline: var(--border-width) solid var(--color-line); font-size: var(--text-lg); font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-bar > #plan-more { border-color: transparent; }
+.plan-bar > #plan-more[aria-expanded="true"] { background: var(--color-bg); }
+.plan-menu { width: min(var(--width-card), 100%); padding: var(--space-4); }
+.plan-menu .plan-confirm { margin: var(--space-2) var(--space-3); }
+.menu-list { display: flex; flex-direction: column; }
+button.menu-item { min-height: var(--control-md); padding: 0 var(--space-5); font-size: var(--text-base); text-align: left; background: transparent; border-color: transparent; }
+button.menu-item:hover { background: var(--color-bg); }
+
+/* Editor: the Replace plot plan confirm in the side panel */
 .replace-confirm { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
 .replace-text { margin: 0; font-size: var(--text-base); line-height: var(--leading-body); }

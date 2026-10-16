@@ -69,6 +69,7 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 
 /* ---------- Field: stacked label over a control ---------- */
 .field > .text-label { margin-bottom: var(--space-3); }
+.field > input { display: block; width: 100%; box-sizing: border-box; } /* a lone field spans its form */
 
 /* ---------- Field group: label + input (+ action) on one wrapping line ---------- */
 .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); font-size: var(--text-base); font-variant-numeric: tabular-nums; }

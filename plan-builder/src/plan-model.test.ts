@@ -41,6 +41,8 @@ describe('toDoc / fromDoc', () => {
     expect(reasonOf(kind)).toBe('invalid');
     const ref = valid(); ref.refs[0].feet = Infinity;
     expect(reasonOf(ref)).toBe('invalid');
+    expect(reasonOf({ ...valid(), archived: 'yes' })).toBe('invalid');
+    expect(reasonOf({ ...valid(), archived: true })).toBeNull();
     expect(reasonOf(valid())).toBeNull();
   });
 });
@@ -67,7 +69,7 @@ describe('downloadTimeoutMs', () => {
 });
 
 describe('sortPlans', () => {
-  const p = (id: string, address: string, updatedAt: number): PlanMeta => ({ id, address, createdAt: 0, updatedAt, pdf, pending: false });
+  const p = (id: string, address: string, updatedAt: number): PlanMeta => ({ id, address, createdAt: 0, updatedAt, pdf, pending: false, archived: false });
   test('newest first, ties by address', () => {
     const sorted = sortPlans([p('a', 'B St', 5), p('b', 'A St', 5), p('c', 'Z St', 9)]);
     expect(sorted.map(x => x.id)).toEqual(['c', 'b', 'a']);
