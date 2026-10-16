@@ -37,7 +37,7 @@
 | Unit | Job | Depends on |
 |---|---|---|
 | `address-extract.ts` (new, pure) | `extractAddress(text): string \| null`; `fileNameToTitle(name): string`; `suggestName({ typed, extracted, fileName }): string` | — |
-| `pdf-protocol.ts` / `pdf-worker.ts` | New `text` request: page-1 text via PDFium's text API; any failure resolves `''` (the 3 s timeout lives in `PdfClient.text`, since a running worker call can't be interrupted) | pdfium |
+| `pdf-protocol.ts` / `pdf-worker.ts` | New `text` request: page-1 text via PDFium's text API; any failure resolves `''` (the 3 s budget lives in `PdfClient.text`, since a running worker call can't be interrupted; it starts once the PDF engine is ready) | pdfium |
 | `plans-ui.ts` | "File picked" form state, "Create plan" / "Change PDF", prefill and the user-edited guard; the "address required" check on create is removed | address-extract, pdf client |
 | `plan-store.ts` / `plan-model.ts` | No change | — |
 

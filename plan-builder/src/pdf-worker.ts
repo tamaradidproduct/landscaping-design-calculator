@@ -54,7 +54,14 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       // Its own temporary document: the one the viewer has open stays untouched
       const tmp = await lib!.loadDocument(new Uint8Array(req.bytes));
       try {
-        post({ type: 'text', id: req.id, text: tmp.getPage(0).getText() });
+        const page = tmp.getPage(0);
+        try {
+          post({ type: 'text', id: req.id, text: page.getText() });
+        } finally {
+          // destroy() doesn't close the page getPage loaded: ~4 MB of WASM heap leaks per pick otherwise
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          raw()._FPDF_ClosePage((page as any).pageIdx);
+        }
       } finally {
         tmp.destroy();
       }

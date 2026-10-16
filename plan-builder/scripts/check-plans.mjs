@@ -1,6 +1,6 @@
 // Saved-plans flow on Riesberg (memory store): create → outline House → back to Plans → reopen → rename → delete.
-// Usage: node scripts/make-text-fixture.mjs   (once: writes test-fixtures/address-text.pdf; that folder is gitignored)
-//        node scripts/check-plans.mjs <riesberg.pdf> [url]
+// Usage: node scripts/check-plans.mjs <riesberg.pdf> [url]
+// Needs test-fixtures/address-text.pdf (committed; `node scripts/make-text-fixture.mjs` regenerates it).
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -36,7 +36,7 @@ check('Button now reads Change PDF', (await page.innerText('#new-pdf')) === 'Cha
 
 await fresh();
 await page.setInputFiles('#file', TEXT_PDF);
-await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 5000 })
+await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 30000 })
   .then(() => check('PDF text address replaces the file name', true), async () => check('PDF text address replaces the file name', false, await addr()));
 
 await freshWarm();
