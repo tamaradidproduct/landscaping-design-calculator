@@ -5,7 +5,7 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
-import { patternDefs, scalePatterns } from './patterns';
+import { patternDefs, scalePatterns, zonePatternDefs, zoneTileFt } from './patterns';
 import type { OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -17,8 +17,8 @@ registerSW({ immediate: true });
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage'), pageEl = $('page'), base = $<HTMLCanvasElement>('base'), sharp = $<HTMLCanvasElement>('sharp');
-// Surface fill patterns, defined once for the plan overlay and the Layers swatches.
-document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs></svg>`);
+// Surface fill patterns: the picker and Layers swatches' fixed ones here, one per zone for the plan (zone-defs).
+document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs><defs id="zone-defs"></defs></svg>`);
 const pdf = new PdfClient();
 pdf.warmup();
 
@@ -41,10 +41,16 @@ let shell: Shell | null = null; // sign-in, Plans and autosave (app-shell.ts); t
 let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const pxPerPtNow = () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c);
-const patternRoot = document.querySelector('.defs')!;
-/** Texture tiles repeat at their real-world size: resize them to the current zoom and scale. */
+const zoneDefs = document.getElementById('zone-defs')!;
+let zoneKey = '';
+/** Each zone's texture repeats at its real-world size: add or drop zone patterns, then resize them to the current zoom and scale. */
 // ftPerPt is per true-shape point, and toScreen applies the stretch correction first: fitScale × zoom is its screen scale.
-const rescalePatterns = () => scalePatterns(patternRoot, tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
+const rescalePatterns = () => {
+  const zones = Object.values(tool.outlines).filter(o => o.kind === 'surface' && o.material);
+  const key = zones.map(o => `${o.id}:${o.material}`).join();
+  if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material! }))); }
+  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, zoneTileFt(o.material!, o.texScale)])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
+};
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
   toScreen: p => { const q = applyCorrection(correction, p); return { x: q.x * fitScale * view.scale + view.x, y: q.y * fitScale * view.scale + view.y }; },

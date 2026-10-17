@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Outline } from './outline';
-import { groupCounts, groupToOpen, readOpen } from './sections';
+import { groupCounts, groupToOpen, isHidden, readOpen, type Group } from './sections';
 
 const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, kind, name: id, pts: [], closed });
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
@@ -19,5 +19,28 @@ describe('collapsible Layers sections', () => {
     expect(readOpen(null)).toEqual({ outlines: true, surfaces: true });
     expect(readOpen('{"outlines":false}')).toEqual({ outlines: false, surfaces: true });
     expect(readOpen('not json')).toEqual({ outlines: true, surfaces: true });
+  });
+});
+
+describe('hiding layers and sections', () => {
+  const boundary = { id: 'b', kind: 'boundary', name: 'Plot boundary', pts: [], closed: true } as Outline;
+  const house = { id: 'f1', kind: 'feature', name: 'House', pts: [], closed: true } as Outline;
+  const lawn = { id: 's1', kind: 'surface', name: 'Lawn', pts: [], closed: true } as Outline;
+  const none = new Set<never>();
+  test('nothing hidden by default', () => expect([boundary, house, lawn].some(o => isHidden(o, none, none))).toBe(false));
+  test('a hidden layer is hidden, its neighbours are not', () => {
+    expect(isHidden(house, new Set(['f1']), none)).toBe(true);
+    expect(isHidden(lawn, new Set(['f1']), none)).toBe(false);
+  });
+  test('a hidden section hides the plot boundary and features together, or the surfaces', () => {
+    const g = new Set<Group>(['outlines']);
+    expect([isHidden(boundary, none, g), isHidden(house, none, g), isHidden(lawn, none, g)]).toEqual([true, true, false]);
+    expect(isHidden(lawn, none, new Set<Group>(['surfaces']))).toBe(true);
+  });
+  test('showing a section again restores each layer\'s own state', () => {
+    const layers = new Set(['f1']);
+    expect(isHidden(house, layers, new Set<Group>(['outlines']))).toBe(true);
+    expect(isHidden(house, layers, none)).toBe(true); // still hidden itself
+    expect(isHidden(boundary, layers, none)).toBe(false);
   });
 });

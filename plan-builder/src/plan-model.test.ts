@@ -8,6 +8,33 @@ const state: PlanState = { outlines: { s1: surface }, refs: [{ id: 's1', i: 0, f
 const valid = () => JSON.parse(JSON.stringify(toDoc(state, meta)));
 const reasonOf = (data: unknown) => { try { fromDoc(data); } catch (e) { return e instanceof PlanFormatError ? e.reason : 'other'; } return null; };
 
+describe('texture scale and visibility', () => {
+  test('texScale, hiddenLayers and hiddenSections round-trip', () => {
+    const st: PlanState = { outlines: { s1: { ...surface, texScale: 1.5 } }, refs: [], hiddenLayers: ['s1'], hiddenSections: ['surfaces', 'outlines'] };
+    const doc = fromDoc(toDoc(st, meta));
+    expect(doc.outlines.s1.texScale).toBe(1.5);
+    expect(doc.hiddenLayers).toEqual(['s1']);
+    expect(doc.hiddenSections).toEqual(['surfaces', 'outlines']);
+  });
+  test('a plan without them still opens', () => {
+    const doc = fromDoc(valid());
+    expect(doc.hiddenLayers).toBeUndefined();
+    expect(doc.hiddenSections).toBeUndefined();
+  });
+  test.each([['0', 0], ['too big', 5], ['too small', 0.1], ['text', 'x'], ['NaN', null]])('texScale %s is an invalid plan', (_, v) => {
+    const doc = valid(); doc.outlines.s1.texScale = v;
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+  test.each([['not a list', 'x'], ['not strings', [1]]])('hiddenLayers %s is an invalid plan', (_, v) => {
+    const doc = valid(); doc.hiddenLayers = v;
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+  test('an unknown hidden section is an invalid plan', () => {
+    const doc = valid(); doc.hiddenSections = ['lot'];
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+});
+
 describe('toDoc / fromDoc', () => {
   test('an old material id is remapped when loaded', () => {
     const doc = valid(); doc.outlines.s1.material = 'sod';

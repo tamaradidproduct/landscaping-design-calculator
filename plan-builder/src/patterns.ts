@@ -1,6 +1,6 @@
-// Fill patterns for surfaces: one SVG <pattern> per material showing its texture tile, defined once in the document
-// and used by the plan overlay and the Layers swatches alike. The plan's patterns repeat at the material's real-world
-// size, so they are resized (scalePatterns) as the plan zooms; the swatch patterns keep a fixed screen size.
+// Fill patterns for surfaces. Each zone has its own SVG <pattern> (its material's tile, repeating at the material's
+// real-world size times the zone's texture scale), resized (scalePatterns) as the plan zooms. The picker and Layers
+// swatches use one fixed-size pattern per material.
 import { MATERIALS, material, type MaterialId } from './materials';
 
 /** Smallest tile on screen, so zoomed-out textures don't turn to noise. */
@@ -19,18 +19,26 @@ export function tileSizePx(tileFt: number, ftPerPt: number | null, pxPerPt: numb
 const pattern = (id: string, href: string, px: number) =>
   `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${px}" height="${px}"><image href="${href}" width="${px}" height="${px}" preserveAspectRatio="none"/></pattern>`;
 
-/** The <pattern> elements for every material (place inside an <svg><defs>). */
-export function patternDefs(): string {
-  return MATERIALS.map(m => pattern(`material-${m.id}`, m.tile, FALLBACK_TILE_PX) + pattern(`swatch-${m.id}`, m.tile, SWATCH_TILE_PX)).join('');
-}
+/** Feet a zone's tile covers: its material's repeat times the zone's texture scale. */
+export const zoneTileFt = (id: MaterialId, texScale = 1): number => material(id).tileFt * texScale;
+
+/** The fixed-size swatch <pattern>s for every material (place inside an <svg><defs>). */
+export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.tile, SWATCH_TILE_PX)).join('');
+
+/** One plan <pattern> per zone, at the fallback size until scalePatterns sizes it. */
+export const zonePatternDefs = (zones: { id: string; material: MaterialId }[]): string =>
+  zones.map(z => pattern(`zone-${z.id}`, material(z.material).tile, FALLBACK_TILE_PX)).join('');
 
 /**
- * Resizes the plan patterns under `root` to real-world scale and anchors them at `origin` (the plan's top-left on screen),
- * so a texture pans and zooms with its zone. `pxPerPt` is screen px per true-shape page point (what `ftPerPt` is per).
+ * Resizes the zone patterns under `root` to real-world scale and anchors them at `origin` (the plan's top-left on screen),
+ * so a texture pans and zooms with its zone. `tileFt` is each zone's tile in feet; `pxPerPt` is screen px per
+ * true-shape page point (what `ftPerPt` is per).
  */
-export function scalePatterns(root: ParentNode, ftPerPt: number | null, pxPerPt: number, origin: { x: number; y: number }): void {
-  root.querySelectorAll('pattern[id^="material-"]').forEach(p => {
-    const px = String(tileSizePx(material(p.id.slice('material-'.length)).tileFt, ftPerPt, pxPerPt));
+export function scalePatterns(root: ParentNode, tileFt: ReadonlyMap<string, number>, ftPerPt: number | null, pxPerPt: number, origin: { x: number; y: number }): void {
+  root.querySelectorAll('pattern').forEach(p => {
+    const ft = tileFt.get(p.id.slice('zone-'.length));
+    if (ft === undefined) return;
+    const px = String(tileSizePx(ft, ftPerPt, pxPerPt));
     p.setAttribute('width', px); p.setAttribute('height', px);
     p.setAttribute('x', String(origin.x)); p.setAttribute('y', String(origin.y));
     const img = p.querySelector('image');
@@ -38,5 +46,5 @@ export function scalePatterns(root: ParentNode, ftPerPt: number | null, pxPerPt:
   });
 }
 
-export const materialFill = (id: MaterialId) => `url(#material-${id})`;
+export const zoneFill = (zoneId: string) => `url(#zone-${zoneId})`;
 export const swatchFill = (id: MaterialId) => `url(#swatch-${id})`;
