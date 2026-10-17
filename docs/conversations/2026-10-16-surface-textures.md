@@ -16,6 +16,11 @@
 - Visibility is **saved with the plan** (session-only was the alternative), as `hiddenLayers` and `hiddenSections` next to `outlines` (not on the outlines, so undo can't bring a layer back). Not an undo step.
 - The plot boundary belongs to the Outlines section. Only collapsed rows have an eye; a selected layer's card has none.
 
+## Picker, sharper textures, rounding (same day)
+- The material picker is a **list** (swatch + name rows under family captions), not chips. Selected zones stay solid; only the zone being drawn is see-through. The zone card is more compact.
+- Textures are **688 px tiles** cut from Figma's 4× exports of each swatch (the raw source images have the wrong tint, so they were not used). Swatches use 64 px thumbnails, so the big tiles load only for zones.
+- **Round all corners** takes ↑ ↓ (Shift: 2′) like a corner's radius field. The sharp corner's round handle moved out (22 → 34 px) and its hit area grew (13 → 18 px); on a rounded corner's arc it stays 13 px so the sides beside it stay grabbable. Rounding already works on any straight-edged shape; corners next to a curved edge stay sharp (asked, not changed).
+
 ## Later
 - Tiles are 184 px (the size Figma gives); re-export larger if textures look soft at high zoom.
 - Per-material tile sizes (some textures may want a bigger or smaller repeat than 10 ft).
