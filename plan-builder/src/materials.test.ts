@@ -38,5 +38,10 @@ describe('materials', () => {
     expect(normalizeMaterialId('sand')).toBe('sand');
     expect(normalizeMaterialId('nope')).toBeNull();
   });
+  test('the flat material colours are gone from the tokens; the shade and edge mix stay', () => {
+    for (const id of Object.keys(LEGACY_MATERIAL_IDS)) expect(token(`color-material-${id}`)).toBeUndefined();
+    expect(token('color-material-shade')).toBeDefined();
+    expect(token('mix-material-edge')).toBeDefined();
+  });
   test('surfaces being edited are see-through at 0.5', () => expect(token('opacity-surface-editing')?.value).toBe('0.5'));
 });

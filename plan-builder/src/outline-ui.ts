@@ -40,7 +40,7 @@ export interface ToolHost {
 }
 
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
-const colorOf = (o: Outline) => o.kind === 'surface' ? `var(--color-material-${o.material})` : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
+const colorOf = (o: Outline) => o.kind === 'surface' ? material(o.material!).edge : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's material fill (colour + pattern), as an inline style addition. */
 const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${materialFill(o.material)}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…

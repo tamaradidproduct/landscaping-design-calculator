@@ -12,7 +12,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         // PDFium's WebAssembly engine is ~4 MB; precache it so the viewer works offline.
-        globPatterns: ['**/*.{js,mjs,css,html,svg,wasm}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,wasm,webp}'],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
       manifest: {
