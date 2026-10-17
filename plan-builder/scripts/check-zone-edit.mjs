@@ -36,7 +36,7 @@ try {
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=pavers]');
+  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['Snap while drawing a surface', await snapLabel()]);
   await drag([300, 250], [360, 350]); // 12′ × 20′, stays selected
   results.push(['Rename field', `wrap ${!!await page.$('#surfaces .layer-rename-wrap')} · pencil ${!!await page.$('#surfaces .layer-rename-wrap svg')} · ${await page.$eval('#surfaces .layer-rename-wrap', e => getComputedStyle(e).borderBottomStyle)} underline`]);
@@ -56,7 +56,7 @@ try {
   results.push(['Material in the card', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
   await page.click('#surfaces [data-act=change-material]');
   results.push(['Change', `chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
-  await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(150);
+  await page.click('#surfaces [data-card] [data-material=red-flagstone]'); await page.waitForTimeout(150);
   results.push(['Pick Flagstone', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
 
   const before = await shape('s1');

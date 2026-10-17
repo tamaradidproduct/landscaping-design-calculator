@@ -110,7 +110,7 @@
 
 ### 6.8 Surfaces (Step 4) ✅🔨
 - The contractor adds the **new work** as zones filled with a material. Stage 1 is **visual only** (no quantities yet).
-- **Materials:** a built-in starter list, each with a flat colour + simple pattern — Hardscape: Gravel, Pavers, Flagstone, Brushed concrete, Stamped concrete, Decking; Softscape: Sod, Artificial turf, Mulch, River rock, Decorative rock. Kept as data so library textures can replace the look later.
+- **Materials:** the **29 area textures of the Landscaping symbols library** (Figma `0B2UpvIGBFOE1ZEDx8rXPR`), grouped in the picker by family — Turf & seed, Mulch & soil, Rock & gravel, Pavers & stone, Concrete, Decking. Each is a photo-texture tile that **repeats at a real-world size (2 ft) and scales with zoom and the plan's scale**; a plan with no scale yet shows a fixed-size texture. Plans saved with the earlier 11 flat-colour materials open with the nearest texture. Linear, point and utility surfaces (fences, walls, edging, stepping stones, dry river, gas/electric/drainage markers) come with the symbols step.
 - **Layers:** a **Surfaces** section (hardscape and softscape together) **above Outlines**; Objects & plants will sit between them later.
 - **Clipping:** the plot boundary clips zones; **existing features (Outlines) always cut zones**, whatever was drawn first; within Surfaces a higher zone cuts lower ones; Layer order ↑ ↓ stays within the section; a zone drawn wholly inside another zone goes just above it.
 - **Starting a zone:** only once the plot boundary is closed. **Add surface…** → pick a material → draw with Freehand or Rectangle (same tool, snapping, curves, Square, undo). Zones also snap to other outlines' **edges**, so a bed can share the lawn's edge.
@@ -121,7 +121,7 @@
 - 🔨 **Draw shape default by kind:** outlines (plot boundary, existing features) start in **Freehand**; surfaces start in **Rectangle**. Switching (bar or X) while drawing is remembered **per kind** on the device, so a zone last drawn Freehand starts Freehand next time and the outlines' choice is unaffected.
 - 🔨 **Snap is off by default for surfaces** (designed, not traced) and on for outlines; the Snap toggle switches the one for what's being drawn or edited.
 - 🔨 **Width × Depth (stage 2):** a selected zone's card has a **Size** row — **Width** and **Depth** of the zone's bounding box (axis-aligned to the page, true feet), for any zone, not only rectangles; an irregular shape reports its overall extent. Typing one resizes the zone **from the center of that box**, along that axis only; an unreadable entry snaps back. A **lock** between the fields (off by default) scales both axes in proportion. The lock is a session preference, not saved, and turns off when another zone is selected. Curved sides count with their bulge. One undo step per entry. Needs a scale (hidden until one exists). Zones only: outlines' typed lengths set the scale. Not shown while drawing.
-- 📝 Next: **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, library textures, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
+- 📝 Next: **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
 
 ### 6.9 Plans & sign-in ✅🔨
 - A contractor keeps **many plans, one per job/address**, and opens any of them on any of their devices.

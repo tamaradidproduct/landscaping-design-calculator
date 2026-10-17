@@ -1,0 +1,124 @@
+// Saved-plans flow on Riesberg (memory store): create → outline House → back to Plans → reopen → rename → delete.
+// Usage: node scripts/check-plans.mjs <riesberg.pdf> [url]
+// Needs test-fixtures/address-text.pdf (committed; `node scripts/make-text-fixture.mjs` regenerates it).
+import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
+
+const [pdf, url = 'http://localhost:5180/?store=memory'] = process.argv.slice(2);
+const HOUSE = [[291.3, 301.1], [376.1, 301.1], [376.1, 314.8], [432.6, 314.8], [432.6, 504.4], [377.6, 504.4], [377.6, 435.8], [278.9, 435.8], [278.9, 400.5], [291.3, 400.5]];
+
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
+const results = [];
+const check = (name, ok, detail = '') => results.push([name, ok ? 'pass' : 'FAIL', detail]);
+const TEXT_PDF = fileURLToPath(new URL('../test-fixtures/address-text.pdf', import.meta.url)), EXTRACTED = '12 Oak Ln, Denver, CO 80202';
+const FILE_TITLE = basename(pdf).replace(/\.pdf$/i, '').replace(/[-_]+/g, ' ').trim(); // "riesberg plot plan"
+const fresh = async () => { await page.goto(url); await page.waitForTimeout(3500); await page.click('#new-plan'); };
+// Race checks need a proven-warm engine: extract once here (waits for the address), then reopen the form.
+const freshWarm = async () => {
+  await fresh();
+  await page.setInputFiles('#file', TEXT_PDF);
+  await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 30000 });
+  await page.click('[data-act=new-cancel]');
+  await page.click('#new-plan');
+};
+const addr = () => page.inputValue('#new-address');
+try {
+// New plan form: pick first, name from the PDF text or file name, nothing created until Create plan
+await fresh();
+check('Address field is optional', !(await page.$eval('#new-address', e => e.required)));
+await page.setInputFiles('#file', pdf);
+await page.waitForSelector('#create-plan');
+check('File name prefills the field', (await addr()) === FILE_TITLE, await addr());
+check('Button now reads Change PDF', (await page.innerText('#new-pdf')) === 'Change PDF');
+
+await fresh();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 30000 })
+  .then(() => check('PDF text address replaces the file name', true), async () => check('PDF text address replaces the file name', false, await addr()));
+
+await freshWarm();
+await page.fill('#new-address', 'Typed Name');
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForTimeout(2000); // warm engine: extraction has long resolved
+check('Typed text is never overwritten', (await addr()) === 'Typed Name', await addr());
+
+await freshWarm();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.waitForFunction(v => document.getElementById('new-address').value === v, EXTRACTED, { timeout: 5000 });
+await page.fill('#new-address', '');
+await page.click('#create-plan');
+await page.waitForFunction(() => document.getElementById('toast').textContent.startsWith('Opened'), null, { timeout: 60000 });
+await page.click('#back-to-plans');
+await page.waitForSelector('.plan-row');
+const created = await page.locator('.plan-address').first().innerText().catch(() => '');
+check('Cleared field still creates a plan named from the PDF text', created === EXTRACTED, created);
+
+await fresh();
+await page.setInputFiles('#file', 'package.json');
+await page.waitForSelector('.text-error:not([hidden])');
+check('Non-PDF shows the error and no Create plan', (await page.innerText('.new-plan .text-error')) === "That file isn't a PDF. Pick the plot plan PDF."
+  && !(await page.$('#create-plan')));
+
+await fresh();
+await page.setInputFiles('#file', pdf);
+await page.waitForSelector('#create-plan');
+await page.click('[data-act=new-cancel]');
+check('Cancel closes the form and creates nothing', !(await page.$('.new-plan')) && !(await page.$('.plan-row')));
+
+await freshWarm();
+await page.setInputFiles('#file', TEXT_PDF);
+await page.setInputFiles('#file', pdf);
+await page.waitForTimeout(2000); // warm engine: A's extraction has long resolved
+check('Change PDF mid-extraction keeps the new file name', (await addr()) === FILE_TITLE, await addr());
+
+await page.goto(url); await page.waitForTimeout(3500);
+await openPlan(page, pdf);
+const toScreen = ([x, y]) => page.evaluate(([x, y]) => {
+  const r = document.getElementById('page').getBoundingClientRect();
+  return [r.left + x * r.width / 612, r.top + y * r.height / 1008];
+}, [x, y]);
+await page.$eval('#snap', b => b.click()); // exact placement
+await page.click('#outlines [data-feature="House"]');
+for (const p of HOUSE) { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(380); }
+await page.click('#outlines [data-act=close]');
+const labels = () => page.$$eval('.overlay .label.feature', ts => ts.map(t => t.textContent).join(', '));
+check('House outlined', (await labels()).includes('House'), await labels());
+const bytes = await page.evaluate(() => window.__planBytes());
+check('Saved document is 100..800 000 bytes', bytes > 100 && bytes < 800000, `${bytes} bytes`);
+await page.waitForTimeout(1500);
+
+await page.click('#back-to-plans');
+const row = page.locator('.plan-row');
+await row.first().waitFor();
+const text = await row.first().innerText();
+check('Row shows address and "Edited just now"', text.includes('Riesberg test') && text.includes('Edited just now'), text.replace(/\s+/g, ' '));
+
+await page.evaluate(() => { document.getElementById('toast').textContent = ''; });
+await row.first().locator('.plan-open').click();
+await page.waitForFunction(() => { const t = document.getElementById('toast'); return !t.hidden && t.textContent.startsWith('Opened'); }, null, { timeout: 60000 });
+await page.waitForFunction(() => [...document.querySelectorAll('.overlay .label.feature')].some(t => t.textContent.includes('House')), null, { timeout: 10000 });
+check('Reopened plan has the House label', (await labels()).includes('House'), await labels());
+
+await page.click('#back-to-plans');
+await page.locator('.plan-row [data-act=rename]').click();
+await page.fill('.plan-rename', '14 Elm St');
+await page.press('.plan-rename', 'Enter');
+await page.waitForFunction(() => document.querySelector('.plan-address')?.textContent === '14 Elm St', null, { timeout: 5000 });
+check('Renamed to 14 Elm St', true);
+
+await page.locator('.plan-row [data-act=delete]').click();
+check('Delete asks for confirmation', (await page.locator('.plan-confirm').innerText()).includes('14 Elm St'));
+await page.locator('.plan-row [data-act=delete-confirm]').click();
+await page.waitForSelector('.plans-empty');
+const empty = await page.innerText('.plans-empty');
+check('Empty state copy shown', empty === 'No plans yet. Start one for your next job.', empty);
+
+} catch (e) {
+  check('Script completed', false, String(e).split('\n')[0].slice(0, 160));
+}
+console.table(results.map(([check, result, detail]) => ({ check, result, detail })));
+await browser.close();
+if (results.some(r => r[1] !== 'pass')) process.exit(1);

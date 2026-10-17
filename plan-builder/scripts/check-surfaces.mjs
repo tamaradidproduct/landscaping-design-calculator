@@ -38,7 +38,7 @@ await page.keyboard.press('Escape');
 results.push(['After the plot boundary', `${(await page.textContent('#surfaces')).trim()}`]);
 
 // Sod before any scale: tapping its edge offers no length field.
-await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=sod]');
+await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=premium-sod]');
 await drag([280, 180], [520, 400]);
 results.push(['Zone closed before a scale: toast', await toast()]);
 await tap([400, 400]);
@@ -58,7 +58,7 @@ const sod = await shape('s1');
 results.push(['House (drawn later) cuts the sod', `sod rings ${sod?.rings} (2 = with a hole)`]);
 
 // Pavers 12′ × 20′ (60 × 100 pt), inside the sod → placed above it.
-await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=pavers]');
+await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=pavers-classic]');
 await drag([300, 250], [360, 350]);
 results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod rings now ${(await shape('s1'))?.rings}`]);
 results.push(['Plan look', `boundary fill ${await page.$eval('.overlay .shape.boundary.closed', e => getComputedStyle(e).fill)} (expect none) · surface labels ${await page.$$eval('.overlay .label.surface', e => e.length)} (expect 0)`]);
@@ -66,7 +66,7 @@ results.push(['Selected zone see-through, other solid', `pavers ${await fillOpac
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 
 // With the pavers still selected, Add surface… starts a new zone (it must not re-material the pavers).
-await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=mulch]');
+await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=wood-mulch]');
 results.push(['Add surface… while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
 await drag([250, 150], [330, 190]); // its top edge lies on the lot line
 await tap([290, 150]);
@@ -87,10 +87,10 @@ results.push(['⌘Z', `x ${back.x0}..${back.x1} (expect 300..360)`]);
 await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(150);
 
 // Material and name.
-await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=flagstone]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=red-flagstone]'); await page.waitForTimeout(100);
 results.push(['Pavers → Flagstone', await zones()]);
 await page.fill('#surface-rename', 'Back patio'); await page.press('#surface-rename', 'Enter'); await page.waitForTimeout(100);
-await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=gravel]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=clear-mountain-granite]'); await page.waitForTimeout(100);
 const mat = () => page.$eval('#surfaces [data-card] .layer-head .swatch rect', e => e.getAttribute('fill'));
 results.push(['Renamed, then → Gravel', `${await zones()} · ${await mat()}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
