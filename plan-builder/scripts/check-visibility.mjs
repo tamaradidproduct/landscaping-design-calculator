@@ -23,6 +23,16 @@ const tile = id => page.$eval(`#zone-defs pattern#zone-${id}`, p => Number(p.get
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
+  // Before any scale is set, the texture scale still works (and follows zoom).
+  if (await page.$('#surfaces [data-zone=s1]')) await page.click('#surfaces [data-zone=s1]'); // else its card is already open
+  const u0 = await tile('s1');
+  await page.click('#surfaces [data-act=tex-up]'); await page.waitForTimeout(150);
+  const u1 = await tile('s1');
+  await page.click('#zoom-in'); await page.waitForTimeout(250);
+  const u2 = await tile('s1');
+  check('No scale yet: + still enlarges the texture', Math.abs(u1 / u0 - 1.25) < 0.001, `${u0.toFixed(1)} → ${u1.toFixed(1)}`);
+  check('No scale yet: the texture follows zoom', u2 > u1 * 1.1, `${u1.toFixed(1)} → ${u2.toFixed(1)}`);
+  await page.click('#surfaces [data-act=tex-reset]'); await page.click('#fit'); await page.keyboard.press('Escape'); await page.waitForTimeout(250);
   await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape');
   await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=deck-wood]'); await drag([300, 420], [480, 620]); await page.keyboard.press('Escape');
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');

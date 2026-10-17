@@ -5,7 +5,8 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
-import { patternDefs, scalePatterns, zonePatternDefs, zoneTileFt } from './patterns';
+import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
+import { material } from './materials';
 import type { OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -49,7 +50,7 @@ const rescalePatterns = () => {
   const zones = Object.values(tool.outlines).filter(o => o.kind === 'surface' && o.material);
   const key = zones.map(o => `${o.id}:${o.material}`).join();
   if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material! }))); }
-  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, zoneTileFt(o.material!, o.texScale)])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
+  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, { tileFt: material(o.material!).tileFt, texScale: o.texScale ?? 1 }])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
 };
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
