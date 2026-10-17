@@ -141,7 +141,13 @@ function updateGroups() {
     $(`group-${g}`).hidden = !isOpen;
     count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
   });
+  document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
+    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : 'outlines';
+    b.setAttribute('aria-pressed', String(!hidden));
+    b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
+  });
 }
+document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => { b.onclick = () => tool.toggleSection(b.dataset.eyeGroup as Group); });
 document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
   b.onclick = () => setGroupOpen(b.dataset.group as Group, !groupsOpen[b.dataset.group as Group]);
 });

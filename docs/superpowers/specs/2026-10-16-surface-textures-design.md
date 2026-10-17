@@ -34,7 +34,7 @@ interface Material {
   family: Family;
   trade: Trade;          // kept for later quantities; not used by the picker
   tile: string;          // asset URL (Vite import)
-  tileFt: number;        // real-world repeat; default 6
+  tileFt: number;        // real-world repeat; default 10
   edge: string;          // zone edge colour, average of the tile, computed at export
 }
 ```
