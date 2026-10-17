@@ -1,7 +1,8 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
 import type { MaterialId } from './materials';
-import { cornerArc } from './shape-edit';
+import { cornerRound } from './shape-edit';
+import { edgeBetween } from './fillet';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -115,15 +116,15 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
 }
 
 /**
- * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points); a
- * corner next to a bent edge stays sharp.
+ * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points), also next to
+ * a bent edge: the rounding then trims the arc.
  */
 export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean, radii?: number[]): Point[] {
   const out: Point[] = [], n = pts.length, edges = closed ? n : n - 1;
+  const rounds = pts.map((_, i) => closed && radii?.[i] ? cornerRound(pts, bulges, i, radii[i]) : null);
   for (let i = 0; i < edges; i++) {
-    const arc = closed && radii?.[i] && !bulges?.[i] && !bulges?.[(i - 1 + n) % n] ? cornerArc(pts, i, radii[i]) : null;
-    const edge = edgePoints(pts[i], pts[(i + 1) % n], bulges?.[i] ?? 0);
-    out.push(...(arc ?? [pts[i]]), ...edge.slice(1));
+    const j = (i + 1) % n;
+    out.push(...(rounds[i]?.arc ?? [pts[i]]), ...edgeBetween(pts[i], pts[j], bulges?.[i] ?? 0, rounds[i]?.tOut ?? 0, rounds[j]?.tIn ?? 1));
   }
   if (!closed && pts.length) out.push(pts[pts.length - 1]);
   return out;
