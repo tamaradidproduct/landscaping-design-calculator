@@ -3,12 +3,20 @@ import { PlanFormatError, cleanAddress, docBytes, downloadTimeoutMs, editedAgo, 
 
 const pdf = { name: 'plot.pdf', size: 1234, rev: 1, uploaded: true };
 const meta = { address: '12 Elm St', createdAt: 1000, updatedAt: 2000, pdf };
-const surface = { id: 's1', kind: 'surface' as const, name: 'Sod', pts: [{ x: 1, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 5 }], closed: true, bulges: [0, 4, 0], radii: [0, 2, 0], material: 'sod' as const };
+const surface = { id: 's1', kind: 'surface' as const, name: 'Sod', pts: [{ x: 1, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 5 }], closed: true, bulges: [0, 4, 0], radii: [0, 2, 0], material: 'premium-sod' as const };
 const state: PlanState = { outlines: { s1: surface }, refs: [{ id: 's1', i: 0, feet: 12 }] };
 const valid = () => JSON.parse(JSON.stringify(toDoc(state, meta)));
 const reasonOf = (data: unknown) => { try { fromDoc(data); } catch (e) { return e instanceof PlanFormatError ? e.reason : 'other'; } return null; };
 
 describe('toDoc / fromDoc', () => {
+  test('an old material id is remapped when loaded', () => {
+    const doc = valid(); doc.outlines.s1.material = 'sod';
+    expect(fromDoc(doc).outlines.s1.material).toBe('premium-sod');
+  });
+  test('an unknown material id is an invalid plan', () => {
+    const doc = valid(); doc.outlines.s1.material = 'nope';
+    expect(reasonOf(doc)).toBe('invalid');
+  });
   test('round-trips a surface with bulges and radii', () => {
     const doc = fromDoc(toDoc(state, meta));
     expect({ outlines: doc.outlines, refs: doc.refs }).toEqual(state);

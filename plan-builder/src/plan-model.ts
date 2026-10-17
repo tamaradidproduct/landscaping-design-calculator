@@ -1,6 +1,7 @@
 // Pure model for a saved plan document (Firestore). No Firebase imports.
 import type { Outline, OutlineKind } from './outline';
 import type { Reference } from './scale';
+import { normalizeMaterialId } from './materials';
 
 export interface PdfInfo { name: string; size: number; rev: number; uploaded: boolean }
 export interface PlanState { outlines: Record<string, Outline>; refs: Reference[] }
@@ -61,7 +62,14 @@ export function fromDoc(data: unknown): PlanDoc {
     if (!isObj(r) || typeof r.id !== 'string') return invalid('reference');
     num(r.i, 'reference i'); num(r.feet, 'reference feet');
   });
-  return strip(data) as unknown as PlanDoc;
+  const doc = strip(data) as unknown as PlanDoc;
+  for (const o of Object.values(doc.outlines)) {
+    if (o.material === undefined) continue;
+    const id = normalizeMaterialId(o.material);
+    if (!id) return invalid(`outline ${o.id} material`);
+    o.material = id;
+  }
+  return doc;
 }
 
 /** Whole-download timeout for a PDF of `size` bytes: 15 s, or longer at 50 KB/s for big files. */
