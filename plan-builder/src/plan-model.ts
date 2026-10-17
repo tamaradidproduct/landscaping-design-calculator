@@ -1,10 +1,12 @@
 // Pure model for a saved plan document (Firestore). No Firebase imports.
-import type { Outline, OutlineKind } from './outline';
+import { TEX_SCALE, type Outline, type OutlineKind } from './outline';
+import { GROUPS, type Group } from './sections';
 import type { Reference } from './scale';
 import { normalizeMaterialId } from './materials';
 
 export interface PdfInfo { name: string; size: number; rev: number; uploaded: boolean }
-export interface PlanState { outlines: Record<string, Outline>; refs: Reference[] }
+/** `hiddenLayers` (outline ids) and `hiddenSections` are absent when nothing is hidden. */
+export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[] }
 /** `archived` is absent on plans that were never archived. */
 export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; archived?: boolean }
 export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean; archived: boolean }
@@ -25,8 +27,8 @@ export function cleanAddress(raw: string): string | null {
 /** Deep copy; JSON drops `undefined` keys, which Firestore rejects. */
 const strip = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs'>): PlanDoc =>
-  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs });
+export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections'>): PlanDoc =>
+  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections });
 
 const invalid = (what: string): never => { throw new PlanFormatError('invalid', `Invalid plan: ${what}`); };
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -42,6 +44,7 @@ function checkOutline(key: string, o: unknown) {
   if (o.bulges !== undefined) numArray(o.bulges, `outline ${key} bulges`);
   if (o.radii !== undefined) numArray(o.radii, `outline ${key} radii`);
   if (o.material !== undefined && typeof o.material !== 'string') invalid(`outline ${key} material`);
+  if (o.texScale !== undefined && !(typeof o.texScale === 'number' && o.texScale >= TEX_SCALE.min && o.texScale <= TEX_SCALE.max)) invalid(`outline ${key} texScale`);
 }
 
 /** Validates by hand and returns the data typed; throws PlanFormatError. */
@@ -57,6 +60,8 @@ export function fromDoc(data: unknown): PlanDoc {
   num(pdf.size, 'pdf size'); num(pdf.rev, 'pdf rev');
   if (!isObj(data.outlines)) return invalid('outlines');
   Object.entries(data.outlines).forEach(([k, o]) => checkOutline(k, o));
+  if (data.hiddenLayers !== undefined && !(Array.isArray(data.hiddenLayers) && data.hiddenLayers.every(x => typeof x === 'string'))) invalid('hiddenLayers');
+  if (data.hiddenSections !== undefined && !(Array.isArray(data.hiddenSections) && data.hiddenSections.every(x => GROUPS.includes(x as Group)))) invalid('hiddenSections');
   if (!Array.isArray(data.refs)) return invalid('refs');
   data.refs.forEach(r => {
     if (!isObj(r) || typeof r.id !== 'string') return invalid('reference');

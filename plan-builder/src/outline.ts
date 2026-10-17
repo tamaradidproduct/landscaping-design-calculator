@@ -19,10 +19,17 @@ export interface Outline {
   id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId;
   /** Corner radii in page points (surfaces only; 0 or missing = sharp). */
   radii?: number[];
+  /** A surface's texture scale: 1 = the material's own repeat (see TEX_SCALE for the range). */
+  texScale?: number;
 }
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';
+/** A zone's texture scale: smallest, largest, and the factor one press of − or + applies. */
+export const TEX_SCALE = { min: 0.25, max: 4, step: 1.25 } as const;
+/** One press of − (-1) or + (+1) on a zone's texture scale, kept within TEX_SCALE and free of rounding drift. */
+export const stepTexScale = (scale: number, dir: 1 | -1): number =>
+  Math.min(TEX_SCALE.max, Math.max(TEX_SCALE.min, Math.round(scale * TEX_SCALE.step ** dir * 1000) / 1000));
 export const sectionOf = (kind: OutlineKind): Section => kind === 'boundary' ? 'lot' : kind === 'feature' ? 'outlines' : 'surfaces';
 const SECTION_RANK: Record<Section, number> = { lot: 0, outlines: 1, surfaces: 2 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, type Outline } from './outline';
+import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, stepTexScale, type Outline } from './outline';
 
 describe('parseFeet', () => {
   test.each([
@@ -197,4 +197,20 @@ describe('review fixes', () => {
 describe('parseRadius', () => {
   test.each([['', 0], ['0', 0], ["0'", 0], ['2', 2], ["2' 6\"", 2.5]])('%s → %d ft', (v, ft) => expect(parseRadius(v)).toBe(ft));
   test('rejects nonsense', () => expect(parseRadius('abc')).toBeNull());
+});
+
+describe('stepTexScale', () => {
+  test('one press multiplies or divides by 1.25', () => {
+    expect(stepTexScale(1, 1)).toBe(1.25);
+    expect(stepTexScale(1.25, -1)).toBe(1);
+  });
+  test('stays within 0.25–4', () => {
+    expect(stepTexScale(4, 1)).toBe(4);
+    expect(stepTexScale(3.5, 1)).toBe(4);
+    expect(stepTexScale(0.25, -1)).toBe(0.25);
+  });
+  test('does not drift over repeated presses', () => {
+    let s = 1; for (let i = 0; i < 5; i++) s = stepTexScale(s, 1); for (let i = 0; i < 5; i++) s = stepTexScale(s, -1);
+    expect(s).toBe(1);
+  });
 });
