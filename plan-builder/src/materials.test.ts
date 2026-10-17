@@ -17,10 +17,10 @@ describe('materials', () => {
     groups.forEach(g => expect(g.materials.length).toBeGreaterThan(0));
     expect(groups.flatMap(g => g.materials)).toHaveLength(29);
   });
-  test('every material has a tile, a 2 ft repeat and an edge colour', () => {
+  test('every material has a tile, a 6 ft repeat and an edge colour', () => {
     for (const m of MATERIALS) {
       expect(m.tile).toBeTruthy();
-      expect(m.tileFt).toBe(2);
+      expect(m.tileFt).toBe(6);
       expect(m.edge).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
