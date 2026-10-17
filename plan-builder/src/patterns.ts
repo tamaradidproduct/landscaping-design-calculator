@@ -24,11 +24,15 @@ export function patternDefs(): string {
   return MATERIALS.map(m => pattern(`material-${m.id}`, m.tile, FALLBACK_TILE_PX) + pattern(`swatch-${m.id}`, m.tile, SWATCH_TILE_PX)).join('');
 }
 
-/** Resizes the plan patterns under `root` to real-world scale. */
-export function scalePatterns(root: ParentNode, ftPerPt: number | null, pxPerPt: number): void {
+/**
+ * Resizes the plan patterns under `root` to real-world scale and anchors them at `origin` (the plan's top-left on screen),
+ * so a texture pans and zooms with its zone. `pxPerPt` is screen px per true-shape page point (what `ftPerPt` is per).
+ */
+export function scalePatterns(root: ParentNode, ftPerPt: number | null, pxPerPt: number, origin: { x: number; y: number }): void {
   root.querySelectorAll('pattern[id^="material-"]').forEach(p => {
     const px = String(tileSizePx(material(p.id.slice('material-'.length)).tileFt, ftPerPt, pxPerPt));
     p.setAttribute('width', px); p.setAttribute('height', px);
+    p.setAttribute('x', String(origin.x)); p.setAttribute('y', String(origin.y));
     const img = p.querySelector('image');
     img?.setAttribute('width', px); img?.setAttribute('height', px);
   });

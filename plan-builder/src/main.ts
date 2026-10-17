@@ -43,7 +43,8 @@ let outlines: OutlinesSection | null = null; // the Layers panel's Outlines sect
 const pxPerPtNow = () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c);
 const patternRoot = document.querySelector('.defs')!;
 /** Texture tiles repeat at their real-world size: resize them to the current zoom and scale. */
-const rescalePatterns = () => scalePatterns(patternRoot, tool.cal?.ftPerPt ?? null, pxPerPtNow());
+// ftPerPt is per true-shape point, and toScreen applies the stretch correction first: fitScale × zoom is its screen scale.
+const rescalePatterns = () => scalePatterns(patternRoot, tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
   toScreen: p => { const q = applyCorrection(correction, p); return { x: q.x * fitScale * view.scale + view.x, y: q.y * fitScale * view.scale + view.y }; },

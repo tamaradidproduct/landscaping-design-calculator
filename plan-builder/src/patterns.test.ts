@@ -36,10 +36,15 @@ describe('scalePatterns', () => {
   };
   test('sizes plan patterns to real-world scale and leaves swatches alone', () => {
     const { root, els } = fake();
-    scalePatterns(root, 0.05, 10);
+    scalePatterns(root, 0.05, 10, { x: 30, y: 40 });
     expect(els[0].attrs).toMatchObject({ width: '400', height: '400' });
     expect(els[0].img.attrs).toMatchObject({ width: '400', height: '400' });
     expect(els[1].attrs).toEqual({});
+  });
+  test('anchors plan patterns at the plan origin so the texture moves with the zone', () => {
+    const { root, els } = fake();
+    scalePatterns(root, 0.05, 10, { x: 30, y: 40 });
+    expect(els[0].attrs).toMatchObject({ x: '30', y: '40' });
   });
   test('swatches stay SWATCH_TILE_PX', () => expect(patternDefs()).toContain(`width="${SWATCH_TILE_PX}"`));
 });
