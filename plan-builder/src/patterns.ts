@@ -1,28 +1,42 @@
-// Fill patterns for surfaces: one SVG <pattern> per material, defined once in the document and used by the plan
-// overlay and the Layers swatches alike. Drawn in screen pixels, so they don't grow with zoom.
-import { MATERIALS, type MaterialId, type PatternId } from './materials';
+// Fill patterns for surfaces: one SVG <pattern> per material showing its texture tile, defined once in the document
+// and used by the plan overlay and the Layers swatches alike. The plan's patterns repeat at the material's real-world
+// size, so they are resized (scalePatterns) as the plan zooms; the swatch patterns keep a fixed screen size.
+import { MATERIALS, material, type MaterialId } from './materials';
 
-/** Tile size and marks per pattern; marks use `currentColor` (the material shaded with color-material-shade at mix-material-edge). */
-const TILES: Record<PatternId, { w: number; h: number; marks: string }> = {
-  plain: { w: 8, h: 8, marks: '' },
-  lines: { w: 6, h: 6, marks: '<path d="M0 3H6" stroke="currentColor" stroke-width="0.6"/>' },
-  speckle: { w: 10, h: 10, marks: '<circle cx="2" cy="3" r="0.9"/><circle cx="7" cy="1.5" r="0.7"/><circle cx="5" cy="7.5" r="0.9"/><circle cx="9" cy="6" r="0.6"/>' },
-  pebbles: { w: 12, h: 12, marks: '<g fill="none" stroke="currentColor" stroke-width="0.7"><ellipse cx="3" cy="3" rx="2.2" ry="1.6"/><ellipse cx="9" cy="5" rx="1.8" ry="1.4"/><ellipse cx="5" cy="9.5" rx="2" ry="1.5"/></g>' },
-  dots: { w: 5, h: 5, marks: '<circle cx="1.5" cy="1.5" r="0.6"/><circle cx="4" cy="3.8" r="0.5"/>' },
-  brick: { w: 12, h: 8, marks: '<path d="M0 0.5H12M0 4.5H12M3 0.5V4.5M9 4.5V8.5" fill="none" stroke="currentColor" stroke-width="0.7"/>' },
-  cells: { w: 16, h: 16, marks: '<path d="M0 6L7 4L9 0M7 4L10 11L16 9M10 11L6 16M0 6L2 13L6 16" fill="none" stroke="currentColor" stroke-width="0.7"/>' },
-  grid: { w: 10, h: 10, marks: '<path d="M0 0.5H10M0.5 0V10" fill="none" stroke="currentColor" stroke-width="0.7"/>' },
-  boards: { w: 6, h: 20, marks: '<path d="M0.5 0V20M3.5 13V17" fill="none" stroke="currentColor" stroke-width="0.7"/>' },
-};
+/** Smallest tile on screen, so zoomed-out textures don't turn to noise. */
+export const MIN_TILE_PX = 4;
+/** Tile size on screen while the plan has no scale yet. */
+export const FALLBACK_TILE_PX = 64;
+/** Tile size in the picker and Layers swatches. */
+export const SWATCH_TILE_PX = 24;
+
+/** Screen px a tile of `tileFt` feet covers, given the plan's feet per PDF point (null: not known) and screen px per PDF point. */
+export function tileSizePx(tileFt: number, ftPerPt: number | null, pxPerPt: number): number {
+  if (ftPerPt === null || !Number.isFinite(ftPerPt) || ftPerPt <= 0) return FALLBACK_TILE_PX;
+  return Math.max(MIN_TILE_PX, tileFt / ftPerPt * pxPerPt);
+}
+
+const pattern = (id: string, href: string, px: number) =>
+  `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${px}" height="${px}"><image href="${href}" width="${px}" height="${px}" preserveAspectRatio="none"/></pattern>`;
 
 /** The <pattern> elements for every material (place inside an <svg><defs>). */
 export function patternDefs(): string {
-  return MATERIALS.map(m => {
-    const t = TILES[m.pattern], c = `var(--${m.color})`;
-    return `<pattern id="material-${m.id}" patternUnits="userSpaceOnUse" width="${t.w}" height="${t.h}"`
-      + ` style="color: color-mix(in srgb, ${c} var(--mix-material-edge), var(--color-material-shade)); fill: currentColor">`
-      + `<rect width="${t.w}" height="${t.h}" style="fill: ${c}"/>${t.marks}</pattern>`;
-  }).join('');
+  return MATERIALS.map(m => pattern(`material-${m.id}`, m.tile, FALLBACK_TILE_PX) + pattern(`swatch-${m.id}`, m.tile, SWATCH_TILE_PX)).join('');
+}
+
+/**
+ * Resizes the plan patterns under `root` to real-world scale and anchors them at `origin` (the plan's top-left on screen),
+ * so a texture pans and zooms with its zone. `pxPerPt` is screen px per true-shape page point (what `ftPerPt` is per).
+ */
+export function scalePatterns(root: ParentNode, ftPerPt: number | null, pxPerPt: number, origin: { x: number; y: number }): void {
+  root.querySelectorAll('pattern[id^="material-"]').forEach(p => {
+    const px = String(tileSizePx(material(p.id.slice('material-'.length)).tileFt, ftPerPt, pxPerPt));
+    p.setAttribute('width', px); p.setAttribute('height', px);
+    p.setAttribute('x', String(origin.x)); p.setAttribute('y', String(origin.y));
+    const img = p.querySelector('image');
+    img?.setAttribute('width', px); img?.setAttribute('height', px);
+  });
 }
 
 export const materialFill = (id: MaterialId) => `url(#material-${id})`;
+export const swatchFill = (id: MaterialId) => `url(#swatch-${id})`;

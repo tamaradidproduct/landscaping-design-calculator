@@ -5,7 +5,7 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
-import { patternDefs } from './patterns';
+import { patternDefs, scalePatterns } from './patterns';
 import type { OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -40,10 +40,15 @@ const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale 
 let shell: Shell | null = null; // sign-in, Plans and autosave (app-shell.ts); told about every editor change
 let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
+const pxPerPtNow = () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c);
+const patternRoot = document.querySelector('.defs')!;
+/** Texture tiles repeat at their real-world size: resize them to the current zoom and scale. */
+// ftPerPt is per true-shape point, and toScreen applies the stretch correction first: fitScale × zoom is its screen scale.
+const rescalePatterns = () => scalePatterns(patternRoot, tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
   toScreen: p => { const q = applyCorrection(correction, p); return { x: q.x * fitScale * view.scale + view.x, y: q.y * fitScale * view.scale + view.y }; },
-  pxPerPt: () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c),
+  pxPerPt: pxPerPtNow,
   drawMagnified(ctx, s, zoom, size) {
     const span = size / zoom; // screen px shown in the magnifier
     ctx.globalAlpha = 1; ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, size, size);
@@ -71,6 +76,7 @@ const tool = new OutlineTool({
     ($('redo') as HTMLButtonElement).disabled = !canRedo;
   },
   changed() {
+    rescalePatterns(); // a typed edge length can change the plan's scale
     shell?.changed();
     surfaces?.render();
     outlines?.render();
@@ -276,6 +282,7 @@ function applyView(next: View, settle = true) {
   pageEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
   $<HTMLButtonElement>('zoom-out').disabled = view.scale <= MIN_ZOOM;
   $<HTMLButtonElement>('zoom-in').disabled = view.scale >= MAX_ZOOM;
+  rescalePatterns();
   tool.render();
   if (settle) renderSharpSoon();
 }

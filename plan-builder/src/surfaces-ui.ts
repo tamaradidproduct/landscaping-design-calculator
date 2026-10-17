@@ -1,16 +1,14 @@
 // The Layers panel's Surfaces section: the new work (hardscape and softscape zones), above Outlines. One row per
 // zone in layer order (a higher zone cuts the ones below; outlines cut every zone), then "Add surface…", which
 // opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
-import { material, materialsByTrade, type MaterialId, type Trade } from './materials';
+import { material, materialsByFamily, type MaterialId } from './materials';
 import { formatFeet, parseFeet, parseRadius, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
 import { button, caption, choiceLine, chips, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
 
-const TRADES: [Trade, string][] = [['hardscape', 'Hardscape'], ['softscape', 'Softscape']];
-
-/** Chips for every material, grouped by trade; `current` is marked. */
-const picker = (current?: MaterialId) => TRADES.map(([trade, title]) => `${caption(title)}${chips(materialsByTrade(trade).map(m =>
+/** Chips for every material, grouped by family; `current` is marked. */
+const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}${chips(materials.map(m =>
   button(`${swatch({ material: m.id })}${esc(m.name)}`, { mods: ['chip', 'compact', 'material-chip'], pressed: m.id === current, data: { material: m.id } })))}`).join('');
 
 export class SurfacesSection {

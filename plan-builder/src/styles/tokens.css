@@ -25,17 +25,6 @@
   --color-feature-ink: #1e2422; /* Feature name on its fill (6.8:1 light, 5.4:1 dark). */
   --color-snap: #d0349a; /* The point being placed: ring, crosshair, magnifier crosshair, snap marks and their labe… */
   --color-guide: #0b8f6a; /* Hints that never snap: 90° corner mark, "Straight", dashed alignment lines. */
-  --color-material-sod: #7fae5b; /* Sod surface fill (with its pattern). */
-  --color-material-turf: #4fae3e; /* Artificial turf surface fill (with its pattern). */
-  --color-material-mulch: #8a5a3b; /* Mulch surface fill (with its pattern). */
-  --color-material-river-rock: #8d9ba8; /* River rock surface fill (with its pattern). */
-  --color-material-decorative-rock: #c7b28b; /* Decorative rock surface fill (with its pattern). */
-  --color-material-gravel: #bcb9b1; /* Gravel surface fill (with its pattern). */
-  --color-material-pavers: #a68d7b; /* Pavers surface fill (with its pattern). */
-  --color-material-flagstone: #c9a676; /* Flagstone surface fill (with its pattern). */
-  --color-material-concrete-brushed: #d4d4cf; /* Brushed concrete surface fill (with its pattern). */
-  --color-material-concrete-stamped: #cdbfa8; /* Stamped concrete surface fill (with its pattern). */
-  --color-material-decking: #9a6a44; /* Decking surface fill (with its pattern). */
   --color-material-shade: #000000; /* Mixed into a material colour (at mix-material-edge) for its pattern marks and a zone's… */
 
   /* ---------- Type scale ---------- */

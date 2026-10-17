@@ -1,7 +1,7 @@
 // UI components as HTML-string builders. Every class name the components in styles/components.css
 // rely on is written here, so templates elsewhere compose these instead of spelling out markup.
 import type { MaterialId } from './materials';
-import { materialFill } from './patterns';
+import { swatchFill } from './patterns';
 
 export type ButtonVariant = 'default' | 'primary' | 'danger';
 export interface ButtonOptions {
@@ -100,10 +100,10 @@ export function nudgePad(): string {
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
-/** A layer's swatch: the outline kind's look, or a surface's material (colour + pattern). */
+/** A layer's swatch: the outline kind's look, or a surface's material (its texture). */
 export type Swatch = 'boundary' | 'feature' | { material: MaterialId };
 export const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
-  : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${materialFill(s.material)}"/></svg></span>`;
+  : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${swatchFill(s.material)}"/></svg></span>`;
 
 /** Layer row: a swatch for the outline kind, the name, and an optional status (e.g. "Drawing…"). */
 export interface LayerRowOptions {

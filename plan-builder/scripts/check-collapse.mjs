@@ -26,7 +26,7 @@ try {
   results.push(['Start', `surfaces ${await head('surfaces')} · outlines ${await head('outlines')} · plot plan shown ${await planShown()}`]);
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=sod]'); await drag([280, 420], [520, 600]); await page.keyboard.press('Escape');
+  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await drag([280, 420], [520, 600]); await page.keyboard.press('Escape');
 
   await page.click('.group-head[data-group=outlines]');
   results.push(['Collapse Outlines', `${await head('outlines')} (expect "· 2") · plot plan shown ${await planShown()}`]);
