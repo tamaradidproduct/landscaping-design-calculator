@@ -11,7 +11,8 @@ import type { PlanState } from './plan-model';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
-import { stretchEdge } from './stretch';
+import { boxSize, resizeBox, stretchEdge } from './stretch';
+import { DEFAULT_SHAPES, shapeGroup, type ShapePrefs } from './shape-pref';
 import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
 import { materialFill } from './patterns';
 import { material, type MaterialId } from './materials';
@@ -78,9 +79,11 @@ export class OutlineTool {
   /** Whether snapping is on for what is being drawn or edited now (a surface, or an outline). */
   get snapOn() { return this.snap[this.editingKind === 'surface' ? 'surfaces' : 'outlines']; }
   set snapOn(on: boolean) { this.snap[this.editingKind === 'surface' ? 'surfaces' : 'outlines'] = on; }
-  private get editingKind() { const id = this.drawing ?? this.selected; return id ? this.outlines[id]?.kind ?? null : null; }
-  /** How new outlines are drawn (the bottom bar's Freehand | Rectangle). */
+  get editingKind() { const id = this.drawing ?? this.selected; return id ? this.outlines[id]?.kind ?? null : null; }
+  /** How the layer being drawn is drawn (the bottom bar's Freehand | Rectangle). */
   shape: OutlineShape = 'freehand';
+  /** The remembered choice per kind: each new layer starts with its kind's (see shape-pref.ts). */
+  shapePrefs: ShapePrefs = { ...DEFAULT_SHAPES };
   private rawAt: Point | null = null;          // where the point would be without snapping
   private snapped: 'corner' | 'line' | 'own' | null = null;
   private stick: { page: Point; kind: 'corner' | 'line' | 'own' } | null = null; // current snap target (sticky)
@@ -210,6 +213,7 @@ export class OutlineTool {
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
     this.drawing = id;
+    this.shape = this.shapePrefs[shapeGroup(kind)];
     this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selected = null;
     this.update();
   }
@@ -602,6 +606,7 @@ export class OutlineTool {
   /** Select an outline from the Layers panel (null: drop the selection). */
   selectOutline(id: string | null) {
     if (this.drawing || (id && !this.outlines[id]?.closed)) return;
+    if (id !== this.selected) this.aspectLock = false;
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
   }
   /** Switch between drawing corner by corner and dragging a rectangle; an outline already started starts over (undoable). */
@@ -610,6 +615,7 @@ export class OutlineTool {
     const o = this.current();
     if (o?.pts.length) { this.record(); o.pts = []; this.selectedCorner = null; this.lastTap = null; }
     this.shape = shape; this.dragAt = null; this.hoverPlaced = null;
+    this.shapePrefs[shapeGroup(this.editingKind)] = shape;
     this.update();
     if (this.hoverAt) this.hover(this.hoverAt); // the pointer's mark follows the new tool straight away (X)
   }
@@ -778,6 +784,26 @@ export class OutlineTool {
     this.selectedEdge = null;
     this.update();
     this.host.toast(`${o.name}: edge now ${formatFeet(this.edgeFeet(id, i) ?? feet)}.`);
+  }
+  /** Width × Depth lock: typing one size scales the other in proportion. A session preference, off for each new selection. */
+  aspectLock = false;
+  /** A surface's bounding box in feet (true shape), or null before a scale exists. */
+  zoneBox(id: string): { w: number; h: number } | null {
+    const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !o.closed || !c) return null;
+    const b = boxSize(o.pts, o.bulges, c.correction);
+    return { w: b.w * c.ftPerPt, h: b.h * c.ftPerPt };
+  }
+  /** A surface's typed Width or Depth: scale it about the center of its bounding box (both sizes when locked). */
+  resizeZone(id: string, axis: 'w' | 'h', feet: number) {
+    const o = this.outlines[id], c = this.cal;
+    if (o?.kind !== 'surface' || !o.closed || !c || !(feet > 0)) return;
+    const before = this.zoneBox(id); if (!before || Math.abs(before[axis] - feet) < 1e-6) return;
+    this.record();
+    const t = resizeBox(o.pts, o.bulges, axis, feet / c.ftPerPt, this.aspectLock, c.correction);
+    o.pts = t.pts; if (t.bulges) o.bulges = t.bulges;
+    this.update();
+    const now = this.zoneBox(id)!;
+    this.host.toast(`${o.name}: ${formatFeet(now.w)} × ${formatFeet(now.h)}.`);
   }
   /** Swap which end of the open surface edge stays put. */
   swapFixedEnd() {

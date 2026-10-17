@@ -170,5 +170,9 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 /* "Round all corners [ 2′ ] Apply" in a surface's card */
 .round-all .row { flex-wrap: nowrap; }
 .round-all input { min-height: var(--control-md); font-size: var(--text-base); }
+/* "Width [ 12.00′ ] 🔗 Depth [ 20.00′ ]" in a surface's card; the lock sits level with the inputs */
+.zone-size .row { flex-wrap: nowrap; align-items: flex-end; }
+.zone-size .field { flex: 1; min-width: 0; }
+.zone-size input { min-height: var(--control-md); font-size: var(--text-base); }
 /* Choice line: one chosen value (swatch + name) and the action that opens the choices, e.g. a zone's material */
 .choice-line { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }

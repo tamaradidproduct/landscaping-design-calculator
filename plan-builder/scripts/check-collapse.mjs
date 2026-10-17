@@ -13,7 +13,7 @@ const open = async () => {
   await openPlan(page, pdf);
 };
 await page.goto(url); await page.waitForTimeout(3500);
-await page.evaluate(() => { localStorage.setItem('plan-builder.shape', 'rect'); localStorage.removeItem('plan-builder.sections'); });
+await page.evaluate(() => { localStorage.setItem('plan-builder.shape.outline', 'rect'); localStorage.removeItem('plan-builder.sections'); });
 await page.reload(); await page.waitForTimeout(3500);
 await open();
 await page.$eval('#snap', b => b.click());

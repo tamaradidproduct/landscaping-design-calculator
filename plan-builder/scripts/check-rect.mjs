@@ -14,7 +14,7 @@ const open = async () => {
   await page.$eval('#snap', b => b.click()); // exact placement
 };
 await page.goto(url); await page.waitForTimeout(3500);
-await page.evaluate(() => localStorage.removeItem('plan-builder.shape'));
+await page.evaluate(() => { localStorage.removeItem('plan-builder.shape.outline'); localStorage.removeItem('plan-builder.shape.surface'); });
 await open();
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 1008]; }, [x, y]);
 const corners = () => page.$$eval('.overlay .corner', cs => cs.map(c => [+c.getAttribute('cx'), +c.getAttribute('cy')]));
