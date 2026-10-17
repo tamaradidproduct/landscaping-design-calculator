@@ -18,9 +18,10 @@ describe('zoneTileFt', () => {
 });
 
 describe('patternDefs (swatches)', () => {
-  test('a fixed-size pattern per material showing its tile', () => {
+  test('a fixed-size pattern per material showing its thumbnail', () => {
     const defs = patternDefs();
-    for (const m of MATERIALS) { expect(defs).toContain(`id="swatch-${m.id}"`); expect(defs).toContain(m.tile); }
+    for (const m of MATERIALS) { expect(defs).toContain(`id="swatch-${m.id}"`); expect(defs).toContain(m.thumb); }
+    expect(defs).not.toContain(MATERIALS[0].tile); // swatches use small thumbnails, so the big tiles load only for zones
     expect(defs).toContain(`width="${SWATCH_TILE_PX}"`);
     expect(defs).not.toContain('id="material-');
   });
