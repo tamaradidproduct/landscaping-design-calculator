@@ -7,6 +7,7 @@ import { SurfacesSection } from './surfaces-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs } from './patterns';
 import type { OutlineShape } from './outline';
+import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 import { docBytes, toDoc } from './plan-model';
@@ -153,12 +154,12 @@ window.addEventListener('blur', () => tool.setModifiers(false, false));
 $('undo').onclick = () => tool.undo();
 $('redo').onclick = () => tool.redo();
 
-// Freehand | Rectangle, remembered on this device (a convenience: losing it just means Freehand). X switches.
-const SHAPE_KEY = 'plan-builder.shape';
-try { if (localStorage.getItem(SHAPE_KEY) === 'rect') tool.shape = 'rect'; } catch { /* storage blocked */ }
+// Freehand | Rectangle, remembered per kind on this device (a convenience: losing it just means the defaults,
+// Freehand for outlines and Rectangle for surfaces). X switches.
+tool.shapePrefs = loadShapes(k => localStorage.getItem(k));
 const pickShape = (shape: OutlineShape) => {
   tool.setShape(shape);
-  try { localStorage.setItem(SHAPE_KEY, shape); } catch { /* storage blocked */ }
+  try { localStorage.setItem(shapeKey(shapeGroup(tool.editingKind)), shape); } catch { /* storage blocked */ }
 };
 $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => {
   b.onclick = () => pickShape(b.dataset.shape === 'rect' ? 'rect' : 'freehand');

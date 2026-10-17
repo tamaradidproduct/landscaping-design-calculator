@@ -11,3 +11,6 @@
 
 ## Later
 - Stage 3: move one corner as a second resize choice in the edge popover.
+
+## Draw shape default (same day)
+- Outlines start in **Freehand**, surfaces in **Rectangle**. A switch made while drawing is remembered **per kind** (on the device), not shared; fixed defaults with no memory were the alternative. The old single shape preference is ignored.

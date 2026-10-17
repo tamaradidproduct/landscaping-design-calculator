@@ -9,7 +9,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.evaluate(() => { localStorage.setItem('plan-builder.shape', 'rect'); localStorage.removeItem('plan-builder.sections'); });
+await page.evaluate(() => { localStorage.setItem('plan-builder.shape.outline', 'rect'); localStorage.removeItem('plan-builder.sections'); });
 await page.reload(); await page.waitForTimeout(3500);
 await openPlan(page, pdf);
 const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 1008]; }, [x, y]);

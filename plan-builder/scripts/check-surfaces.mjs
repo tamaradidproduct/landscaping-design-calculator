@@ -10,7 +10,7 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2 });
 const results = [];
 await page.goto(url); await page.waitForTimeout(3500);
-await page.evaluate(() => localStorage.setItem('plan-builder.shape', 'rect'));
+await page.evaluate(() => localStorage.setItem('plan-builder.shape.outline', 'rect'));
 await page.reload(); await page.waitForTimeout(3500);
 await openPlan(page, pdf);
 await page.$eval('#snap', b => b.click()); // exact placement (edge snapping is covered by hand)
