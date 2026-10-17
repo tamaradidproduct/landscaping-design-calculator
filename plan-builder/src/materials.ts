@@ -11,8 +11,10 @@ export type Trade = SurfaceSource['trade'];
 
 export interface Material {
   id: MaterialId; name: string; family: Family; trade: Trade;
-  /** URL of the texture tile. */
+  /** URL of the texture tile (full size: loaded only once a zone uses it). */
   tile: string;
+  /** URL of a small version for the picker and Layers swatches. */
+  thumb: string;
   /** Feet the tile covers, across and down, before it repeats. */
   tileFt: number;
   /** The tile's average colour: a zone's edge, handle and label colour. */
@@ -20,10 +22,11 @@ export interface Material {
 }
 
 const tiles = import.meta.glob<string>('./assets/surfaces/*.webp', { eager: true, query: '?url', import: 'default' });
+const thumbs = import.meta.glob<string>('./assets/surfaces/thumbs/*.webp', { eager: true, query: '?url', import: 'default' });
 const TILE_FT = 10;
 
 export const MATERIALS: readonly Material[] = SURFACE_SOURCES.map(({ id, name, family, trade }) => ({
-  id, name, family, trade, tile: tiles[`./assets/surfaces/${id}.webp`], tileFt: TILE_FT, edge: (edges as Record<string, string>)[id],
+  id, name, family, trade, tile: tiles[`./assets/surfaces/${id}.webp`], thumb: thumbs[`./assets/surfaces/thumbs/${id}.webp`], tileFt: TILE_FT, edge: (edges as Record<string, string>)[id],
 }));
 
 export const material = (id: MaterialId): Material => MATERIALS.find(x => x.id === id)!;

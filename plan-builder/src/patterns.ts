@@ -23,7 +23,7 @@ const pattern = (id: string, href: string, px: number) =>
 export const zoneTileFt = (id: MaterialId, texScale = 1): number => material(id).tileFt * texScale;
 
 /** The fixed-size swatch <pattern>s for every material (place inside an <svg><defs>). */
-export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.tile, SWATCH_TILE_PX)).join('');
+export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.thumb, SWATCH_TILE_PX)).join('');
 
 /** One plan <pattern> per zone, at the fallback size until scalePatterns sizes it. */
 export const zonePatternDefs = (zones: { id: string; material: MaterialId }[]): string =>

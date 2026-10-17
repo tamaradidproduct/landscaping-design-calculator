@@ -6,11 +6,11 @@ import { TEX_SCALE } from './outline';
 import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, choiceLine, chips, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
+import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
 
-/** Chips for every material, grouped by family; `current` is marked. */
-const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}${chips(materials.map(m =>
-  button(`${swatch({ material: m.id })}${esc(m.name)}`, { mods: ['chip', 'compact', 'material-chip'], pressed: m.id === current, data: { material: m.id } })))}`).join('');
+/** Every material as a list, grouped by family under a caption; `current` is marked. */
+const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
+  button(`${swatch({ material: m.id })}<span class="layer-name">${esc(m.name)}</span>`, { mods: ['layer-row', ...(m.id === current ? ['selected'] : [])], pressed: m.id === current, data: { material: m.id } })).join('')}</div>`).join('');
 
 export class SurfacesSection {
   private picking = false; // the material picker for a new zone is open
