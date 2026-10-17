@@ -4,6 +4,7 @@
 import { material, materialsByFamily, type MaterialId } from './materials';
 import { TEX_SCALE } from './outline';
 import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from './outline';
+import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
 import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
@@ -63,11 +64,23 @@ export class SurfacesSection {
       size.querySelector<HTMLButtonElement>('[data-act=aspect-lock]')!.onclick = () => { t.aspectLock = !t.aspectLock; this.render(); };
     }
     const round = this.el.querySelector<HTMLFormElement>('form.round-all');
-    if (round && card) round.onsubmit = e => {
-      e.preventDefault();
-      const ft = parseRadius(round.querySelector('input')!.value);
-      if (ft !== null) t.roundAll(card.dataset.card!, ft);
-    };
+    if (round && card) {
+      const field = round.querySelector<HTMLInputElement>('input')!, id = card.dataset.card!;
+      round.onsubmit = e => {
+        e.preventDefault();
+        const ft = parseRadius(field.value);
+        if (ft !== null) t.roundAll(id, ft);
+      };
+      // Arrow keys step the radius live (0.5′, Shift 2′), like a corner's; the field keeps focus through the redraw.
+      field.onkeydown = e => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        const ft = stepRadius(parseRadius(field.value) ?? t.uniformRadius(id), e.key === 'ArrowUp' ? 1 : -1, e.shiftKey);
+        t.roundAll(id, ft, true);
+        const next = this.el.querySelector<HTMLInputElement>('form.round-all input');
+        if (next) { next.value = ft ? String(ft) : ''; next.focus(); }
+      };
+    }
   }
 
   /** Width × Depth of the zone's bounding box with an aspect lock between them (needs a scale). */
@@ -96,7 +109,7 @@ export class SurfacesSection {
     const mat = this.changing === o.id ? picker(o.material)
       : choiceLine(swatch(sw), material(o.material!).name, button('Change', { mods: ['compact'], data: { act: 'change-material' } }));
     const round = t.cal ? formStack(row(
-      input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
+      input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′ (↑ ↓ to adjust)', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
       body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,

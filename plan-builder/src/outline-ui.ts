@@ -747,7 +747,7 @@ export class OutlineTool {
     return o?.kind === 'surface' && o.closed ? o : null;
   }
   /** Where the selected surface corner's round handle sits (screen), on its bisector at the arc's middle. */
-  private roundHandlePos(): { id: string; i: number; at: Point } | null {
+  private roundHandlePos(): { id: string; i: number; at: Point; onArc: boolean } | null {
     const o = this.selectedZone, sel = this.selectedCorner;
     // The corner the pointer is near shows its handle; otherwise the selected corner does.
     const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
@@ -755,15 +755,15 @@ export class OutlineTool {
     // On the arc's middle once rounded (on the drawn line, even when the radius is clamped to the sides); a sharp
     // corner's handle sits just inside it.
     const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0);
-    if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]) };
+    if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]), onArc: true };
     const { dir } = cornerBisector(o.pts, c.i), d = MARK.roundHandleMin;
     const s = this.host.toScreen(o.pts[c.i]), t = this.host.toScreen({ x: o.pts[c.i].x + dir.x, y: o.pts[c.i].y + dir.y });
     const u = { x: t.x - s.x, y: t.y - s.y }, l = Math.hypot(u.x, u.y) || 1;
-    return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d } };
+    return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d }, onArc: false };
   }
   private roundHandleAt(p: Point) {
     const h = this.drawing ? null : this.roundHandlePos();
-    return h && dist(h.at, p) < HIT.roundHandle ? h : null;
+    return h && dist(h.at, p) < (h.onArc ? HIT.roundHandleOnArc : HIT.roundHandle) ? h : null;
   }
   private bendHandleAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd: number = HIT.bend;
@@ -870,11 +870,19 @@ export class OutlineTool {
     this.update();
   }
   /** Round every corner of a surface to one radius in feet (0 = all sharp). */
-  roundAll(id: string, feet: number) {
+  roundAll(id: string, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c) return;
-    this.record();
+    // Arrow-key steps within 1.5 s undo as one step (like a corner's).
+    const t = performance.now(), ln = this.lastNudge, key = -1, run = steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500;
+    if (!run) this.record(); else this.revision++;
+    if (steps) this.lastNudge = { t, id, i: key };
     o.radii = o.pts.map(() => feet / c.ftPerPt);
     this.update();
+  }
+  /** The one radius (feet) every corner of a surface has, or 0 when they differ or are sharp. */
+  uniformRadius(id: string): number {
+    const o = this.outlines[id], c = this.cal, r = o?.radii; if (!o || !c || !r?.length || r.length !== o.pts.length || r.some(x => x !== r[0])) return 0;
+    return Math.round(r[0] * c.ftPerPt * 100) / 100;
   }
   /** Square all corners: line every corner of an outline up with the others at once. */
   squareAll(id: string) {
