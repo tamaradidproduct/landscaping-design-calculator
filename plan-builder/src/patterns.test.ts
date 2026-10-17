@@ -1,19 +1,19 @@
 import { describe, expect, test } from 'vitest';
 import { MATERIALS, material } from './materials';
-import { FALLBACK_TILE_PX, MIN_TILE_PX, SWATCH_TILE_PX, patternDefs, scalePatterns, swatchFill, tileSizePx, zoneFill, zonePatternDefs, zoneTileFt } from './patterns';
+import { MIN_TILE_PX, SWATCH_TILE_PX, UNSCALED_TILE_PT, patternDefs, scalePatterns, swatchFill, tileSizePx, zoneFill, zonePatternDefs } from './patterns';
 
 describe('tileSizePx', () => {
-  test('tile feet ÷ feet per point × screen px per point', () => expect(tileSizePx(2, 0.05, 10)).toBe(400));
-  test('never smaller than MIN_TILE_PX', () => expect(tileSizePx(2, 0.05, 0.01)).toBe(MIN_TILE_PX));
-  test('without a usable scale it uses FALLBACK_TILE_PX', () => {
-    for (const ft of [null, 0, NaN, Infinity, -1]) expect(tileSizePx(2, ft, 10)).toBe(FALLBACK_TILE_PX);
+  test('tile feet × texture scale ÷ feet per point × screen px per point', () => {
+    expect(tileSizePx(2, 0.05, 10)).toBe(400);
+    expect(tileSizePx(2, 0.05, 10, 2)).toBe(800);
   });
-});
-
-describe('zoneTileFt', () => {
-  test('the material repeat times the zone scale (1 when unset)', () => {
-    expect(zoneTileFt('sand')).toBe(material('sand').tileFt);
-    expect(zoneTileFt('sand', 2)).toBe(material('sand').tileFt * 2);
+  test('never smaller than MIN_TILE_PX', () => expect(tileSizePx(2, 0.05, 0.01)).toBe(MIN_TILE_PX));
+  test('without a usable scale the tile is UNSCALED_TILE_PT page points, still following zoom and the texture scale', () => {
+    for (const ft of [null, 0, NaN, Infinity, -1]) {
+      expect(tileSizePx(10, ft, 2)).toBe(UNSCALED_TILE_PT * 2);
+      expect(tileSizePx(10, ft, 2, 3)).toBe(UNSCALED_TILE_PT * 2 * 3);
+      expect(tileSizePx(10, ft, 4)).toBe(UNSCALED_TILE_PT * 4);
+    }
   });
 });
 
@@ -48,13 +48,13 @@ describe('scalePatterns', () => {
   };
   test('sizes each zone pattern to real-world scale and anchors it at the plan origin', () => {
     const { root, els } = fake();
-    scalePatterns(root, new Map([['s1', 10]]), 0.05, 10, { x: 30, y: 40 });
+    scalePatterns(root, new Map([['s1', { tileFt: 10, texScale: 1 }]]), 0.05, 10, { x: 30, y: 40 });
     expect(els[0].attrs).toEqual({ width: '2000', height: '2000', x: '30', y: '40' });
     expect(els[0].img.attrs).toEqual({ width: '2000', height: '2000' });
   });
   test('a pattern with no zone left is skipped', () => {
     const { root, els } = fake();
-    scalePatterns(root, new Map([['s1', 10]]), 0.05, 10, { x: 0, y: 0 });
+    scalePatterns(root, new Map([['s1', { tileFt: 10, texScale: 1 }]]), 0.05, 10, { x: 0, y: 0 });
     expect(els[1].attrs).toEqual({});
   });
 });
