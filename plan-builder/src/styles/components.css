@@ -172,6 +172,8 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .chip-field input { width: var(--width-field-inline); flex: none; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); }
 /* "Round all corners [ 2′ ] Apply" in a surface's card */
 .round-all .row { flex-wrap: nowrap; }
+.tex-scale { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.tex-scale .row { flex-wrap: nowrap; }
 .round-all input { min-height: var(--control-md); font-size: var(--text-base); }
 /* "Width [ 12.00′ ] 🔗 Depth [ 20.00′ ]" in a surface's card; the lock sits level with the inputs */
 .zone-size .row { flex-wrap: nowrap; align-items: flex-end; }

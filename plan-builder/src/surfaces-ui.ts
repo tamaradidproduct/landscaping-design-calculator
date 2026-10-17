@@ -74,7 +74,7 @@ export class SurfacesSection {
   private size(o: Outline): string {
     const t = this.tool, b = t.zoneBox(o.id); if (!b) return '';
     const box = (id: string, text: string, ft: number) => field(id, text, input(id, { inputmode: 'decimal', value: formatFeet(ft), ariaLabel: text }));
-    return formStack(`${caption('Size')}${row(box('zone-width', 'Width', b.w),
+    return formStack(`${row(box('zone-width', 'Width', b.w),
       button('<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 014.5 9l1-1"/></svg>', { mods: ['icon', 'small', 'toggle'], pressed: t.aspectLock, ariaLabel: 'Lock aspect ratio', data: { act: 'aspect-lock' } }),
       box('zone-depth', 'Depth', b.h))}`, 'zone-size', true);
   }
@@ -82,10 +82,10 @@ export class SurfacesSection {
   /** Texture scale: − smaller, the percent (tap to reset to 100%), + larger. */
   private texScale(o: Outline): string {
     const s = o.texScale ?? 1;
-    return `${caption('Texture scale')}${row(
-      button('−', { mods: ['icon'], ariaLabel: 'Smaller texture', data: { act: 'tex-down' }, disabled: s <= TEX_SCALE.min }),
-      button(`${Math.round(s * 100)}%`, { mods: ['compact'], ariaLabel: 'Reset texture scale to 100%', data: { act: 'tex-reset' } }),
-      button('+', { mods: ['icon'], ariaLabel: 'Larger texture', data: { act: 'tex-up' }, disabled: s >= TEX_SCALE.max }))}`;
+    return `<div class="tex-scale"><span class="text-label">Texture</span><div class="row">${
+      button('−', { mods: ['icon'], ariaLabel: 'Smaller texture', data: { act: 'tex-down' }, disabled: s <= TEX_SCALE.min })}${
+      button(`${Math.round(s * 100)}%`, { mods: ['compact'], ariaLabel: 'Reset texture scale to 100%', data: { act: 'tex-reset' } })}${
+      button('+', { mods: ['icon'], ariaLabel: 'Larger texture', data: { act: 'tex-up' }, disabled: s >= TEX_SCALE.max })}</div></div>`;
   }
 
   /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, material, rounding, tidy, order. */
@@ -95,11 +95,11 @@ export class SurfacesSection {
     // The material shows as one line; Change opens the picker in place.
     const mat = this.changing === o.id ? picker(o.material)
       : choiceLine(swatch(sw), material(o.material!).name, button('Change', { mods: ['compact'], data: { act: 'change-material' } }));
-    const round = t.cal ? formStack(field('round-all', 'Round all corners', row(
-      input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
+    const round = t.cal ? formStack(row(
+      input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      body: `${caption('Material')}${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
+      body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
     });
   }
 }

@@ -17,10 +17,10 @@ export function drawingCard(t: OutlineTool, o: Outline, swatch: Swatch, subject:
     button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
 }
 
-/** A selected layer's actions: Square all corners, Redo outline and (unless it's the plot boundary) Delete. */
+/** A selected layer's actions: Square corners, Redo and (unless it's the plot boundary) Delete. */
 export const editActions = (deletable: boolean) => layerActions(
-  button('Square all corners', { mods: compact, data: { act: 'square-all' } }),
-  button('Redo outline', { mods: compact, data: { act: 'redraw' } }),
+  button('Square corners', { mods: compact, data: { act: 'square-all' } }),
+  button('Redo', { mods: compact, data: { act: 'redraw' } }),
   deletable ? button('Delete', { variant: 'danger', mods: compact, data: { act: 'delete' } }) : '');
 
 /** Layer order ↑ ↓ within the layer's section (hidden when it's the only one there). */
