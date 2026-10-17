@@ -11,6 +11,6 @@ export type Matrix = [number, number, number, number, number, number];
 export type WorkerResponse =
   | { type: 'ready'; id: number }
   | { type: 'opened'; id: number; pageCount: number; pageSize: { w: number; h: number } }
-  | { type: 'rendered'; id: number; width: number; height: number; pixels: Uint8ClampedArray }
+  | { type: 'rendered'; id: number; width: number; height: number; pixels: Uint8ClampedArray<ArrayBuffer> }
   | { type: 'text'; id: number; text: string }
   | { type: 'error'; id: number; message: string };

@@ -79,7 +79,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
  * Render page 1 into a width x height RGBA buffer. Page point (x, y) lands at device
  * (a·x + c·y + e, b·x + d·y + f). The page sheet is white; everything outside it is transparent.
  */
-function render(width: number, height: number, [a, b, c, d, e, f]: Matrix): Uint8ClampedArray {
+function render(width: number, height: number, [a, b, c, d, e, f]: Matrix): Uint8ClampedArray<ArrayBuffer> {
   const m = raw();
   const page = m._FPDF_LoadPage(docIdx(), 0);
   const W = m._FPDF_GetPageWidthF(page) as number, H = m._FPDF_GetPageHeightF(page) as number;
@@ -96,7 +96,7 @@ function render(width: number, height: number, [a, b, c, d, e, f]: Matrix): Uint
     m.HEAPF32.set([a, b, c, d, e, f], matrix >> 2);
     m.HEAPF32.set([0, 0, width, height], clip >> 2);
     m._FPDF_RenderPageBitmapWithMatrix(bitmap, page, matrix, clip, 0);
-    const out = new Uint8ClampedArray(m.HEAPU8.buffer.slice(buf, buf + bytes));
+    const out = new Uint8ClampedArray(m.HEAPU8.buffer.slice(buf, buf + bytes) as ArrayBuffer);
     for (let i = 0; i < out.length; i += 4) { const b = out[i]; out[i] = out[i + 2]; out[i + 2] = b; } // BGRA -> RGBA
     return out;
   } finally {
