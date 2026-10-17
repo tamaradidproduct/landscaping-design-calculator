@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { MATERIALS } from './materials';
+import { MATERIALS, material } from './materials';
 import { FALLBACK_TILE_PX, MIN_TILE_PX, SWATCH_TILE_PX, materialFill, patternDefs, scalePatterns, swatchFill, tileSizePx } from './patterns';
 
 describe('tileSizePx', () => {
@@ -37,8 +37,9 @@ describe('scalePatterns', () => {
   test('sizes plan patterns to real-world scale and leaves swatches alone', () => {
     const { root, els } = fake();
     scalePatterns(root, 0.05, 10, { x: 30, y: 40 });
-    expect(els[0].attrs).toMatchObject({ width: '400', height: '400' });
-    expect(els[0].img.attrs).toMatchObject({ width: '400', height: '400' });
+    const px = String(material('sand').tileFt / 0.05 * 10);
+    expect(els[0].attrs).toMatchObject({ width: px, height: px });
+    expect(els[0].img.attrs).toMatchObject({ width: px, height: px });
     expect(els[1].attrs).toEqual({});
   });
   test('anchors plan patterns at the plan origin so the texture moves with the zone', () => {

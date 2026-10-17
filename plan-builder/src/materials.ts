@@ -20,7 +20,7 @@ export interface Material {
 }
 
 const tiles = import.meta.glob<string>('./assets/surfaces/*.webp', { eager: true, query: '?url', import: 'default' });
-const TILE_FT = 2;
+const TILE_FT = 6;
 
 export const MATERIALS: readonly Material[] = SURFACE_SOURCES.map(({ id, name, family, trade }) => ({
   id, name, family, trade, tile: tiles[`./assets/surfaces/${id}.webp`], tileFt: TILE_FT, edge: (edges as Record<string, string>)[id],
