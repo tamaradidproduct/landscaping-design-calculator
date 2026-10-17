@@ -1,6 +1,6 @@
 // Surfaces on Riesberg: the section waits for the plot boundary; zones are cut by existing features whatever the
 // drawing order; typing a zone edge length resizes it (never the scale); material change and rename; layer order
-// stays within Surfaces; solid vs see-through; redrawing the boundary keeps the zones.
+// stays within Surfaces; solid when selected, see-through only while drawing; redrawing the boundary keeps the zones.
 // Usage: node scripts/check-surfaces.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
@@ -62,7 +62,7 @@ await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-ma
 await drag([300, 250], [360, 350]);
 results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod rings now ${(await shape('s1'))?.rings}`]);
 results.push(['Plan look', `boundary fill ${await page.$eval('.overlay .shape.boundary.closed', e => getComputedStyle(e).fill)} (expect none) · surface labels ${await page.$$eval('.overlay .label.surface', e => e.length)} (expect 0)`]);
-results.push(['Selected zone see-through, other solid', `pavers ${await fillOpacity('s2')} · sod ${await fillOpacity('s1')}`]);
+results.push(['Selected zone stays solid (expect 1 · 1)', `pavers ${await fillOpacity('s2')} · sod ${await fillOpacity('s1')}`]);
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 
 // With the pavers still selected, Add surface… starts a new zone (it must not re-material the pavers).

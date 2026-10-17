@@ -102,7 +102,7 @@
   --opacity-handle: 0.85; /* Bend handles. */
   --mix-snap-halo: 18%; /* Disc behind a snapped point. */
   --mix-material-edge: 65%; /* How much of the material colour stays when shading it with color-material-shade for pat… */
-  --opacity-surface-editing: 0.5; /* Fill of the selected surface or the one being drawn, so the plan shows through. */
+  --opacity-surface-editing: 0.5; /* Fill of the surface being drawn, so the plan shows through while tracing. */
   --opacity-layer-off: 0.45; /* A hidden layer's row in the Layers panel, dimmed so it reads as off. */
 
   /* ---------- Layout and misc ---------- */
