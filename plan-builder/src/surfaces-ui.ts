@@ -2,7 +2,8 @@
 // zone in layer order (a higher zone cuts the ones below; outlines cut every zone), then "Add surface…", which
 // opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
 import { material, materialsByFamily, type MaterialId } from './materials';
-import { formatFeet, parseFeet, parseRadius, type Outline } from './outline';
+import { TEX_SCALE } from './outline';
+import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
 import { button, caption, choiceLine, chips, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
@@ -24,7 +25,7 @@ export class SurfacesSection {
     if (t.drawing || !t.boundaryClosed) this.picking = false;
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
-      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id } }));
+      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
       ${zones.length ? '' : hint('Add the new surfaces: lawn, beds, patio…')}
       ${rows.join('')}
@@ -38,12 +39,17 @@ export class SurfacesSection {
     // Adding a zone closes the selected one's card, so only one material picker shows at a time.
     this.el.querySelector<HTMLButtonElement>('[data-act=add-surface]')?.addEventListener('click', () => { this.picking = true; if (t.selected) t.selectOutline(null); else this.render(); });
     this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
+    this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
     // The picker's chips start a new zone; the card's chips change that zone's material.
     this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) wireLayerCard(card, t, { 'change-material': () => { this.changing = card.dataset.card!; this.render(); } });
+    const scaleOf = () => t.outlines[card?.dataset.card ?? '']?.texScale ?? 1;
+    card?.querySelector<HTMLButtonElement>('[data-act=tex-down]')?.addEventListener('click', () => t.setTexScale(card.dataset.card!, stepTexScale(scaleOf(), -1)));
+    card?.querySelector<HTMLButtonElement>('[data-act=tex-up]')?.addEventListener('click', () => t.setTexScale(card.dataset.card!, stepTexScale(scaleOf(), 1)));
+    card?.querySelector<HTMLButtonElement>('[data-act=tex-reset]')?.addEventListener('click', () => t.setTexScale(card.dataset.card!, 1));
     const size = this.el.querySelector<HTMLFormElement>('form.zone-size');
     if (size && card) {
       const commit = (axis: 'w' | 'h', el: HTMLInputElement) => {
@@ -73,6 +79,15 @@ export class SurfacesSection {
       box('zone-depth', 'Depth', b.h))}`, 'zone-size', true);
   }
 
+  /** Texture scale: − smaller, the percent (tap to reset to 100%), + larger. */
+  private texScale(o: Outline): string {
+    const s = o.texScale ?? 1;
+    return `${caption('Texture scale')}${row(
+      button('−', { mods: ['icon'], ariaLabel: 'Smaller texture', data: { act: 'tex-down' }, disabled: s <= TEX_SCALE.min }),
+      button(`${Math.round(s * 100)}%`, { mods: ['compact'], ariaLabel: 'Reset texture scale to 100%', data: { act: 'tex-reset' } }),
+      button('+', { mods: ['icon'], ariaLabel: 'Larger texture', data: { act: 'tex-up' }, disabled: s >= TEX_SCALE.max }))}`;
+  }
+
   /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, material, rounding, tidy, order. */
   private card(o: Outline): string {
     const t = this.tool, sw = { material: o.material! };
@@ -84,7 +99,7 @@ export class SurfacesSection {
       input('round-all', { inputmode: 'decimal', placeholder: 'Radius, e.g. 2′' }), button('Apply', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      body: `${caption('Material')}${mat}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
+      body: `${caption('Material')}${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
     });
   }
 }

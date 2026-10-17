@@ -98,6 +98,9 @@ button.layer-row.selected { background: var(--color-bg); border-color: var(--col
 button.layer-row.suggest { color: var(--color-muted); border: var(--border-width) dashed var(--color-line); }
 .layer-item { display: flex; align-items: center; gap: var(--space-3); }
 .layer-item > .layer-row { flex: 1; min-width: 0; }
+button.layer-row.off { opacity: var(--opacity-layer-off); }
+.group-line { display: flex; align-items: center; gap: var(--space-3); }
+.group-line > button.group-head { flex: 1; min-width: 0; }
 .layer-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
 .layer-sub { font-size: var(--text-sm); color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

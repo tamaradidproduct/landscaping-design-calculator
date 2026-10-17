@@ -44,17 +44,27 @@
         </section>
         <section class="side-section layers">
           <h2 class="side-title">Layers</h2>
-          <button type="button" class="group-head" data-group="surfaces" aria-expanded="true" aria-controls="group-surfaces">
-            <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-            <span class="group-title">Surfaces</span><span class="group-count" hidden></span>
-          </button>
+          <div class="group-line">
+            <button type="button" class="group-head" data-group="surfaces" aria-expanded="true" aria-controls="group-surfaces">
+              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+              <span class="group-title">Surfaces</span><span class="group-count" hidden></span>
+            </button>
+            <button type="button" class="icon" data-eye-group="surfaces" aria-pressed="true" aria-label="Hide all surfaces" title="Hide all surfaces">
+              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+            </button>
+          </div>
           <div class="group-body" id="group-surfaces">
             <div class="layer-list" id="surfaces"></div>
           </div>
-          <button type="button" class="group-head" data-group="outlines" aria-expanded="true" aria-controls="group-outlines">
-            <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-            <span class="group-title">Outlines</span><span class="group-count" hidden></span>
-          </button>
+          <div class="group-line">
+            <button type="button" class="group-head" data-group="outlines" aria-expanded="true" aria-controls="group-outlines">
+              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+              <span class="group-title">Outlines</span><span class="group-count" hidden></span>
+            </button>
+            <button type="button" class="icon" data-eye-group="outlines" aria-pressed="true" aria-label="Hide all outlines" title="Hide all outlines">
+              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+            </button>
+          </div>
           <div class="group-body" id="group-outlines">
             <div class="layer-list" id="outlines"></div>
             <div class="plan-layer">
