@@ -53,7 +53,7 @@ type Drag =
   // Surfaces only: move the whole zone, push one side, or round a corner (screen points from the press).
   | { type: 'move'; id: string; start: Point; before: Point[]; moved: boolean }
   | { type: 'side'; id: string; i: number; start: Point; before: Point[]; moved: boolean; fixed: 0 | 1 }
-  | { type: 'round'; id: string; i: number; start: Point; r0: number; moved: boolean };
+  | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -317,8 +317,8 @@ export class OutlineTool {
     if (round) {
       // Start from the radius as drawn (a typed one may be clamped to fit the sides).
       const o = this.outlines[round.id]!, at = this.host.toPage(round.at), c = o.pts[round.i];
-      const r0 = o.radii?.[round.i] ? radiusFromHandle(Math.hypot(at.x - c.x, at.y - c.y), cornerBisector(o.pts, round.i).half) : 0;
-      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0, moved: false };
+      const r0 = o.radii?.[round.i] ? radiusFromHandle(Math.hypot(at.x - c.x, at.y - c.y), cornerBisector(o.pts, round.i, o.bulges).half) : 0;
+      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0, radiiBefore: o.pts.map((_, k) => o.radii?.[k] ?? 0), moved: false };
       this.dragBefore = this.snapshot();
       return true;
     }
@@ -408,10 +408,12 @@ export class OutlineTool {
       o.pts = pushSide(d.before, d.i, delta);
       const ft = this.edgeFeet(o.id, d.i); this.showTipText(ft ? `Side ${formatFeet(ft)}` : 'Move side', p);
     } else {
-      const { dir, half } = cornerBisector(o.pts, d.i), along = delta.x * dir.x + delta.y * dir.y;
+      const { dir, half } = cornerBisector(o.pts, d.i, o.bulges), along = delta.x * dir.x + delta.y * dir.y;
       const r = radiusFromHandle(roundHandleDistance(d.r0, half) + along, half);
-      o.radii = o.pts.map((_, k) => k === d.i ? r : o.radii?.[k] ?? 0);
-      this.showTipText(r > 0 ? `Radius ${this.cal ? formatFeet(r * this.cal.ftPerPt) : ''}`.trim() : 'Sharp corner', p);
+      // Shift held: every corner takes this radius (letting go of Shift puts the others back).
+      o.radii = o.pts.map((_, k) => this.shiftKey || k === d.i ? r : d.radiiBefore[k]);
+      const text = r > 0 ? `Radius ${this.cal ? formatFeet(r * this.cal.ftPerPt) : ''}`.trim() : 'Sharp corner';
+      this.showTipText(this.shiftKey ? `All corners · ${text}` : text, p);
     }
     this.render();
   }
@@ -703,7 +705,7 @@ export class OutlineTool {
     let near: number | null = null, nd: number = HIT.roundReveal;
     if (z && p) {
       const pp = this.host.toPage(p), k = this.host.pxPerPt();
-      z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp) * k; if (d < nd) { nd = d; near = i; } });
+      z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp, z.bulges) * k; if (d < nd) { nd = d; near = i; } });
     }
     const cornerChanged = near !== this.hoverCorner;
     this.hoverCorner = near;
@@ -736,7 +738,7 @@ export class OutlineTool {
     const pp = this.host.toPage(p), tol = HIT.zoneSide / this.host.pxPerPt();
     let best: number | null = null, bd = tol;
     o.pts.forEach((_, i) => {
-      const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp);
+      const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp, o.bulges);
       if (d < bd) { bd = d; best = i; }
     });
     return best;
@@ -751,12 +753,12 @@ export class OutlineTool {
     const o = this.selectedZone, sel = this.selectedCorner;
     // The corner the pointer is near shows its handle; otherwise the selected corner does.
     const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
-    if (!o || c?.id !== o.id || !o.pts[c.i] || o.bulges?.[c.i] || o.bulges?.[(c.i - 1 + o.pts.length) % o.pts.length]) return null;
+    if (!o || c?.id !== o.id || !o.pts[c.i]) return null;
     // On the arc's middle once rounded (on the drawn line, even when the radius is clamped to the sides); a sharp
     // corner's handle sits just inside it.
-    const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0);
+    const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0, o.bulges);
     if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]), onArc: true };
-    const { dir } = cornerBisector(o.pts, c.i), d = MARK.roundHandleMin;
+    const { dir } = cornerBisector(o.pts, c.i, o.bulges), d = MARK.roundHandleMin;
     const s = this.host.toScreen(o.pts[c.i]), t = this.host.toScreen({ x: o.pts[c.i].x + dir.x, y: o.pts[c.i].y + dir.y });
     const u = { x: t.x - s.x, y: t.y - s.y }, l = Math.hypot(u.x, u.y) || 1;
     return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d }, onArc: false };
