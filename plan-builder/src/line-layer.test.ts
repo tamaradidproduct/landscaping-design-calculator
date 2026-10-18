@@ -21,12 +21,14 @@ describe('LineLayer', () => {
     const id = L.add('dry-river', [P(0, 0), P(0, 0), P(8, 0)], 4)!;
     expect(L.placed[id].points).toEqual([P(0, 0), P(8, 0)]);
   });
-  test('width is clamped to 0.25–12 and snapped to 0.25 on add and on setWidth', () => {
+  test('width is clamped to 0.25–12 on add and on setWidth, and kept as given inside that range', () => {
     const L = new LineLayer();
     const id = L.add('wood-privacy-fence', [P(0, 0), P(9, 0)], 0.1)!;
     expect(L.placed[id].widthFt).toBe(0.25);
     L.setWidth(id, 40); expect(L.placed[id].widthFt).toBe(12);
-    L.setWidth(id, 1.13); expect(L.placed[id].widthFt).toBe(1.25);
+    L.setWidth(id, 1.13); expect(L.placed[id].widthFt).toBe(1.13);
+    expect(L.placed[L.add('wood-privacy-fence', [P(0, 1), P(9, 1)], 0.33)!].widthFt).toBe(0.33); // the fence's default is stored as drawn
+    expect(L.placed[L.add('dry-river', [P(0, 2), P(9, 2)], 0.55)!].widthFt).toBe(0.55);
   });
   test('movePoint moves one point', () => {
     const L = new LineLayer(); const id = L.add('wood-privacy-fence', [P(0, 0), P(9, 0), P(9, 9)], 1)!;

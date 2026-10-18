@@ -22,10 +22,10 @@ export interface LineItem {
 }
 
 export const LINE_WIDTH_FT = { min: 0.25, max: 12, step: 0.25 } as const;
-/** A width in feet, kept within 0.25–12 and on the 0.25 ft steps. */
+/** A width in feet, kept within 0.25–12 and to the cent (a default of 0.33 ft stays 0.33; the − / + steps are what move on 0.25 ft steps). */
 export const clampLineWidth = (ft: number): number => {
   if (!Number.isFinite(ft)) return LINE_WIDTH_FT.min;
-  return Math.min(LINE_WIDTH_FT.max, Math.max(LINE_WIDTH_FT.min, Math.round(ft / LINE_WIDTH_FT.step) * LINE_WIDTH_FT.step));
+  return Math.min(LINE_WIDTH_FT.max, Math.max(LINE_WIDTH_FT.min, Math.round(ft * 100) / 100));
 };
 
 /** One press of − (-1) or + (+1) on a width: onto the next 0.25 ft step in that direction. */

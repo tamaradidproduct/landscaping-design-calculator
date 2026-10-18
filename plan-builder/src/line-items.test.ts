@@ -20,9 +20,13 @@ describe('line items', () => {
     expect(searchLineItems('FENCE').map(i => i.id)).toEqual(['wood-privacy-fence']);
     expect(searchLineItems('')).toHaveLength(5); expect(searchLineItems('zzz')).toEqual([]);
   });
-  test('clampLineWidth keeps 0.25–12 ft in 0.25 steps', () => {
+  test('clampLineWidth keeps a width within 0.25–12 ft and otherwise leaves it as typed (to the cent)', () => {
     expect(LINE_WIDTH_FT).toEqual({ min: 0.25, max: 12, step: 0.25 });
-    expect(clampLineWidth(0.1)).toBe(0.25); expect(clampLineWidth(40)).toBe(12); expect(clampLineWidth(1.13)).toBe(1.25); expect(clampLineWidth(Number.NaN)).toBe(0.25);
+    expect(clampLineWidth(0.1)).toBe(0.25); expect(clampLineWidth(40)).toBe(12); expect(clampLineWidth(Number.NaN)).toBe(0.25);
+    expect(clampLineWidth(0.33)).toBe(0.33); expect(clampLineWidth(0.55)).toBe(0.55); expect(clampLineWidth(1.13)).toBe(1.13); expect(clampLineWidth(1 / 3)).toBe(0.33);
+  });
+  test('the default widths survive clamping', () => {
+    for (const i of LINE_ITEMS) expect(clampLineWidth(i.defaultWidthFt), i.id).toBe(i.defaultWidthFt);
   });
   test('stepLineWidth moves onto the next 0.25 ft step, within the limits', () => {
     expect(stepLineWidth(0.33, 1)).toBe(0.5); expect(stepLineWidth(0.33, -1)).toBe(0.25);

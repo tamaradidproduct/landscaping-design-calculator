@@ -40,8 +40,8 @@ try {
   await page.click('[data-act=finish-line]'); await page.waitForTimeout(250);
   const first = await runs();
   check('Done saves one run (l1)', first.length === 1 && first[0].id === 'l1', JSON.stringify(first));
-  const w0 = await thickness(), want = 0.33 / 0.2 * k;
-  check('The run is drawn at its true width (0.33 ft at 0.2 ft/pt)', Math.abs(w0 / want - 1) < 0.05 || (want < 2 && w0 >= 1.9), `${w0.toFixed(2)} px vs ${want.toFixed(2)} px`);
+  const widthValue = () => page.$eval('#line-width', i => i.value);
+  check('Done stores the fence default as drawn: 0.33 ft (4 in), not a rounded step', (await widthValue()) === '0.33', `width ${await widthValue()}`);
   check('It is selected, with its card, handles and bend squares', !!(await page.$('#lines [data-act=width-up]')) && (await page.$$('.overlay .line-point')).length === 3 && (await page.$$('.overlay .line-bend')).length === 2, 'card + 3 points + 2 bends');
   // Move a point
   const p1 = await centre('.line-point[data-point="1"]'); await drag(p1, [p1[0] + 50, p1[1] + 40]);
@@ -51,12 +51,13 @@ try {
   const straightPolys = (await runs())[0].polys, m0 = await centre('.line-bend[data-bend="0"]'); await drag(m0, [m0[0], m0[1] - 40]);
   check('Dragging a bend square curves the segment (more pieces)', (await runs())[0].polys > straightPolys, `${straightPolys} → ${(await runs())[0].polys} pieces`);
   // Width
-  const t1 = await thickness(); await page.click('#lines [data-act=width-up]'); await page.waitForTimeout(200);
-  const t2 = await thickness();
-  check('+ widens the run (0.33 → 0.5 ft)', Math.abs(t2 / t1 - 0.5 / 0.33) < 0.1 || (t1 < 2.1 && t2 >= 2), `${t1.toFixed(1)} → ${t2.toFixed(1)} px`);
+  await page.click('#lines [data-act=width-up]'); await page.waitForTimeout(200);
+  check('+ widens the run to the next 0.25 ft step (0.33 → 0.5)', (await widthValue()) === '0.5', `width ${await widthValue()}`);
   await page.fill('#line-width', '2'); await page.keyboard.press('Enter'); await page.waitForTimeout(200);
   const t3 = await thickness();
-  check('A typed width applies (2 ft is 4× the 0.5 ft before)', Math.abs(t3 / t2 - 4) < 0.2, `${t2.toFixed(1)} → ${t3.toFixed(1)} px`);
+  check('A typed width applies (2 ft, stored as typed)', (await widthValue()) === '2' && t3 > 4, `width ${await widthValue()}, tile ${t3.toFixed(1)} px`);
+  await page.fill('#line-width', '4 in'); await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+  check('A typed 4 in is 0.33 ft, not snapped to a step', (await widthValue()) === '0.33', `width ${await widthValue()}`);
   // Delete a point, undo
   const p2 = await centre('.line-point[data-point="2"]'); await page.mouse.click(...p2); await page.waitForTimeout(250);
   await page.click('#lines [data-act=delete-line-point]'); await page.waitForTimeout(250);
@@ -67,10 +68,28 @@ try {
   await page.keyboard.press('Escape');
   await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
   check('Esc cancels a draft without saving', (await runs()).length === 1 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} run`);
-  // Second line: dry river, two points, double-tap to finish
-  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]);
-  const [dx, dy] = await toScreen([350, 520]); await page.mouse.dblclick(dx, dy); await page.waitForTimeout(500);
-  check('A double-tap on the last point ends the run', (await runs()).length === 2 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} runs, draft ${!!(await page.$('[data-act=finish-line]'))}, toast "${await page.$eval('#toast', t => t.textContent)}"`);
+  // ⌘Z mid-draft takes back one point and leaves the saved line alone
+  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await tap([250, 480]);
+  const dots = () => page.$$eval('.overlay .corner', d => d.length);
+  check('Two taps make two draft points', (await dots()) === 2, `${await dots()} dots`);
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
+  check('⌘Z mid-draft removes the last point only (draft stays, the saved fence is untouched)', (await dots()) === 1 && !!(await page.$('[data-act=finish-line]')) && (await runs()).length === 1, `${await dots()} dot, ${(await runs()).length} run`);
+  // A double-tap on the last point after a pause finishes the run (l2)
+  await tap([350, 520]); await page.waitForTimeout(700);
+  const [bx, by] = await toScreen([350, 520]); await page.mouse.dblclick(bx, by); await page.waitForTimeout(500);
+  check('A double-tap on a point placed earlier ends the run', (await runs()).length === 2 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} runs, draft ${!!(await page.$('[data-act=finish-line]'))}`);
+  // Second line l3: double-tap on a new spot adds the point and finishes
+  await page.keyboard.press('Escape');
+  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 520]);
+  const [dx, dy] = await toScreen([350, 560]); await page.mouse.dblclick(dx, dy); await page.waitForTimeout(500);
+  check('A double-tap on a new spot adds the point and ends the run', (await runs()).length === 3 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} runs`);
+  await page.keyboard.press('Escape');
+  // Edging along the plot boundary's left edge: tapping it selects the line, not the outline's edge
+  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=white-stone-edging]'); await tap([250, 200]); await tap([250, 400]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(250);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  await tap([250, 300]);
+  check('Tapping edging that lies on the boundary selects the line, not the edge', (await page.$$('.overlay .line-point')).length === 2 && (await page.$$('.popover:not([hidden])')).length === 0, `${(await page.$$('.overlay .line-point')).length} points, ${(await page.$$('.popover:not([hidden])')).length} popovers`);
+  await page.keyboard.press('Escape');
   // Starting a symbol while a line is selected leaves no stuck state
   await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', 'hot'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
   check('Arming a symbol drops the line selection', (await page.$$('.overlay .line-point')).length === 0 && !!(await page.$('[data-act=stop-placing]')), 'no handles, Done shown');
@@ -91,11 +110,11 @@ try {
   check('Turning a marker 90° points it along the run', /rotate\(90 /.test((await symImgs()).find(i => /gas-line/.test(i.src)).t ?? ''), '90°');
   await page.keyboard.press('Escape');
   const list = await listText();
-  check('The Plant list shows lines with feet and runs', /Lines \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 1 run/.test(list), list.slice(0, 160));
+  check('The Plant list shows lines with feet and runs', /Lines \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| White stone edging \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 2 runs/.test(list), list.slice(0, 160));
   check('…stepping stones under Objects and the gas marker under Utility markers', /Objects \| .*Porcelain stepping stones.*1/.test(list) && /Utility markers \| .*Gas line.*1/.test(list), list.slice(-160));
   // Hide
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
-  check('Hiding a kind hides its runs only', (await runs()).length === 1 && (await runs())[0].id === 'l2', (await runs()).map(r => r.id).join());
+  check('Hiding a kind hides its runs only', (await runs()).length === 3 && !(await runs()).some(r => r.id === 'l1'), (await runs()).map(r => r.id).join());
   await page.click('[data-eye-group=lines]'); await page.waitForTimeout(200);
   check('Hiding the section hides every run', (await runs()).length === 0, 'none drawn');
   check('Hidden runs still count in the Plant list', /Wood privacy fence \| \d/.test(await listText()), 'still listed');
@@ -108,9 +127,9 @@ try {
   await page.waitForTimeout(600);
   check('After reopening: still hidden', (await runs()).length === 0 && (await page.$eval('[data-eye-group=lines]', b => b.getAttribute('aria-pressed'))) === 'false', 'section hidden');
   await page.click('[data-eye-group=lines]'); await page.waitForTimeout(200);
-  check('Showing the section leaves the hidden kind hidden', (await runs()).length === 1 && (await runs())[0].id === 'l2', (await runs()).map(r => r.id).join());
+  check('Showing the section leaves the hidden kind hidden', (await runs()).length === 3 && !(await runs()).some(r => r.id === 'l1'), (await runs()).map(r => r.id).join());
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
-  check('Showing that kind restores both runs', (await runs()).length === 2, (await runs()).map(r => r.id).join());
+  check('Showing that kind restores all four runs', (await runs()).length === 4, (await runs()).map(r => r.id).join());
   check('Stone and marker survived reopening', (await symImgs()).length === 2, `${(await symImgs()).length} symbols`);
   check('The list still shows lines and markers', /Lines \|/.test(await listText()) && /Utility markers/.test(await listText()), (await listText()).slice(0, 80));
   await page.screenshot({ path: `${outDir}/lines-end.png` });

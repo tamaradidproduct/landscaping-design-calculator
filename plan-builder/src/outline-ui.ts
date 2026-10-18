@@ -10,7 +10,7 @@ import { committedOutlines } from './editor-state';
 import type { PlacedLine, PlacedSymbol, PlanState } from './plan-model';
 import { LineLayer } from './line-layer';
 import { linesSvgParts } from './lines-render';
-import { draftReady, draftWithPoint } from './line-draft';
+import { draftReady, draftTap } from './line-draft';
 import { clampLineWidth, lineItemById } from './line-items';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
@@ -314,13 +314,12 @@ export class OutlineTool {
   }
   private addLinePoint(screen: Point) {
     const d = this.lineDraft; if (!d) return;
-    const now = performance.now(), prev = this.lastLineTap;
-    // A quick second tap on the point just placed ends the line.
-    if (prev && now - prev.t < GESTURE.doubleTapMs && dist(prev.at, screen) < 30 && d.points.length >= 2) { this.lastLineTap = null; this.finishLine(); return; }
-    const raw = this.draftTarget(screen), next = draftWithPoint(d.points, this.host.toPage(raw), this.host.pxPerPt());
-    if (!next) return;
-    d.points = next; this.update();
-    this.lastLineTap = { t: performance.now(), at: screen }; // stamped after the redraw, so a slow redraw can't use up the double-tap window
+    const prev = this.lastLineTap, target = this.host.toPage(this.draftTarget(screen));
+    const outcome = draftTap(d.points, target, this.host.pxPerPt(), prev ? { t: prev.t, screenDist: dist(prev.at, screen) } : null, performance.now());
+    if (outcome === 'finish') { this.lastLineTap = null; this.finishLine(); return; }
+    if (outcome === 'add') { d.points = [...d.points, target]; this.update(); }
+    // Every tap is stamped, ignored ones too (a double-tap on a point placed earlier still finishes), after the redraw so a slow one can't use up the window.
+    this.lastLineTap = { t: performance.now(), at: screen };
   }
   /** Where the next point of the draft would land for a pointer at `screen`: Shift holds the run to 45° steps from the last point. */
   private draftTarget(screen: Point): Point {
@@ -371,8 +370,13 @@ export class OutlineTool {
     this.update();
   }
   get saveRevision() { return this.revision; }
-  undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
-  redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
+  /** While a line is being drawn, Undo takes back its last point (then the draft itself); the plan's history is not touched until it is saved. */
+  undo() {
+    if (this.drag) return;
+    if (this.lineDraft) { if (this.lineDraft.points.length) this.popDraftPoint(); else this.cancelLine(); return; }
+    const s = this.history.undo(this.snapshot()); if (s) this.restore(s);
+  }
+  redo() { if (this.drag || this.lineDraft) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
 
   // ---------- Commands ----------
   /** Outline the plot boundary (replacing the current one, if any). */
@@ -555,6 +559,8 @@ export class OutlineTool {
         this.dragBefore = this.snapshot(); return true;
       }
     }
+    // A line under the press wins over an outline edge beneath it (edging along a surface's edge, a fence on the property line): the tap selects the line.
+    if (!this.selectedEdge && this.lineAt(p)) return false;
     const edge = this.edgeAt(p);
     if (edge) {
       // The corner nearer the tap stays put if a length is typed for a surface edge.
