@@ -1,0 +1,262 @@
+{
+  "blue-diamond-spruce": {
+    "w": 509,
+    "h": 512
+  },
+  "austrian-pine": {
+    "w": 509,
+    "h": 512
+  },
+  "fat-albert-spruce": {
+    "w": 512,
+    "h": 512
+  },
+  "rocky-mountain-maple": {
+    "w": 497,
+    "h": 512
+  },
+  "japanese-maple": {
+    "w": 512,
+    "h": 512
+  },
+  "oak": {
+    "w": 512,
+    "h": 501
+  },
+  "snow-fountain-weeping-cherry": {
+    "w": 512,
+    "h": 495
+  },
+  "eastern-redbud": {
+    "w": 512,
+    "h": 512
+  },
+  "spring-snow-crabapple": {
+    "w": 512,
+    "h": 467
+  },
+  "lilac-tree": {
+    "w": 507,
+    "h": 512
+  },
+  "korean-lilac-tree": {
+    "w": 507,
+    "h": 512
+  },
+  "ivory-silk-lilac-tree": {
+    "w": 512,
+    "h": 470
+  },
+  "lilacs": {
+    "w": 507,
+    "h": 512
+  },
+  "dogwood": {
+    "w": 512,
+    "h": 482
+  },
+  "lavender": {
+    "w": 512,
+    "h": 508
+  },
+  "hydrangea": {
+    "w": 512,
+    "h": 491
+  },
+  "skyrocket-juniper": {
+    "w": 483,
+    "h": 512
+  },
+  "blue-arrow-juniper": {
+    "w": 442,
+    "h": 512
+  },
+  "emerald-green-juniper": {
+    "w": 483,
+    "h": 512
+  },
+  "golden-bamboo": {
+    "w": 485,
+    "h": 512
+  },
+  "fernbush": {
+    "w": 512,
+    "h": 512
+  },
+  "japanese-fern": {
+    "w": 512,
+    "h": 490
+  },
+  "panchito-manzanita": {
+    "w": 512,
+    "h": 471
+  },
+  "mugo-pine": {
+    "w": 512,
+    "h": 499
+  },
+  "pinyon-pine": {
+    "w": 512,
+    "h": 508
+  },
+  "rubber-rabbitbrush": {
+    "w": 512,
+    "h": 499
+  },
+  "boxwood": {
+    "w": 512,
+    "h": 506
+  },
+  "globe-pine": {
+    "w": 512,
+    "h": 508
+  },
+  "creeping-phlox": {
+    "w": 512,
+    "h": 497
+  },
+  "may-night-salvia": {
+    "w": 512,
+    "h": 512
+  },
+  "basket-of-gold": {
+    "w": 512,
+    "h": 497
+  },
+  "black-eyed-susan": {
+    "w": 512,
+    "h": 491
+  },
+  "coneflower": {
+    "w": 512,
+    "h": 467
+  },
+  "purple-coneflower": {
+    "w": 484,
+    "h": 512
+  },
+  "white-nugget": {
+    "w": 512,
+    "h": 471
+  },
+  "blue-mist-spirea": {
+    "w": 512,
+    "h": 502
+  },
+  "gardilla-geranium": {
+    "w": 512,
+    "h": 467
+  },
+  "colorado-blue-columbine": {
+    "w": 499,
+    "h": 512
+  },
+  "cockscomb": {
+    "w": 512,
+    "h": 510
+  },
+  "sage": {
+    "w": 512,
+    "h": 507
+  },
+  "lily-of-the-valley": {
+    "w": 475,
+    "h": 512
+  },
+  "snapdragons": {
+    "w": 512,
+    "h": 483
+  },
+  "wooly-thyme": {
+    "w": 512,
+    "h": 500
+  },
+  "russian-sage": {
+    "w": 512,
+    "h": 443
+  },
+  "maiden-grass": {
+    "w": 512,
+    "h": 494
+  },
+  "japanese-forest-grass": {
+    "w": 512,
+    "h": 512
+  },
+  "feather-reed-grass": {
+    "w": 512,
+    "h": 389
+  },
+  "blue-grama-grass": {
+    "w": 512,
+    "h": 494
+  },
+  "arizona-star": {
+    "w": 512,
+    "h": 505
+  },
+  "corn": {
+    "w": 512,
+    "h": 471
+  },
+  "vegetable-plants": {
+    "w": 512,
+    "h": 471
+  },
+  "firepit": {
+    "w": 477,
+    "h": 512
+  },
+  "colorado-buff-boulder": {
+    "w": 512,
+    "h": 470
+  },
+  "planter-box": {
+    "w": 512,
+    "h": 215
+  },
+  "hot-tub": {
+    "w": 512,
+    "h": 512
+  },
+  "monkey-bars": {
+    "w": 502,
+    "h": 512
+  },
+  "playground": {
+    "w": 512,
+    "h": 426
+  },
+  "water-feature": {
+    "w": 496,
+    "h": 512
+  },
+  "inground-trampoline": {
+    "w": 476,
+    "h": 476
+  },
+  "swing-set": {
+    "w": 512,
+    "h": 274
+  },
+  "bubbling-boulder": {
+    "w": 512,
+    "h": 510
+  },
+  "seating-wall": {
+    "w": 428,
+    "h": 428
+  },
+  "outdoor-lantern": {
+    "w": 496,
+    "h": 496
+  },
+  "outdoor-grill": {
+    "w": 512,
+    "h": 157
+  },
+  "spigot": {
+    "w": 350,
+    "h": 350
+  }
+}
