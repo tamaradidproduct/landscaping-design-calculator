@@ -65,7 +65,8 @@ function handles(l: PlacedLine, o: LinesSvgOptions): string {
   return svg;
 }
 
-export function linesSvg(o: LinesSvgOptions): string {
+/** The runs (drawn under the plants and objects) and the handles, halo and draft (drawn on top of everything), separately. */
+export function linesSvgParts(o: LinesSvgOptions): { runs: string; top: string } {
   let svg = '', top = '';
   for (const l of o.placed) {
     if (!o.shown(l)) continue;
@@ -77,5 +78,7 @@ export function linesSvg(o: LinesSvgOptions): string {
     if (pts.length > 1) top += `<path d="${polyline(pts)}" class="line-draft" style="stroke-width:${f(widthPx(o.draft.widthFt, o))}px"/>`;
     o.draft.points.forEach(p => { const s = o.toScreen(p); top += `<circle cx="${f(s.x)}" cy="${f(s.y)}" r="${MARK.corner}" class="corner" style="--c:var(--color-accent)"/>`; });
   }
-  return svg + top;
+  return { runs: svg, top };
 }
+
+export function linesSvg(o: LinesSvgOptions): string { const { runs, top } = linesSvgParts(o); return runs + top; }

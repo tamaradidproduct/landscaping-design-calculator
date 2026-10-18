@@ -378,10 +378,11 @@ function endPointer(e: PointerEvent) {
   if (pointers.size === 1 && pinch) { pinch = null; return; } // one finger still down: keep it as a pan
   if (pointers.size > 0) return;
   pinch = null;
+  const drafting = !!tool.lineDraft; // a tap that ends the line leaves no draft behind, but still isn't a zoom
   if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
-    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing) { // placing: quick taps drop symbols, not a zoom
+    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing && !drafting) { // placing or drawing a line: quick taps drop symbols and points (a double-tap ends the line), not a zoom
       lastTap.t = 0;
       if (view.scale > 1.05) fitToStage(); else applyView(zoomAt(view, 3, p));
       return;

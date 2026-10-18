@@ -7,8 +7,12 @@ import {
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
-import type { PlacedSymbol, PlanState } from './plan-model';
-import { groupOf, isHidden, isSymbolHidden, type Group } from './sections';
+import type { PlacedLine, PlacedSymbol, PlanState } from './plan-model';
+import { LineLayer } from './line-layer';
+import { linesSvgParts } from './lines-render';
+import { draftReady, draftWithPoint } from './line-draft';
+import { clampLineWidth, lineItemById } from './line-items';
+import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
 import { symbolById } from './symbols';
@@ -58,7 +62,10 @@ type Drag =
   | { type: 'side'; id: string; i: number; start: Point; before: Point[]; moved: boolean; fixed: 0 | 1 }
   | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean }
   // A placed symbol being moved (the press in screen px, and where the symbol was in page points).
-  | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean };
+  | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean }
+  // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
+  | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean }
+  | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -112,6 +119,14 @@ export class OutlineTool {
   /** The library symbol armed for placing (each tap drops one), or null. */
   placing: string | null = null;
   selectedSymbol: string | null = null;
+  /** Lines drawn on the plan (fence, walls, edging, dry river). */
+  lines = new LineLayer();
+  /** The line being drawn (its points are page points): each tap adds one, until finishLine (Done, Enter) or cancelLine (Esc). */
+  lineDraft: { item: string; points: Point[]; widthFt: number } | null = null;
+  selectedLine: string | null = null;
+  /** The selected line's selected point (Delete point acts on it). */
+  selectedLinePoint: number | null = null;
+  private lastLineTap: { t: number; at: Point } | null = null;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -161,7 +176,7 @@ export class OutlineTool {
   private snapshot(): Snapshot {
     return {
       outlines: structuredClone(this.outlines), drawing: this.drawing, refs: structuredClone(this.refs), selectedCorner: this.selectedCorner,
-      selected: this.selected, replaced: structuredClone(this.replaced), symbols: structuredClone(this.symbols.placed),
+      selected: this.selected, replaced: structuredClone(this.replaced), symbols: structuredClone(this.symbols.placed), lines: structuredClone(this.lines.placed),
     };
   }
   /** Call right before every change the user may want to undo. */
@@ -170,6 +185,9 @@ export class OutlineTool {
     this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
     this.selected = s.selected; this.replaced = s.replaced;
     this.symbols.placed = s.symbols; if (this.selectedSymbol && !s.symbols[this.selectedSymbol]) this.selectedSymbol = null;
+    this.lines.placed = s.lines; this.lineDraft = null; this.lastLineTap = null;
+    if (this.selectedLine && !s.lines[this.selectedLine]) { this.selectedLine = null; this.selectedLinePoint = null; }
+    else if (this.selectedLinePoint !== null && !(this.selectedLine && s.lines[this.selectedLine]?.points[this.selectedLinePoint])) this.selectedLinePoint = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
@@ -181,7 +199,8 @@ export class OutlineTool {
   load(state: PlanState) {
     this.outlines = structuredClone(state.outlines); this.refs = structuredClone(state.refs);
     this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
-    this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
+    this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
+    this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id] || this.lines.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
     this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
@@ -193,10 +212,11 @@ export class OutlineTool {
   /** What to save: outlines and references, minus any outline still being drawn. */
   state(): PlanState {
     const outlines = committedOutlines(this.outlines, this.drawing, this.replaced);
-    const layers = [...this.hiddenLayers].filter(id => outlines[id] || this.symbols.placed[id]);
+    const layers = [...this.hiddenLayers].filter(id => outlines[id] || this.symbols.placed[id] || this.lines.placed[id]);
     return {
       outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined,
       symbols: Object.keys(this.symbols.placed).length ? structuredClone(this.symbols.placed) : undefined,
+      lines: Object.keys(this.lines.placed).length ? structuredClone(this.lines.placed) : undefined,
     };
   }
   isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
@@ -225,7 +245,7 @@ export class OutlineTool {
     if (!symbolById(symbolId)) return;
     if (this.drawing) this.cancel();
     this.hiddenSections.delete('symbols'); // placing into a hidden section shows it
-    this.placing = symbolId; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null;
+    this.placing = symbolId; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.clearLines();
     this.revision++; this.update();
   }
   stopPlacing() { if (!this.placing) return; this.placing = null; this.update(); }
@@ -236,7 +256,7 @@ export class OutlineTool {
   selectSymbol(id: string | null) {
     const s = id ? this.symbols.placed[id] : null;
     if (this.drawing || (id && (!s || !this.symbolShown(s)))) return;
-    this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = id;
+    this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = id; this.clearLines();
     this.update();
   }
   rotateSymbol(id: string, deg: number) {
@@ -261,9 +281,91 @@ export class OutlineTool {
   private symbolAt(screen: Point): string | null {
     return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
   }
+  // ---------- Lines ----------
+  /** Whether a drawn line is drawn and can be tapped. */
+  lineShown = (l: PlacedLine): boolean => !isLineHidden(l, this.hiddenLayers, this.hiddenSections);
+  /** Show or hide every line of one item (all hidden → show them, else hide them). Not an undo step. */
+  toggleLineGroup(item: string) {
+    const ids = this.lines.groups().find(g => g.item === item)?.ids ?? []; if (!ids.length) return;
+    if (ids.every(id => this.hiddenLayers.has(id))) ids.forEach(id => this.hiddenLayers.delete(id)); else ids.forEach(id => this.hiddenLayers.add(id));
+    this.visibilityChanged();
+  }
+  /** Drop the line selection and any line being drawn (another tool or selection takes over). */
+  private clearLines() { this.selectedLine = null; this.selectedLinePoint = null; this.lineDraft = null; this.lastLineTap = null; }
+  /** Start drawing a line of a library item: each tap on the plan adds a point, until finishLine (Done or Enter) or cancelLine (Esc). */
+  startLine(item: string) {
+    const lib = lineItemById(item); if (!lib) return;
+    if (this.drawing) this.cancel();
+    this.hiddenSections.delete('lines'); // drawing into a hidden section shows it
+    this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.clearLines();
+    this.lineDraft = { item, points: [], widthFt: lib.defaultWidthFt };
+    this.revision++; this.update();
+  }
+  cancelLine() { if (!this.lineDraft) return; this.lineDraft = null; this.lastLineTap = null; this.update(); }
+  /** Save the line being drawn (one undo step) and select it; with fewer than two distinct points nothing is saved. */
+  finishLine() {
+    const d = this.lineDraft; if (!d) return;
+    if (!draftReady(d.points)) { this.host.toast('Tap at least two points along the run.'); return; }
+    this.record();
+    const id = this.lines.add(d.item, d.points, d.widthFt);
+    this.lineDraft = null; this.lastLineTap = null;
+    if (id) { this.selectedLine = id; this.selectedLinePoint = null; }
+    this.update();
+  }
+  private addLinePoint(screen: Point) {
+    const d = this.lineDraft; if (!d) return;
+    const now = performance.now(), prev = this.lastLineTap;
+    // A quick second tap on the point just placed ends the line.
+    if (prev && now - prev.t < GESTURE.doubleTapMs && dist(prev.at, screen) < 30 && d.points.length >= 2) { this.lastLineTap = null; this.finishLine(); return; }
+    const raw = this.draftTarget(screen), next = draftWithPoint(d.points, this.host.toPage(raw), this.host.pxPerPt());
+    if (!next) return;
+    d.points = next; this.lastLineTap = { t: now, at: screen }; this.update();
+  }
+  /** Where the next point of the draft would land for a pointer at `screen`: Shift holds the run to 45° steps from the last point. */
+  private draftTarget(screen: Point): Point {
+    const d = this.lineDraft, last = d?.points[d.points.length - 1];
+    return this.shiftKey && last ? constrain45(this.host.toScreen(last), screen).point : screen;
+  }
+  /** Back out the last point of the line being drawn. */
+  private popDraftPoint() { if (this.lineDraft?.points.length) { this.lineDraft.points.pop(); this.lastLineTap = null; this.update(); } }
+  selectLine(id: string | null) {
+    const l = id ? this.lines.placed[id] : null;
+    if (this.drawing || (id && (!l || !this.lineShown(l)))) return;
+    this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.lineDraft = null;
+    this.selectedLine = id; this.selectedLinePoint = null; this.update();
+  }
+  setLineWidth(id: string, ft: number) {
+    const l = this.lines.placed[id], next = clampLineWidth(ft); if (!l || next === l.widthFt) return;
+    this.record(); this.lines.setWidth(id, next); this.update();
+  }
+  removeLine(id: string) {
+    if (!this.lines.placed[id]) return;
+    this.record(); this.lines.remove(id); this.hiddenLayers.delete(id);
+    if (this.selectedLine === id) { this.selectedLine = null; this.selectedLinePoint = null; }
+    this.update();
+  }
+  /** Delete one point of a line (never below two). */
+  removeLinePoint(id: string, i: number) {
+    const l = this.lines.placed[id]; if (!l || l.points.length <= 2 || !l.points[i]) return;
+    this.record(); this.lines.removePoint(id, i); this.selectedLinePoint = null; this.update();
+  }
+  private lineAt(screen: Point): string | null {
+    return this.lines.hitTest(this.host.toPage(screen), this.lineShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
+  }
+  /** The selected line's point or bend handle under a press: points win, being the finer target. */
+  private lineHandleAt(p: Point): { kind: 'point' | 'bend'; i: number } | null {
+    const l = this.selectedLine ? this.lines.placed[this.selectedLine] : null; if (!l) return null;
+    let best: { kind: 'point' | 'bend'; i: number } | null = null, bd: number = HIT.corner;
+    l.points.forEach((q, i) => { const d = dist(this.host.toScreen(q), p); if (d < bd) { bd = d; best = { kind: 'point', i }; } });
+    if (best) return best;
+    bd = HIT.bend;
+    for (let i = 0; i + 1 < l.points.length; i++) { const d = dist(this.host.toScreen(edgeMid(l.points, i, l.bulges)), p); if (d < bd) { bd = d; best = { kind: 'bend', i }; } }
+    return best;
+  }
   private visibilityChanged() {
     if (this.selected && this.isHidden(this.selected)) { this.selected = null; this.selectedCorner = null; this.selectedEdge = null; }
     const sym = this.selectedSymbol && this.symbols.placed[this.selectedSymbol]; if (sym && !this.symbolShown(sym)) this.selectedSymbol = null;
+    const ln = this.selectedLine && this.lines.placed[this.selectedLine]; if (ln && !this.lineShown(ln)) { this.selectedLine = null; this.selectedLinePoint = null; }
     this.revision++; // saved, but nothing to undo
     this.update();
   }
@@ -310,7 +412,7 @@ export class OutlineTool {
   redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name, o.material); }
   private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
     if (this.drawing) this.cancel();
-    this.placing = null; this.selectedSymbol = null; // drawing takes over from placing
+    this.placing = null; this.selectedSymbol = null; this.clearLines(); // drawing takes over from placing
     this.record();
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
@@ -369,7 +471,7 @@ export class OutlineTool {
   // ---------- Pointer input (screen coordinates) ----------
   pointerDown(p: Point, pointerType: string): boolean {
     this.hideTip();
-    if (this.placing) return false; // armed: a tap places (see tap), a drag still pans
+    if (this.placing || this.lineDraft) return false; // armed or drawing a line: a tap places (see tap), a drag still pans
     this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p;
     if (!this.drawing) this.stick = null; // keep only the target the placing preview is showing
     if (pointerType !== 'mouse') {
@@ -408,6 +510,14 @@ export class OutlineTool {
       this.rawAt = m; this.dragAt = m; this.snapped = null; this.selectedEdge = null; this.update();
       return true;
     }
+    const lh = !this.drawing && this.selectedLine ? this.lineHandleAt(p) : null;
+    if (lh && this.selectedLine) {
+      const l = this.lines.placed[this.selectedLine];
+      this.drag = lh.kind === 'point'
+        ? { type: 'line-point', id: l.id, i: lh.i, start: p, before: { ...l.points[lh.i] }, moved: false }
+        : { type: 'line-bend', id: l.id, i: lh.i, start: p, moved: false };
+      this.dragBefore = this.snapshot(); return true;
+    }
     if (this.drawing) {
       // A tap places right under the finger; only when the finger starts dragging does the point
       // rise above it (gradually, so it doesn't jump), keeping it visible while adjusting.
@@ -434,7 +544,7 @@ export class OutlineTool {
     const sid = this.symbolAt(p);
     if (sid) {
       const s = this.symbols.placed[sid];
-      this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = sid;
+      this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = sid; this.clearLines();
       this.drag = { type: 'symbol', id: sid, start: p, before: { x: s.x, y: s.y }, moved: false };
       this.dragBefore = this.snapshot(); this.update(); return true;
     }
@@ -448,13 +558,27 @@ export class OutlineTool {
     if (edge) {
       // The corner nearer the tap stays put if a length is typed for a surface edge.
       const o = this.outlines[edge.id]!, a = this.host.toScreen(o.pts[edge.i]), b = this.host.toScreen(o.pts[(edge.i + 1) % o.pts.length]);
-      this.selectedEdge = { ...edge, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 }; this.selected = edge.id; this.update(); return true;
+      this.selectedEdge = { ...edge, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 }; this.selected = edge.id; this.clearLines(); this.update(); return true;
     }
     return false;
   }
 
   pointerMove(p: Point) {
     const d = this.drag; if (!d) return;
+    if (d.type === 'line-point') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
+      d.moved = true;
+      const a = this.host.toPage(d.start), b = this.host.toPage(p);
+      this.lines.movePoint(d.id, d.i, { x: d.before.x + b.x - a.x, y: d.before.y + b.y - a.y });
+      this.render(); return;
+    }
+    if (d.type === 'line-bend') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return;
+      d.moved = true;
+      const l = this.lines.placed[d.id];
+      if (l) this.lines.setBulge(d.id, d.i, bulgeToward(l.points[d.i], l.points[d.i + 1], this.host.toPage(p)));
+      this.render(); return;
+    }
     if (d.type === 'symbol') {
       if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
       d.moved = true;
@@ -639,6 +763,11 @@ export class OutlineTool {
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
+    if (d.type === 'line-point' || d.type === 'line-bend') {
+      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
+      else if (d.type === 'line-point') this.selectedLinePoint = this.selectedLinePoint === d.i ? null : d.i; // a tap selects (or drops) the point
+      this.dragBefore = null; this.update(); return;
+    }
     if (d.type === 'symbol') {
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       this.dragBefore = null; this.update(); return;
@@ -707,7 +836,7 @@ export class OutlineTool {
     if (this.drag && this.drag.type !== 'place' && this.drag.moved && this.dragBefore) {
       // Put a corner or bend back where it was before the accidental drag.
       const before = this.dragBefore;
-      this.outlines = before.outlines; this.refs = before.refs; this.symbols.placed = before.symbols;
+      this.outlines = before.outlines; this.refs = before.refs; this.symbols.placed = before.symbols; this.lines.placed = before.lines;
       this.revision++;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
@@ -722,8 +851,11 @@ export class OutlineTool {
    */
   tap(p: Point) {
     if (this.drawing) return;
+    if (this.lineDraft) { this.addLinePoint(p); return; }
     if (this.placing) { this.placeSymbolAt(p); return; }
-    const hadSymbol = this.selectedSymbol !== null; this.selectedSymbol = null;
+    const lid = this.lineAt(p);
+    if (lid) { this.selectLine(lid); return; }
+    const hadSymbol = this.selectedSymbol !== null || this.selectedLine !== null; this.selectedSymbol = null; this.clearLines();
     const hit = this.featureAt(p);
     if (hit === this.selected && !this.selectedEdge && !this.selectedCorner) { if (hadSymbol) this.update(); return; }
     this.selectedEdge = null; this.selectedCorner = null; this.selected = hit;
@@ -733,7 +865,7 @@ export class OutlineTool {
   selectOutline(id: string | null) {
     if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) return;
     if (id !== this.selected) this.aspectLock = false;
-    this.placing = null; this.selectedSymbol = null;
+    this.placing = null; this.selectedSymbol = null; this.clearLines();
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
   }
   /** Switch between drawing corner by corner and dragging a rectangle; an outline already started starts over (undoable). */
@@ -768,8 +900,8 @@ export class OutlineTool {
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
   deselect() {
-    if (!this.selectedEdge && !this.selectedCorner && !this.selected && !this.selectedSymbol) return;
-    this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.selectedSymbol = null; this.update();
+    if (!this.selectedEdge && !this.selectedCorner && !this.selected && !this.selectedSymbol && !this.selectedLine) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.selectedSymbol = null; this.clearLines(); this.update();
   }
   /** The layer whose visible part is under p (visible parts never overlap; one wholly covered can't be tapped). */
   private featureAt(p: Point): string | null {
@@ -783,7 +915,7 @@ export class OutlineTool {
 
   hover(p: Point | null) {
     this.hoverAt = p;
-    if (this.placing) { this.render(); return; } // the ghost follows the pointer
+    if (this.placing || this.lineDraft) { this.render(); return; } // the ghost, or the line's rubber band, follows the pointer
     // Preview where a click would land, so snapping (and Shift) is visible before clicking.
     this.hoverPlaced = p && this.drawing ? this.placeAt(p, this.anchorFor(null)) : null;
     if (!this.hoverPlaced) { this.snapped = null; this.angle = null; if (!this.drag) this.stick = null; }
@@ -1054,11 +1186,16 @@ export class OutlineTool {
     // Surfaces, then the plants and objects, then the outlines; within each group the layer being edited goes last. Handles go on top of all.
     const activeLast = (list: Outline[]) => list.sort((a, b) => Number(a.id === active) - Number(b.id === active));
     const paint = [...activeLast(all.filter(o => o.kind === 'surface')), ...activeLast(all.filter(o => o.kind !== 'surface'))];
-    const symbolsMarkup = symbolsSvg({
+    const ln = linesSvgParts({
+      placed: this.lines.ordered(), shown: this.lineShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
+      selected: this.selectedLine, selectedPoint: this.selectedLinePoint,
+      draft: this.lineDraft ? { ...this.lineDraft, hover: this.hoverAt ? this.draftTarget(this.hoverAt) : null } : undefined,
+    });
+    const symbolsMarkup = ln.runs + symbolsSvg({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
       selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
-    let symbolsDone = false, top = '';
+    let symbolsDone = false, top = ln.top;
     for (const o of paint) {
       if (!symbolsDone && o.kind !== 'surface') { svg += symbolsMarkup; symbolsDone = true; }
       if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
@@ -1297,6 +1434,15 @@ export class OutlineTool {
     if (mod && key === 'y') { e.preventDefault(); this.redo(); return; }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (this.placing && e.key === 'Escape') { this.stopPlacing(); return; }
+    if (this.lineDraft) {
+      if (e.key === 'Escape') { this.cancelLine(); return; }
+      if (e.key === 'Enter') { e.preventDefault(); this.finishLine(); return; }
+      if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.popDraftPoint(); return; }
+    }
+    if (this.selectedLine && !this.drawing) {
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (this.selectedLinePoint !== null) this.removeLinePoint(this.selectedLine, this.selectedLinePoint); else this.removeLine(this.selectedLine); return; }
+      if (e.key === 'Escape') { this.deselect(); return; }
+    }
     if (this.selectedSymbol && !this.drawing) {
       if (arrows[e.key]) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudgeSymbol(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.removeSymbol(this.selectedSymbol); return; }
@@ -1331,4 +1477,5 @@ interface Snapshot {
   selected: string | null;
   replaced: Outline | null;
   symbols: Record<string, PlacedSymbol>;
+  lines: Record<string, PlacedLine>;
 }
