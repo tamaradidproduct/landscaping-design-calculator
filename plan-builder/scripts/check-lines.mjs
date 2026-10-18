@@ -75,11 +75,30 @@ try {
   await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', 'hot'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
   check('Arming a symbol drops the line selection', (await page.$$('.overlay .line-point')).length === 0 && !!(await page.$('[data-act=stop-placing]')), 'no handles, Done shown');
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
+  // Stepping stone and utility marker: one per tap, direction on the marker, both counted
+  const pickSymbol = async (query, id) => { await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', query); await page.waitForTimeout(150); await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
+  const symImgs = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, src: x.getAttribute('href'), w: +x.getAttribute('width'), h: +x.getAttribute('height'), t: x.getAttribute('transform') })));
+  await pickSymbol('porcelain', 'porcelain-pavers'); await tap([300, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
+  await pickSymbol('gas', 'gas-line'); await tap([450, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
+  const placed = await symImgs(), stone = placed.find(i => /porcelain-pavers/.test(i.src)), gas = placed.find(i => /gas-line/.test(i.src));
+  check('A stepping stone and a gas marker are placed', !!stone && !!gas, `${placed.length} symbols`);
+  check('The stone is 2 ft square at plan scale', !!stone && Math.abs(stone.w / stone.h - 1) < 0.02, stone ? `${stone.w.toFixed(1)} × ${stone.h.toFixed(1)} px` : 'missing');
+  check('The marker is at least 20 px long', !!gas && Math.max(gas.w, gas.h) >= 19.9, gas ? `${gas.w.toFixed(1)} × ${gas.h.toFixed(1)} px` : 'missing');
+  const [gx, gy] = await toScreen([450, 300]); await page.mouse.click(gx, gy); await page.waitForTimeout(250);
+  check('A marker card says Direction', /Direction/.test(await page.$eval('#symbols [data-card]', c => c.innerText)), 'hint shown');
+  for (let i = 0; i < 6; i++) await page.click('#symbols [data-act=rot-up]');
+  await page.waitForTimeout(200);
+  check('Turning a marker 90° points it along the run', /rotate\(90 /.test((await symImgs()).find(i => /gas-line/.test(i.src)).t ?? ''), '90°');
+  await page.keyboard.press('Escape');
+  const list = await listText();
+  check('The Plant list shows lines with feet and runs', /Lines \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 1 run/.test(list), list.slice(0, 160));
+  check('…stepping stones under Objects and the gas marker under Utility markers', /Objects \| .*Porcelain stepping stones.*1/.test(list) && /Utility markers \| .*Gas line.*1/.test(list), list.slice(-160));
   // Hide
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
   check('Hiding a kind hides its runs only', (await runs()).length === 1 && (await runs())[0].id === 'l2', (await runs()).map(r => r.id).join());
   await page.click('[data-eye-group=lines]'); await page.waitForTimeout(200);
   check('Hiding the section hides every run', (await runs()).length === 0, 'none drawn');
+  check('Hidden runs still count in the Plant list', /Wood privacy fence \| \d/.test(await listText()), 'still listed');
   // Persistence
   await page.waitForTimeout(1800);
   await page.click('#back-to-plans'); await page.locator('.plan-row').first().waitFor();
@@ -92,6 +111,8 @@ try {
   check('Showing the section leaves the hidden kind hidden', (await runs()).length === 1 && (await runs())[0].id === 'l2', (await runs()).map(r => r.id).join());
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
   check('Showing that kind restores both runs', (await runs()).length === 2, (await runs()).map(r => r.id).join());
+  check('Stone and marker survived reopening', (await symImgs()).length === 2, `${(await symImgs()).length} symbols`);
+  check('The list still shows lines and markers', /Lines \|/.test(await listText()) && /Utility markers/.test(await listText()), (await listText()).slice(0, 80));
   await page.screenshot({ path: `${outDir}/lines-end.png` });
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
 check('No page errors', errors.length === 0, errors.slice(0, 2).join(' | ') || 'none');
