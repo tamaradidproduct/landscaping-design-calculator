@@ -98,6 +98,9 @@ button.layer-row.selected { background: var(--color-bg); border-color: var(--col
 button.layer-row.suggest { color: var(--color-muted); border: var(--border-width) dashed var(--color-line); }
 .layer-item { display: flex; align-items: center; gap: var(--space-3); }
 .layer-item > .layer-row { flex: 1; min-width: 0; }
+button.layer-row.off { opacity: var(--opacity-layer-off); }
+.group-line { display: flex; align-items: center; gap: var(--space-3); }
+.group-line > button.group-head { flex: 1; min-width: 0; }
 .layer-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-tight); }
 .layer-sub { font-size: var(--text-sm); color: var(--color-muted); font-variant-numeric: tabular-nums; }
 .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -150,8 +153,9 @@ input[type="range"] { flex: 1; min-height: var(--control-sm); padding: 0; border
 .loading { position: absolute; inset: 0; display: grid; place-content: center; font-size: var(--text-xl); color: var(--color-muted); }
 /* Pattern definitions for surfaces (no layout of their own). */
 svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-/* Material chips: swatch + name; the zone's current material is pressed. */
-button.chip.material-chip { display: inline-flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); }
+/* Material picker: one row per material (swatch + name), tighter than a layer row; the zone's current one is marked. */
+.material-list { gap: 0; }
+.material-list > button.layer-row { min-height: var(--control-sm); }
 button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
 .swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
 .swatch.material svg { display: block; width: 100%; height: 100%; }
@@ -169,6 +173,8 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .chip-field input { width: var(--width-field-inline); flex: none; min-height: var(--control-sm); padding: 0 var(--space-3); font-size: var(--text-base); }
 /* "Round all corners [ 2′ ] Apply" in a surface's card */
 .round-all .row { flex-wrap: nowrap; }
+.tex-scale { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.tex-scale .row { flex-wrap: nowrap; }
 .round-all input { min-height: var(--control-md); font-size: var(--text-base); }
 /* "Width [ 12.00′ ] 🔗 Depth [ 20.00′ ]" in a surface's card; the lock sits level with the inputs */
 .zone-size .row { flex-wrap: nowrap; align-items: flex-end; }

@@ -1,7 +1,8 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
 import type { MaterialId } from './materials';
-import { cornerArc } from './shape-edit';
+import { cornerRound } from './shape-edit';
+import { edgeBetween } from './fillet';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -19,10 +20,17 @@ export interface Outline {
   id: string; kind: OutlineKind; name: string; pts: Point[]; closed: boolean; bulges?: number[]; material?: MaterialId;
   /** Corner radii in page points (surfaces only; 0 or missing = sharp). */
   radii?: number[];
+  /** A surface's texture scale: 1 = the material's own repeat (see TEX_SCALE for the range). */
+  texScale?: number;
 }
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';
+/** A zone's texture scale: smallest, largest, and the factor one press of − or + applies. */
+export const TEX_SCALE = { min: 0.25, max: 4, step: 1.25 } as const;
+/** One press of − (-1) or + (+1) on a zone's texture scale, kept within TEX_SCALE and free of rounding drift. */
+export const stepTexScale = (scale: number, dir: 1 | -1): number =>
+  Math.min(TEX_SCALE.max, Math.max(TEX_SCALE.min, Math.round(scale * TEX_SCALE.step ** dir * 1000) / 1000));
 export const sectionOf = (kind: OutlineKind): Section => kind === 'boundary' ? 'lot' : kind === 'feature' ? 'outlines' : 'surfaces';
 const SECTION_RANK: Record<Section, number> = { lot: 0, outlines: 1, surfaces: 2 };
 
@@ -108,15 +116,15 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
 }
 
 /**
- * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points); a
- * corner next to a bent edge stays sharp.
+ * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points), also next to
+ * a bent edge: the rounding then trims the arc.
  */
 export function outlinePath(pts: Point[], bulges: number[] | undefined, closed: boolean, radii?: number[]): Point[] {
   const out: Point[] = [], n = pts.length, edges = closed ? n : n - 1;
+  const rounds = pts.map((_, i) => closed && radii?.[i] ? cornerRound(pts, bulges, i, radii[i]) : null);
   for (let i = 0; i < edges; i++) {
-    const arc = closed && radii?.[i] && !bulges?.[i] && !bulges?.[(i - 1 + n) % n] ? cornerArc(pts, i, radii[i]) : null;
-    const edge = edgePoints(pts[i], pts[(i + 1) % n], bulges?.[i] ?? 0);
-    out.push(...(arc ?? [pts[i]]), ...edge.slice(1));
+    const j = (i + 1) % n;
+    out.push(...(rounds[i]?.arc ?? [pts[i]]), ...edgeBetween(pts[i], pts[j], bulges?.[i] ?? 0, rounds[i]?.tOut ?? 0, rounds[j]?.tIn ?? 1));
   }
   if (!closed && pts.length) out.push(pts[pts.length - 1]);
   return out;

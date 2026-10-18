@@ -19,7 +19,7 @@ export class OutlinesSection {
     const s = outlineSuggestions(all);
     const ordered = [...all.filter(o => o.kind === 'boundary'), ...all.filter(o => o.kind === 'feature')];
     const rows = ordered.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o) : layerRow(o.name, {
-      swatch: swatchOf(o), data: { layer: o.id },
+      swatch: swatchOf(o), data: { layer: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
     const scaleHint = !t.cal && all.some(o => o.closed) && !t.drawing
@@ -39,6 +39,7 @@ export class OutlinesSection {
           ${splitRow(button('Outline', { type: 'submit', variant: 'primary' }), button('Cancel', { data: { act: 'cancel-name' } }))}`)
         : suggestRow('Custom outline…', { act: 'name' })}`;
 
+    this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     this.el.querySelectorAll<HTMLButtonElement>('[data-layer]').forEach(b => {
       b.onclick = () => {
         const id = b.dataset.layer!;

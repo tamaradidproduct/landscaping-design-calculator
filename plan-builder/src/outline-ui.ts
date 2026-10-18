@@ -3,18 +3,19 @@
 import {
   areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
   edgeTapOrder, moveInSection, nearestOnRing, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
-  type Outline, type OutlineKind, type OutlineShape,
+  TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
 import type { PlanState } from './plan-model';
+import { groupOf, isHidden, type Group } from './sections';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { boxSize, resizeBox, stretchEdge } from './stretch';
 import { DEFAULT_SHAPES, shapeGroup, type ShapePrefs } from './shape-pref';
 import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
-import { materialFill } from './patterns';
+import { zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, row, token } from './ui';
@@ -41,8 +42,8 @@ export interface ToolHost {
 
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
 const colorOf = (o: Outline) => o.kind === 'surface' ? material(o.material!).edge : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
-/** A surface's material fill (colour + pattern), as an inline style addition. */
-const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${materialFill(o.material)}` : '';
+/** A surface's texture fill (its zone's own pattern), as an inline style addition. */
+const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${zoneFill(o.id)}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
@@ -52,7 +53,7 @@ type Drag =
   // Surfaces only: move the whole zone, push one side, or round a corner (screen points from the press).
   | { type: 'move'; id: string; start: Point; before: Point[]; moved: boolean }
   | { type: 'side'; id: string; i: number; start: Point; before: Point[]; moved: boolean; fixed: 0 | 1 }
-  | { type: 'round'; id: string; i: number; start: Point; r0: number; moved: boolean };
+  | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -98,6 +99,9 @@ export class OutlineTool {
   private dragBefore: Snapshot | null = null;
   private lastNudge: { t: number; id: string; i: number } | null = null;
   private revision = 0;
+  /** Hidden layers (by id) and sections: saved with the plan, but not undoable (like the view). */
+  hiddenLayers = new Set<string>();
+  hiddenSections = new Set<Group>();
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -165,6 +169,7 @@ export class OutlineTool {
   /** Replace everything with a saved plan: no selection, no undo history; snap and shape preferences stay. */
   load(state: PlanState) {
     this.outlines = structuredClone(state.outlines); this.refs = structuredClone(state.refs);
+    this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id])); this.hiddenSections = new Set(state.hiddenSections);
     this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
@@ -174,7 +179,28 @@ export class OutlineTool {
     this.update();
   }
   /** What to save: outlines and references, minus any outline still being drawn. */
-  state(): PlanState { return { outlines: committedOutlines(this.outlines, this.drawing, this.replaced), refs: structuredClone(this.refs) }; }
+  state(): PlanState {
+    const outlines = committedOutlines(this.outlines, this.drawing, this.replaced);
+    const layers = [...this.hiddenLayers].filter(id => outlines[id]);
+    return { outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined };
+  }
+  isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
+  /** Show or hide one layer; a hidden layer isn't drawn, selected, snapped to or tapped. Not an undo step. */
+  toggleLayer(id: string) {
+    if (!this.outlines[id] || id === this.drawing) return;
+    if (!this.hiddenLayers.delete(id)) this.hiddenLayers.add(id);
+    this.visibilityChanged();
+  }
+  /** Show or hide a whole section; each layer's own eye is left as it was. */
+  toggleSection(g: Group) {
+    if (!this.hiddenSections.delete(g)) this.hiddenSections.add(g);
+    this.visibilityChanged();
+  }
+  private visibilityChanged() {
+    if (this.selected && this.isHidden(this.selected)) { this.selected = null; this.selectedCorner = null; this.selectedEdge = null; }
+    this.revision++; // saved, but nothing to undo
+    this.update();
+  }
   get saveRevision() { return this.revision; }
   undo() { if (this.drag) return; const s = this.history.undo(this.snapshot()); if (s) this.restore(s); }
   redo() { if (this.drag) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
@@ -205,6 +231,15 @@ export class OutlineTool {
     o.material = m;
     this.update();
   }
+  /** Set a surface's texture scale (1 = the material's own repeat), within TEX_SCALE. */
+  setTexScale(id: string, scale: number) {
+    const o = this.outlines[id]; if (o?.kind !== 'surface') return;
+    const s = Math.min(TEX_SCALE.max, Math.max(TEX_SCALE.min, scale));
+    if ((o.texScale ?? 1) === s) return;
+    this.record();
+    if (s === 1) delete o.texScale; else o.texScale = s;
+    this.update();
+  }
   /** Draw an existing outline again from scratch, keeping its name; Cancel puts the old one back. */
   redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name, o.material); }
   private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
@@ -212,6 +247,7 @@ export class OutlineTool {
     this.record();
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
+    this.hiddenLayers.delete(id); this.hiddenSections.delete(groupOf(this.outlines[id]!)); // drawing into a hidden layer shows it
     this.drawing = id;
     this.shape = this.shapePrefs[shapeGroup(kind)];
     this.selectedEdge = null; this.lastTap = null; this.selectedCorner = null; this.selected = null;
@@ -281,8 +317,8 @@ export class OutlineTool {
     if (round) {
       // Start from the radius as drawn (a typed one may be clamped to fit the sides).
       const o = this.outlines[round.id]!, at = this.host.toPage(round.at), c = o.pts[round.i];
-      const r0 = o.radii?.[round.i] ? radiusFromHandle(Math.hypot(at.x - c.x, at.y - c.y), cornerBisector(o.pts, round.i).half) : 0;
-      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0, moved: false };
+      const r0 = o.radii?.[round.i] ? radiusFromHandle(Math.hypot(at.x - c.x, at.y - c.y), cornerBisector(o.pts, round.i, o.bulges).half) : 0;
+      this.drag = { type: 'round', id: round.id, i: round.i, start: p, r0, radiiBefore: o.pts.map((_, k) => o.radii?.[k] ?? 0), moved: false };
       this.dragBefore = this.snapshot();
       return true;
     }
@@ -372,10 +408,12 @@ export class OutlineTool {
       o.pts = pushSide(d.before, d.i, delta);
       const ft = this.edgeFeet(o.id, d.i); this.showTipText(ft ? `Side ${formatFeet(ft)}` : 'Move side', p);
     } else {
-      const { dir, half } = cornerBisector(o.pts, d.i), along = delta.x * dir.x + delta.y * dir.y;
+      const { dir, half } = cornerBisector(o.pts, d.i, o.bulges), along = delta.x * dir.x + delta.y * dir.y;
       const r = radiusFromHandle(roundHandleDistance(d.r0, half) + along, half);
-      o.radii = o.pts.map((_, k) => k === d.i ? r : o.radii?.[k] ?? 0);
-      this.showTipText(r > 0 ? `Radius ${this.cal ? formatFeet(r * this.cal.ftPerPt) : ''}`.trim() : 'Sharp corner', p);
+      // Shift held: every corner takes this radius (letting go of Shift puts the others back).
+      o.radii = o.pts.map((_, k) => this.shiftKey || k === d.i ? r : d.radiiBefore[k]);
+      const text = r > 0 ? `Radius ${this.cal ? formatFeet(r * this.cal.ftPerPt) : ''}`.trim() : 'Sharp corner';
+      this.showTipText(this.shiftKey ? `All corners · ${text}` : text, p);
     }
     this.render();
   }
@@ -458,7 +496,7 @@ export class OutlineTool {
   /** Outlines a placed point may snap to: tracing the boundary or a feature ignores designed surfaces. */
   private snapTargets(exclude?: { id: string; i: number }) {
     const editing = exclude?.id ?? this.drawing;
-    return snapSources(Object.values(this.outlines), editing ? this.outlines[editing]?.kind ?? null : null);
+    return snapSources(Object.values(this.outlines).filter(o => !this.isHidden(o.id)), editing ? this.outlines[editing]?.kind ?? null : null);
   }
   private findSnap(raw: Point, exclude: { id: string; i: number } | undefined, lineOnly: boolean): Point | null {
     if (lineOnly) {
@@ -605,7 +643,7 @@ export class OutlineTool {
   }
   /** Select an outline from the Layers panel (null: drop the selection). */
   selectOutline(id: string | null) {
-    if (this.drawing || (id && !this.outlines[id]?.closed)) return;
+    if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) return;
     if (id !== this.selected) this.aspectLock = false;
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
   }
@@ -647,7 +685,7 @@ export class OutlineTool {
   /** The layer whose visible part is under p (visible parts never overlap; one wholly covered can't be tapped). */
   private featureAt(p: Point): string | null {
     const pp = this.host.toPage(p);
-    for (const [id, shape] of this.visible) if (insideShape(shape, pp)) return id;
+    for (const [id, shape] of this.visible) if (!this.isHidden(id) && insideShape(shape, pp)) return id;
     return null;
   }
 
@@ -667,7 +705,7 @@ export class OutlineTool {
     let near: number | null = null, nd: number = HIT.roundReveal;
     if (z && p) {
       const pp = this.host.toPage(p), k = this.host.pxPerPt();
-      z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp) * k; if (d < nd) { nd = d; near = i; } });
+      z.pts.forEach((_, i) => { const d = distToCorner(z.pts, i, z.radii, pp, z.bulges) * k; if (d < nd) { nd = d; near = i; } });
     }
     const cornerChanged = near !== this.hoverCorner;
     this.hoverCorner = near;
@@ -700,7 +738,7 @@ export class OutlineTool {
     const pp = this.host.toPage(p), tol = HIT.zoneSide / this.host.pxPerPt();
     let best: number | null = null, bd = tol;
     o.pts.forEach((_, i) => {
-      const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp);
+      const d = o.bulges?.[i] ? (nearestEdge(o.pts, pp, tol, o.bulges) === i ? tol / 2 : Infinity) : distToSide(o.pts, i, o.radii, pp, o.bulges);
       if (d < bd) { bd = d; best = i; }
     });
     return best;
@@ -711,23 +749,23 @@ export class OutlineTool {
     return o?.kind === 'surface' && o.closed ? o : null;
   }
   /** Where the selected surface corner's round handle sits (screen), on its bisector at the arc's middle. */
-  private roundHandlePos(): { id: string; i: number; at: Point } | null {
+  private roundHandlePos(): { id: string; i: number; at: Point; onArc: boolean } | null {
     const o = this.selectedZone, sel = this.selectedCorner;
     // The corner the pointer is near shows its handle; otherwise the selected corner does.
     const c = this.hoverCorner !== null && o ? { id: o.id, i: this.hoverCorner } : sel;
-    if (!o || c?.id !== o.id || !o.pts[c.i] || o.bulges?.[c.i] || o.bulges?.[(c.i - 1 + o.pts.length) % o.pts.length]) return null;
+    if (!o || c?.id !== o.id || !o.pts[c.i]) return null;
     // On the arc's middle once rounded (on the drawn line, even when the radius is clamped to the sides); a sharp
     // corner's handle sits just inside it.
-    const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0);
-    if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]) };
-    const { dir } = cornerBisector(o.pts, c.i), d = MARK.roundHandleMin;
+    const arc = cornerArc(o.pts, c.i, o.radii?.[c.i] ?? 0, o.bulges);
+    if (arc) return { id: o.id, i: c.i, at: this.host.toScreen(arc[arc.length >> 1]), onArc: true };
+    const { dir } = cornerBisector(o.pts, c.i, o.bulges), d = MARK.roundHandleMin;
     const s = this.host.toScreen(o.pts[c.i]), t = this.host.toScreen({ x: o.pts[c.i].x + dir.x, y: o.pts[c.i].y + dir.y });
     const u = { x: t.x - s.x, y: t.y - s.y }, l = Math.hypot(u.x, u.y) || 1;
-    return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d } };
+    return { id: o.id, i: c.i, at: { x: s.x + u.x / l * d, y: s.y + u.y / l * d }, onArc: false };
   }
   private roundHandleAt(p: Point) {
     const h = this.drawing ? null : this.roundHandlePos();
-    return h && dist(h.at, p) < HIT.roundHandle ? h : null;
+    return h && dist(h.at, p) < (h.onArc ? HIT.roundHandleOnArc : HIT.roundHandle) ? h : null;
   }
   private bendHandleAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd: number = HIT.bend;
@@ -754,7 +792,7 @@ export class OutlineTool {
   private edgeAt(p: Point): { id: string; i: number } | null {
     const tol = HIT.edge / this.host.pxPerPt(), pp = this.host.toPage(p);
     for (const o of edgeTapOrder(Object.values(this.outlines), this.selected)) {
-      if (!o?.closed) continue;
+      if (!o?.closed || this.isHidden(o.id)) continue;
       const i = nearestEdge(o.pts, pp, tol, o.bulges);
       if (i !== null) return { id: o.id, i };
     }
@@ -834,11 +872,19 @@ export class OutlineTool {
     this.update();
   }
   /** Round every corner of a surface to one radius in feet (0 = all sharp). */
-  roundAll(id: string, feet: number) {
+  roundAll(id: string, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c) return;
-    this.record();
+    // Arrow-key steps within 1.5 s undo as one step (like a corner's).
+    const t = performance.now(), ln = this.lastNudge, key = -1, run = steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500;
+    if (!run) this.record(); else this.revision++;
+    if (steps) this.lastNudge = { t, id, i: key };
     o.radii = o.pts.map(() => feet / c.ftPerPt);
     this.update();
+  }
+  /** The one radius (feet) every corner of a surface has, or 0 when they differ or are sharp. */
+  uniformRadius(id: string): number {
+    const o = this.outlines[id], c = this.cal, r = o?.radii; if (!o || !c || !r?.length || r.length !== o.pts.length || r.some(x => x !== r[0])) return 0;
+    return Math.round(r[0] * c.ftPerPt * 100) / 100;
   }
   /** Square all corners: line every corner of an outline up with the others at once. */
   squareAll(id: string) {
@@ -912,7 +958,7 @@ export class OutlineTool {
     const paint = [...all.filter(o => o.kind === 'surface'), ...all.filter(o => o.kind !== 'surface')];
     paint.sort((a, b) => Number(a.id === active) - Number(b.id === active));
     for (const o of paint) {
-      if (!o || !o.pts.length) continue;
+      if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
       // Rectangle in progress: preview the whole rectangle from the first corner to the pointer.
@@ -926,7 +972,7 @@ export class OutlineTool {
         // it's clear what is being edited.
         if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}${fillOf(o)}"/>`;
         if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
-      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
+      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}${drawingThis && o.kind === 'surface' ? ' drawing' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
@@ -957,7 +1003,7 @@ export class OutlineTool {
     for (const o of Object.values(this.outlines)) {
       // Feature names go on top of every shape so overlapping features stay readable, inside each one's visible
       // part. Surfaces carry no label: their fill says what they are, and the row names them.
-      if (o.kind === 'surface') continue;
+      if (o.kind === 'surface' || this.isHidden(o.id)) continue;
       const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
       if (!at) continue;
       const c = h.toScreen(at);

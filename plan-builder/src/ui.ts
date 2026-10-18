@@ -110,15 +110,24 @@ export interface LayerRowOptions {
   swatch: Swatch; meta?: string; selected?: boolean; data?: Record<string, string>;
   /** A quiet second line under the name (e.g. the plot area). */
   sub?: string;
+  /** Adds an eye beside the row that shows or hides layer `id`. */
+  eye?: { id: string; hidden: boolean };
 }
+/** An eye toggle: pressed = shown. `what` names it for the label ("Lawn"); `data` says what it toggles. */
+export const eyeButton = (hidden: boolean, what: string, data: Record<string, string>) => {
+  const label = `${hidden ? 'Show' : 'Hide'} ${what}`, d = Object.entries(data).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
+  return `<button type="button" class="icon" aria-pressed="${!hidden}" aria-label="${esc(label)}" title="${esc(label)}"${d}>`
+    + '<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg></button>';
+};
 const layerName = (name: string, sub?: string) => sub
   ? `<span class="layer-text"><span class="layer-name">${esc(name)}</span><span class="layer-sub">${esc(sub)}</span></span>`
   : `<span class="layer-name">${esc(name)}</span>`;
 export function layerRow(name: string, o: LayerRowOptions): string {
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
-  return `<button type="button" class="layer-row${o.selected ? ' selected' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
+  const row = `<button type="button" class="layer-row${o.selected ? ' selected' : ''}${o.eye?.hidden ? ' off' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
     + `${swatch(o.swatch)}${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
+  return o.eye ? `<div class="layer-item">${eyeButton(o.eye.hidden, name, { eye: o.eye.id })}${row}</div>` : row;
 }
 /**
  * Layer card: the row of the outline being drawn or edited, expanded in place. The head keeps the swatch and

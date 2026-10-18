@@ -20,8 +20,8 @@ export const MARK = {
   guideLabelDy: 24,
   cornerBracket: 8,     // rectangle tool: arm length of the ⌐ mark at the pointer
   guideSpan: 100000,    // rectangle tool: the guides run this far each way (the plan clips them)
-  roundHandle: 6,       // surfaces: radius of the round-corner handle on the selected corner's bisector
-  roundHandleMin: 22,   // …and its least distance from the corner (screen px), so it doesn't hide under the corner dot
+  roundHandle: 8,       // surfaces: radius of the round-corner handle on the selected corner's bisector
+  roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;
@@ -36,8 +36,9 @@ export const HIT = {
   bend: 20,             // an edge's middle square
   zoneCorner: 14,       // a selected surface's corner dot (tighter, so its sides and round handle stay reachable)
   zoneSide: 10,         // the drawn straight part of a selected surface's side (push it)
-  roundHandle: 13,      // the round handle (small, so the sides next to it stay easy to grab)
-  roundReveal: 24,      // from the drawn line at a selected surface's corner (its arc, once rounded): shows the round handle
+  roundHandle: 18,      // the round handle on a sharp corner (finger-sized; it floats clear of the corner dot and the sides)
+  roundHandleOnArc: 13, // …once the corner is rounded and the handle sits on the arc (smaller, so the sides next to it stay easy to grab)
+  roundReveal: 52,      // from the drawn line at a selected surface's corner (its arc, once rounded): shows the round handle, out to the handle itself
 } as const;
 
 /** Gesture thresholds: distances in screen px, times in ms. */

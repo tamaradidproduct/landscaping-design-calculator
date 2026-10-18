@@ -46,6 +46,7 @@
 /* Surfaces: solid material fill (colour + pattern, set inline) with a darker edge; see-through while selected or drawn. */
 .overlay .shape.surface { stroke: color-mix(in srgb, var(--c) var(--mix-material-edge), var(--color-material-shade)); stroke-width: var(--stroke-hairline); }
 .overlay .shape.surface.closed { fill-opacity: 1; }
-.overlay .shape.surface.selected { fill-opacity: var(--opacity-surface-editing); stroke-width: var(--stroke-heavy); }
+.overlay .shape.surface.selected { stroke-width: var(--stroke-heavy); }
+.overlay .shape.surface.drawing { fill-opacity: var(--opacity-surface-editing); } /* the zone being drawn: see-through, so the plan shows to trace */
 /* Surfaces: the round-corner handle on the selected corner's bisector */
 .overlay .round-handle { fill: var(--color-paper); stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
