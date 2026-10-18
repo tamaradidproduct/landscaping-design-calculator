@@ -1,0 +1,27 @@
+{
+  "wood-privacy-fence": {
+    "w": 40,
+    "h": 576,
+    "color": "#b78559"
+  },
+  "veneer-wall": {
+    "w": 40,
+    "h": 576,
+    "color": "#b5afa7"
+  },
+  "retaining-wall": {
+    "w": 40,
+    "h": 576,
+    "color": "#7b7f80"
+  },
+  "white-stone-edging": {
+    "w": 40,
+    "h": 256,
+    "color": "#dedbd8"
+  },
+  "dry-river": {
+    "w": 294,
+    "h": 294,
+    "color": "#c6c4c2"
+  }
+}

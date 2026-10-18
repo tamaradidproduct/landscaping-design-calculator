@@ -68,7 +68,15 @@ export const SYMBOL_SIZES = {
   'outdoor-lantern': { w: 1, d: 1, url: 'https://www.1stoplighting.com/p/small-post-mount-fix-incand-120v-by-dabmar-gm212-bz', note: 'Landscape fixtures 6–14 in wide (11.75 in post mount)' },
   'outdoor-grill': { w: 6, d: 2, url: 'https://www.thebbqdepot.com/blog/complete-guide-to-builtin-grills/', note: 'The Figma art is a long grill island (3.3:1): built-in islands run about 6.4×3 ft (a 36 in grill alone is 3×2 ft)', approximate: true },
   'spigot': { w: 0.5, d: 0.5, url: 'https://nachi.org/gallery/general-6/frost-free-hose-bibb', note: 'A hose bibb is about 8 in; drawn as a small point symbol', approximate: true },
+  // Figma sizes at 36 px per ft (a 72 px stepping stone is 2 ft).
+  'porcelain-pavers': { w: 2, d: 2, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 72 × 72 px ÷ 36 px per ft' },
+  'concrete-pavers': { w: 2, d: 2, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 72 × 72 px ÷ 36 px per ft' },
+  'flagstone-pavers': { w: 2, d: 2, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 72 × 73 px ÷ 36 px per ft' },
+  'colorado-buff-stone': { w: 3.56, d: 2, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 128 × 72 px ÷ 36 px per ft' },
+  'gas-line': { w: 0.42, d: 1.03, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 15 × 37 px ÷ 36 px per ft' },
+  'electric-line': { w: 0.42, d: 1.03, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 15 × 37 px ÷ 36 px per ft' },
+  'drainage-line': { w: 3.78, d: 3.03, url: 'https://www.figma.com/design/0B2UpvIGBFOE1ZEDx8rXPR', note: 'Figma 136 × 109 px ÷ 36 px per ft' },
 };
 
 /** Spread (feet) for a family, for a symbol with no source of its own. */
-export const FAMILY_TYPICAL = {'Evergreen trees': 12, 'Deciduous trees': 25, 'Accent trees': 12, 'Accent shrubs': 5, 'Privacy shrubs': 3, 'Large shrubs': 5, 'Perennials': 1.5, 'Ground covers': 1.5, 'Ornamental grasses': 2.5, 'Other': 3, 'Objects': 3};
+export const FAMILY_TYPICAL = {'Evergreen trees': 12, 'Deciduous trees': 25, 'Accent trees': 12, 'Accent shrubs': 5, 'Privacy shrubs': 3, 'Large shrubs': 5, 'Perennials': 1.5, 'Ground covers': 1.5, 'Ornamental grasses': 2.5, 'Other': 3, 'Objects': 3, 'Stepping stones': 2, 'Utility markers': 1};
