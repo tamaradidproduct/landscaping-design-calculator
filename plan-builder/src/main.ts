@@ -5,6 +5,7 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
+import { renderPlantList } from './plant-list-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
@@ -89,6 +90,7 @@ const tool = new OutlineTool({
     shell?.changed();
     surfaces?.render();
     symbolsSection?.render();
+    renderPlantList($('plant-list'), tool);
     outlines?.render();
     updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
@@ -159,6 +161,7 @@ surfaces = new SurfacesSection($('surfaces'), tool);
 surfaces.render();
 symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
+renderPlantList($('plant-list'), tool);
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 updateGroups();

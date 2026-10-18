@@ -83,6 +83,7 @@
   --width-sidebar: 280px; /* Side panel on the right (history, view, layers). */
   --width-plan-head: 300px; /* Editor header, top left of the plan (back, plan name, actions); the name truncates to fit. */
   --width-swatch: 14px; /* Colour swatch at the start of a layer row. */
+  --width-plant-art: 48px; /* The plan symbol and the photo on a Plant list card. */
   --width-field-inline: 60px; /* A short field inside a chip (a corner's radius, "Round [ 2 ]"). */
   --width-icon: 16px; /* Inline line icon (the eye and pencil on the Plot plan layer). */
 
