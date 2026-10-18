@@ -83,6 +83,7 @@
   --width-sidebar: 280px; /* Side panel on the right (history, view, layers). */
   --width-plan-head: 300px; /* Editor header, top left of the plan (back, plan name, actions); the name truncates to fit. */
   --width-swatch: 14px; /* Colour swatch at the start of a layer row. */
+  --width-plant-art: 48px; /* The plan symbol and the photo on a Plant list card. */
   --width-field-inline: 60px; /* A short field inside a chip (a corner's radius, "Round [ 2 ]"). */
   --width-icon: 16px; /* Inline line icon (the eye and pencil on the Plot plan layer). */
 
@@ -104,6 +105,7 @@
   --mix-material-edge: 65%; /* How much of the material colour stays when shading it with color-material-shade for pat… */
   --opacity-surface-editing: 0.5; /* Fill of the surface being drawn, so the plan shows through while tracing. */
   --opacity-layer-off: 0.45; /* A hidden layer's row in the Layers panel, dimmed so it reads as off. */
+  --opacity-symbol-ghost: 0.5; /* The plant or object armed for placing, shown see-through at the pointer. */
 
   /* ---------- Layout and misc ---------- */
   --z-toast: 5; /* Toast: above the plan, the panel and popovers (it never takes taps). */

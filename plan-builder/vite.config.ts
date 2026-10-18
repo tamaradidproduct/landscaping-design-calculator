@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Texture and symbol images are separate files (precached for offline), never base64 inside the main script.
+  build: { assetsInlineLimit: 0 },
   // GitHub Pages serves staging/production under a sub-path (set by the deploy workflows).
   base: process.env.VITE_BASE ?? '/',
   worker: { format: 'es' },

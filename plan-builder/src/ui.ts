@@ -101,8 +101,9 @@ export function nudgePad(): string {
 }
 
 /** A layer's swatch: the outline kind's look, or a surface's material (its texture). */
-export type Swatch = 'boundary' | 'feature' | { material: MaterialId };
+export type Swatch = 'boundary' | 'feature' | { material: MaterialId } | { symbol: string };
 export const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
+  : 'symbol' in s ? `<span class="swatch symbol"><img src="${esc(s.symbol)}" alt=""></span>`
   : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${swatchFill(s.material)}"/></svg></span>`;
 
 /** Layer row: a swatch for the outline kind, the name, and an optional status (e.g. "Drawing…"). */
@@ -110,8 +111,8 @@ export interface LayerRowOptions {
   swatch: Swatch; meta?: string; selected?: boolean; data?: Record<string, string>;
   /** A quiet second line under the name (e.g. the plot area). */
   sub?: string;
-  /** Adds an eye beside the row that shows or hides layer `id`. */
-  eye?: { id: string; hidden: boolean };
+  /** Adds an eye beside the row (data-eye, or data-<attr>) that shows or hides layer `id`. */
+  eye?: { id: string; hidden: boolean; attr?: string };
 }
 /** An eye toggle: pressed = shown. `what` names it for the label ("Lawn"); `data` says what it toggles. */
 export const eyeButton = (hidden: boolean, what: string, data: Record<string, string>) => {
@@ -127,7 +128,7 @@ export function layerRow(name: string, o: LayerRowOptions): string {
   const row = `<button type="button" class="layer-row${o.selected ? ' selected' : ''}${o.eye?.hidden ? ' off' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
     + `${swatch(o.swatch)}${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
-  return o.eye ? `<div class="layer-item">${eyeButton(o.eye.hidden, name, { eye: o.eye.id })}${row}</div>` : row;
+  return o.eye ? `<div class="layer-item">${eyeButton(o.eye.hidden, name, { [o.eye.attr ?? 'eye']: o.eye.id })}${row}</div>` : row;
 }
 /**
  * Layer card: the row of the outline being drawn or edited, expanded in place. The head keeps the swatch and

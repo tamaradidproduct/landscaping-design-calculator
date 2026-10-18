@@ -39,7 +39,8 @@
 | 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
 | 4 | Surfaces, stage 1: material zones (hardscape + softscape), solid fills, resize by typed edge length | 🔨 done, in review | `feat/material-zones` |
 | 4b | Surfaces stage 2 (Width × Depth in the zone card, optional aspect lock), stage 3 (move one corner) | 🔨 stage 2 done; stage 3 📝 next | `feat/surfaces-width-depth` |
-| 5+ | Plant symbols, objects, edging/walls… | ❓ | — |
+| 5 | Plants & objects (symbols at true mature size) and the Plant list | 🔨 done, in review | `feat/symbols` |
+| 5b | Edging, walls, fences, stepping stones, utility markers (the rest of the library's surfaces) | ❓ | — |
 | 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
@@ -86,7 +87,7 @@
 - 📝 Later calibration methods: trace-the-lot with typed lengths for every edge; reading the printed scale (unreliable: Riesberg prints both 1"=30' and 1"=20'; only 1"=30' is right) — would need OCR, as plan text is often drawn as shapes.
 
 ### 6.4 Library ✅
-- Built-in shared library (the Landscaping symbols set). Plant symbols at **true mature size**. Picker: search + categories. ❓ Mature-spread data per plant.
+- Built-in shared library (the Landscaping symbols set). Plant symbols at **true mature size**. Picker: search + categories. ✅ Mature spread researched per plant with a source (docs/symbol-sizes.md).
 
 ### 6.5 Outputs ✅ (not built)
 - Plan sheet in the style of the Servin example + priced proposal, as a **PDF**.
@@ -125,6 +126,15 @@
 - 🔨 **Width × Depth (stage 2):** a selected zone's card has a **Size** row — **Width** and **Depth** of the zone's bounding box (axis-aligned to the page, true feet), for any zone, not only rectangles; an irregular shape reports its overall extent. Typing one resizes the zone **from the center of that box**, along that axis only; an unreadable entry snaps back. A **lock** between the fields (off by default) scales both axes in proportion. The lock is a session preference, not saved, and turns off when another zone is selected. Curved sides count with their bulge. One undo step per entry. Needs a scale (hidden until one exists). Zones only: outlines' typed lengths set the scale. Not shown while drawing.
 - 📝 Next: **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
 
+### 6.10 Plants & objects ✅🔨
+- The library's **51 plants and 14 objects** (families: evergreen, deciduous and accent trees, accent, privacy and large shrubs, perennials, ground covers, ornamental grasses, other). Each has its plan-view art, a photo (plants), a category and a researched size: a plant is a circle of its **typical mature spread**, an object its footprint (long side researched, the other from the art's proportions). Every size has a source and a range in `docs/symbol-sizes.md`; ⚠️ marks approximate ones.
+- **Layers → Plants & objects** (between Surfaces and Outlines). **Add plant or object…** opens a list picker with search, then families. Picking one arms placing: **each tap drops one** at its true size until **Done** or Esc; dragging still pans.
+- A placed symbol: tap to select, drag to move, arrow keys nudge, **Rotate** (− / typed angle / +, 15° steps), **Delete**; every change undoes (a drag or a run of nudges is one step). Where symbols overlap, the last placed is on top.
+- **Rows** group by kind ("Blue Diamond Spruce × 3") with an eye per kind and one on the section header (saved with the plan, like the other eyes; hidden symbols still count in the list).
+- Saved with the plan as `symbols` (library id, position, rotation). With no plan scale yet, a symbol is 2.4 page points per foot and still follows zoom.
+- **Plant list** panel under Layers, live: surfaces used (swatch, name), plants (symbol, name, category, quantity, photo), objects (symbol, name, quantity). The water-consumption table is 📝 later.
+- 📝 Later: plant growth over time, quantities with prices, per-symbol size overrides, the water table.
+
 ### 6.9 Plans & sign-in ✅🔨
 - A contractor keeps **many plans, one per job/address**, and opens any of them on any of their devices.
 - **Sign-in:** Google only; required to use the app. **Invite-only:** an `invites/<email>` doc added by hand in the Firebase console; security rules refuse everything else. An un-invited account sees "not invited" and can read or write nothing. No in-app admin, no invite email.
@@ -154,7 +164,7 @@
 - ✅ Saving jobs: Google sign-in, invite-only, Firebase sync, works offline (§6.9)
 - ❓ Multi-page plot plans; edit-name button meaning.
 - ❓ Pilot contractor recruitment; business model; success measure.
-- ❓ Mature-spread data for plant symbols.
+- ✅ Mature-spread data for plant symbols: researched online, each with its source and range, flagged when approximate (docs/symbol-sizes.md).
 
 ---
 
@@ -187,7 +197,7 @@
 
 ## A.5 Domain conventions
 - ✅ Scale convention: **1 px = 1 inch** (= 12 px/ft; matches app default). Plot plans are calibrated to this before drafting (see `landscaping-plan-scale-calibration` skill).
-- 🔍 Symbol library ("Landscaping symbols", Servin; Figma `0B2UpvIGBFOE1ZEDx8rXPR`): ~47 plants, 44 surfaces, 17 objects. Each item has a **measurement class: count | area | linear**.
+- 🔍 Symbol library ("Landscaping symbols", Servin; Figma `0B2UpvIGBFOE1ZEDx8rXPR`): 51 plants, 14 objects and the surfaces (29 area textures, plus linear, point and utility ones). Each item has a **measurement class: count | area | linear**.
 - 🔍 Library names ≠ card titles, and some have typos (`Blue arrrow juniper`, `Perrenials`) — matching must use main-component names.
 - ✅ **Library is source of truth** for materials and measurement type; replaces the 11 hardcoded materials. Measurement class (count/area/linear) decides how each item is measured — no manual Area/Length choice for library items.
 

@@ -4,6 +4,8 @@ import { PdfClient } from './pdf-client';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
+import { SymbolsSection } from './symbols-ui';
+import { renderPlantList } from './plant-list-ui';
 import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
@@ -40,6 +42,7 @@ const content = (): Size => ({ w: shown().w * fitScale, h: shown().h * fitScale 
 // ---------- Outline tool (Step 2a) ----------
 let shell: Shell | null = null; // sign-in, Plans and autosave (app-shell.ts); told about every editor change
 let surfaces: SurfacesSection | null = null; // the Layers panel's Surfaces section, created once the tool exists
+let symbolsSection: SymbolsSection | null = null; // the Layers panel's Plants & objects section
 let outlines: OutlinesSection | null = null; // the Layers panel's Outlines section, created once the tool exists
 const pxPerPtNow = () => fitScale * view.scale * Math.sqrt(correction.a * correction.d - correction.b * correction.c);
 const zoneDefs = document.getElementById('zone-defs')!;
@@ -86,6 +89,8 @@ const tool = new OutlineTool({
     rescalePatterns(); // a typed edge length can change the plan's scale
     shell?.changed();
     surfaces?.render();
+    symbolsSection?.render();
+    renderPlantList($('plant-list'), tool);
     outlines?.render();
     updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
@@ -135,7 +140,7 @@ function updateGroups() {
   const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
   activeLayer = next;
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
-  const counts = groupCounts(Object.values(tool.outlines));
+  const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length);
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
     b.setAttribute('aria-expanded', String(isOpen));
@@ -143,7 +148,7 @@ function updateGroups() {
     count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
-    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : 'outlines';
+    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : 'outlines';
     b.setAttribute('aria-pressed', String(!hidden));
     b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
   });
@@ -154,6 +159,9 @@ document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
 });
 surfaces = new SurfacesSection($('surfaces'), tool);
 surfaces.render();
+symbolsSection = new SymbolsSection($('symbols'), tool);
+symbolsSection.render();
+renderPlantList($('plant-list'), tool);
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 updateGroups();
@@ -373,7 +381,7 @@ function endPointer(e: PointerEvent) {
   if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
-    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30) {
+    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing) { // placing: quick taps drop symbols, not a zoom
       lastTap.t = 0;
       if (view.scale > 1.05) fitToStage(); else applyView(zoomAt(view, 3, p));
       return;
@@ -383,7 +391,7 @@ function endPointer(e: PointerEvent) {
   renderSharpSoon();
 }
 stage.addEventListener('pointerup', endPointer);
-stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('pointercancel', e => { moved = true; endPointer(e); }); // an OS-cancelled touch is not a tap
 stage.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') tool.hover(null); });
 // Trackpad: two-finger drag pans; pinch (reported as ctrl+wheel) zooms. Mouse wheel: ctrl+wheel zooms.
 stage.addEventListener('wheel', e => {

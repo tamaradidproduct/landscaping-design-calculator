@@ -159,6 +159,7 @@ svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
 .swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
 .swatch.material svg { display: block; width: 100%; height: 100%; }
+.swatch.symbol img { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* ---------- Collapsible Layers section: a header button (chevron, title, count when collapsed) over its body ---------- */
 button.group-head {
   display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: var(--control-sm); margin-top: var(--space-3); padding: 0 var(--space-2);
@@ -182,3 +183,15 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .zone-size input { min-height: var(--control-md); font-size: var(--text-base); }
 /* Choice line: one chosen value (swatch + name) and the action that opens the choices, e.g. a zone's material */
 .choice-line { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }
+
+/* ---------- Plant list: surfaces used, then a card per plant (symbol, name, category, quantity, photo) and per object ---------- */
+.plant-list > summary { cursor: pointer; }
+.plant-card { display: grid; grid-template-columns: var(--width-plant-art) minmax(0, 1fr) auto var(--width-plant-art); align-items: center; gap: var(--space-5); padding: var(--space-3) 0; border-bottom: var(--border-width) dotted var(--color-line); }
+.plant-art { width: var(--width-plant-art); height: var(--width-plant-art); object-fit: contain; }
+.plant-photo { width: var(--width-plant-art); height: var(--width-plant-art); object-fit: cover; border-radius: var(--radius-sm); }
+.plant-text, .plant-qty { display: flex; flex-direction: column; min-width: 0; }
+.plant-qty { align-items: flex-end; }
+.plant-name { font-weight: var(--weight-strong); font-size: var(--text-base); }
+.plant-category { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted); }
+.plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }

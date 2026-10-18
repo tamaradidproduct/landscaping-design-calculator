@@ -1,12 +1,15 @@
 // Pure model for a saved plan document (Firestore). No Firebase imports.
 import { TEX_SCALE, type Outline, type OutlineKind } from './outline';
 import { GROUPS, type Group } from './sections';
+import { symbolById } from './symbols';
 import type { Reference } from './scale';
 import { normalizeMaterialId } from './materials';
 
 export interface PdfInfo { name: string; size: number; rev: number; uploaded: boolean }
 /** `hiddenLayers` (outline ids) and `hiddenSections` are absent when nothing is hidden. */
-export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[] }
+/** A plant or object dropped on the plan: where its centre is (page points) and how far it is turned (degrees, absent = 0). */
+export interface PlacedSymbol { id: string; symbol: string; x: number; y: number; rot?: number }
+export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[]; symbols?: Record<string, PlacedSymbol> }
 /** `archived` is absent on plans that were never archived. */
 export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; archived?: boolean }
 export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean; archived: boolean }
@@ -27,8 +30,8 @@ export function cleanAddress(raw: string): string | null {
 /** Deep copy; JSON drops `undefined` keys, which Firestore rejects. */
 const strip = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections'>): PlanDoc =>
-  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections });
+export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections' | 'symbols'>): PlanDoc =>
+  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections, symbols: state.symbols });
 
 const invalid = (what: string): never => { throw new PlanFormatError('invalid', `Invalid plan: ${what}`); };
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -47,6 +50,23 @@ function checkOutline(key: string, o: unknown) {
   if (o.texScale !== undefined && !(typeof o.texScale === 'number' && o.texScale >= TEX_SCALE.min && o.texScale <= TEX_SCALE.max)) invalid(`outline ${key} texScale`);
 }
 
+/** The editor's part of a document (what the tool loads), as copies. */
+export const planStateOf = (d: PlanDoc): PlanState => structuredClone({
+  outlines: d.outlines, refs: d.refs,
+  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}),
+});
+
+const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols'] as const;
+/**
+ * The fields a save writes: only the editor's (a full set could clobber a newer pdf or address from another device). An
+ * optional field the plan no longer has is listed in `clear`, so the stored one is removed, not left behind.
+ */
+export function editorFields(next: PlanDoc): { write: Record<string, unknown>; clear: string[] } {
+  const write: Record<string, unknown> = { v: 1, outlines: next.outlines, refs: next.refs, updatedAt: next.updatedAt }, clear: string[] = [];
+  for (const k of OPTIONAL_EDITOR_FIELDS) if (next[k] !== undefined) write[k] = next[k]; else clear.push(k);
+  return { write, clear };
+}
+
 /** Validates by hand and returns the data typed; throws PlanFormatError. */
 export function fromDoc(data: unknown): PlanDoc {
   if (!isObj(data)) return invalid('not an object');
@@ -62,6 +82,14 @@ export function fromDoc(data: unknown): PlanDoc {
   Object.entries(data.outlines).forEach(([k, o]) => checkOutline(k, o));
   if (data.hiddenLayers !== undefined && !(Array.isArray(data.hiddenLayers) && data.hiddenLayers.every(x => typeof x === 'string'))) invalid('hiddenLayers');
   if (data.hiddenSections !== undefined && !(Array.isArray(data.hiddenSections) && data.hiddenSections.every(x => GROUPS.includes(x as Group)))) invalid('hiddenSections');
+  if (data.symbols !== undefined) {
+    if (!isObj(data.symbols)) return invalid('symbols');
+    Object.entries(data.symbols).forEach(([k, p]) => {
+      if (!isObj(p) || p.id !== k || typeof p.symbol !== 'string' || !symbolById(p.symbol)) return invalid(`symbol ${k}`);
+      num(p.x, `symbol ${k} x`); num(p.y, `symbol ${k} y`);
+      if (p.rot !== undefined) num(p.rot, `symbol ${k} rot`);
+    });
+  }
   if (!Array.isArray(data.refs)) return invalid('refs');
   data.refs.forEach(r => {
     if (!isObj(r) || typeof r.id !== 'string') return invalid('reference');
