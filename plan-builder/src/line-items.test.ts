@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { LINE_ITEMS, LINE_WIDTH_FT, clampLineWidth, lineItemById, searchLineItems } from './line-items';
+import { LINE_ITEMS, LINE_WIDTH_FT, clampLineWidth, lineItemById, searchLineItems, stepLineWidth } from './line-items';
 
 describe('line items', () => {
   test('five items in picker order', () => {
@@ -23,5 +23,10 @@ describe('line items', () => {
   test('clampLineWidth keeps 0.25–12 ft in 0.25 steps', () => {
     expect(LINE_WIDTH_FT).toEqual({ min: 0.25, max: 12, step: 0.25 });
     expect(clampLineWidth(0.1)).toBe(0.25); expect(clampLineWidth(40)).toBe(12); expect(clampLineWidth(1.13)).toBe(1.25); expect(clampLineWidth(Number.NaN)).toBe(0.25);
+  });
+  test('stepLineWidth moves onto the next 0.25 ft step, within the limits', () => {
+    expect(stepLineWidth(0.33, 1)).toBe(0.5); expect(stepLineWidth(0.33, -1)).toBe(0.25);
+    expect(stepLineWidth(1, 1)).toBe(1.25); expect(stepLineWidth(1, -1)).toBe(0.75);
+    expect(stepLineWidth(12, 1)).toBe(12); expect(stepLineWidth(0.25, -1)).toBe(0.25);
   });
 });

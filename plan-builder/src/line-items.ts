@@ -28,6 +28,12 @@ export const clampLineWidth = (ft: number): number => {
   return Math.min(LINE_WIDTH_FT.max, Math.max(LINE_WIDTH_FT.min, Math.round(ft / LINE_WIDTH_FT.step) * LINE_WIDTH_FT.step));
 };
 
+/** One press of − (-1) or + (+1) on a width: onto the next 0.25 ft step in that direction. */
+export const stepLineWidth = (ft: number, dir: 1 | -1): number => {
+  const k = ft / LINE_WIDTH_FT.step;
+  return clampLineWidth((dir > 0 ? Math.floor(k + 1e-9) + 1 : Math.ceil(k - 1e-9) - 1) * LINE_WIDTH_FT.step);
+};
+
 const art = import.meta.glob<string>('./assets/lines/*.webp', { eager: true, query: '?url', import: 'default' });
 const thumbs = import.meta.glob<string>('./assets/lines/thumbs/*.webp', { eager: true, query: '?url', import: 'default' });
 
