@@ -177,7 +177,7 @@ All commands run in `plan-builder/`. Never push, open a PR or enable auto-merge 
 
 - [ ] **Step 1: Failing tests:** two fence runs of 100 pt at `ftPerPt` 0.1 total 20 ft in 2 runs; with `ftPerPt` null `feet` is null and `ptLength` is 200; items sort in `LINE_ITEMS` order; a gas marker counts under `markers` not `objects`; a stepping stone counts under `objects`; hidden items still count (the function never takes visibility); a plan with only lines is non-empty.
 - [ ] **Step 2: Implement** the model; UI: "Lines" caption with a row per item (thumbnail, name, "62 ft · 3 runs" or "no scale · 3 runs"), "Utility markers" caption with the marker cards (no photo); update the empty-state test in the UI so lines alone render the list. Call sites pass `tool.lines.placed` and `tool.cal?.ftPerPt ?? null`.
-- [ ] **Step 4: Run** `npm test && npm run typecheck` → PASS. Commit `feat(lines): lines, stones and markers in the Plant list`.
+- [ ] **Step 3: Run** `npm test && npm run typecheck` → PASS. Commit `feat(lines): lines, stones and markers in the Plant list`.
 
 ### Task 9: Playwright check, docs, tokens
 
