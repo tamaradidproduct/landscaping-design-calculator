@@ -32,9 +32,12 @@ export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | n
 export class SymbolLayer {
   placed: Record<string, PlacedSymbol> = {};
 
-  /** Drop a symbol at a page point; returns its new id (y1, y2 … the lowest free). */
+  /** The symbols bottom to top: by the number in their id (a saved map may come back in any key order). */
+  ordered(): PlacedSymbol[] { return Object.values(this.placed).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1))); }
+
+  /** Drop a symbol on top at a page point; returns its new id (y1, y2 …: one past the highest, so it is always on top). */
   place(symbol: string, at: Point): string {
-    let n = 1; while (this.placed[`y${n}`]) n++;
+    const n = Math.max(0, ...Object.keys(this.placed).map(k => Number(k.slice(1)))) + 1;
     const id = `y${n}`; this.placed[id] = { id, symbol, x: at.x, y: at.y };
     return id;
   }
@@ -51,9 +54,9 @@ export class SymbolLayer {
    * object its rectangle turned with it. A target is never smaller than 14 px, so a tiny symbol can still be tapped.
    */
   hitTest(p: Point, shown: (s: PlacedSymbol) => boolean, ftPerPt: number | null, pxPerPt: number): string | null {
-    const minHalf = MIN_HIT_PX / pxPerPt, ids = Object.keys(this.placed);
-    for (let k = ids.length - 1; k >= 0; k--) {
-      const s = this.placed[ids[k]], lib = symbolById(s.symbol); if (!lib || !shown(s)) continue;
+    const minHalf = MIN_HIT_PX / pxPerPt, all = this.ordered();
+    for (let k = all.length - 1; k >= 0; k--) {
+      const s = all[k], lib = symbolById(s.symbol); if (!lib || !shown(s)) continue;
       const size = symbolSizePt(lib.size, ftPerPt), hw = Math.max(size.w / 2, minHalf), hd = Math.max(size.d / 2, minHalf);
       const a = -normalizeDeg(s.rot ?? 0) * Math.PI / 180, dx = p.x - s.x, dy = p.y - s.y;
       const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
@@ -65,7 +68,7 @@ export class SymbolLayer {
   /** The placed symbols grouped by library symbol, in library order (ids in placing order). */
   groups(): { symbol: string; ids: string[] }[] {
     const by = new Map<string, string[]>();
-    for (const s of Object.values(this.placed)) by.set(s.symbol, [...(by.get(s.symbol) ?? []), s.id]);
+    for (const s of this.ordered()) by.set(s.symbol, [...(by.get(s.symbol) ?? []), s.id]);
     return SYMBOLS.filter(l => by.has(l.id)).map(l => ({ symbol: l.id, ids: by.get(l.id)! }));
   }
   counts(): Map<string, number> { return new Map(this.groups().map(g => [g.symbol, g.ids.length])); }

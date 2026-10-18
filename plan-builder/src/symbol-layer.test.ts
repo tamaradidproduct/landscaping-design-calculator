@@ -20,13 +20,22 @@ describe('symbol sizes', () => {
 });
 
 describe('SymbolLayer', () => {
-  test('place returns y1, y2 … and stores the point; ids are reused only when free', () => {
+  test('place returns y1, y2 … and stores the point; a new id is always past the highest (so it is on top)', () => {
     const l = new SymbolLayer();
     expect(l.place('blue-diamond-spruce', { x: 1, y: 2 })).toBe('y1');
     expect(l.place('hot-tub', { x: 3, y: 4 })).toBe('y2');
     expect(l.placed.y1).toEqual({ id: 'y1', symbol: 'blue-diamond-spruce', x: 1, y: 2 });
     l.remove('y1');
+    expect(l.place('firepit', { x: 0, y: 0 })).toBe('y3');
+    l.remove('y3'); l.remove('y2');
     expect(l.place('firepit', { x: 0, y: 0 })).toBe('y1');
+  });
+  test('stacking follows the number in the id, whatever order the map comes back in', () => {
+    const l = new SymbolLayer();
+    l.placed = { y10: { id: 'y10', symbol: 'hot-tub', x: 0, y: 0 }, y2: { id: 'y2', symbol: 'hot-tub', x: 0, y: 0 }, y1: { id: 'y1', symbol: 'hot-tub', x: 0, y: 0 } };
+    expect(l.ordered().map(s => s.id)).toEqual(['y1', 'y2', 'y10']);
+    expect(l.hitTest({ x: 0, y: 0 }, all, 0.05, 1)).toBe('y10');
+    expect(l.groups()[0].ids).toEqual(['y1', 'y2', 'y10']);
   });
   test('move, setRotation and remove', () => {
     const l = new SymbolLayer(); const id = l.place('hot-tub', { x: 10, y: 10 });

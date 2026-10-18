@@ -37,6 +37,13 @@ try {
   check('A plant is drawn at its researched spread', Math.abs(two[0].w / expected - 1) < 0.03, `${two[0].w.toFixed(1)} px vs ${expected.toFixed(1)}`);
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   check('The Plant list counts them', (await counts()).join() === '2', (await page.$eval('#plant-list', e => e.innerText.replace(/\n+/g, ' | '))));
+  // Disarming: the card's ×; and starting a surface while armed
+  await arm('hot-tub'); await page.click('#symbols [data-act=collapse]'); await page.waitForTimeout(150);
+  check('The × on the placing card stops placing', !(await page.$('[data-act=stop-placing]')), 'Done button gone');
+  await arm('hot-tub'); await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await page.waitForTimeout(150);
+  await drag([300, 200], [340, 240]);
+  check('Starting a surface while armed draws it, and placing stops', !(await page.$('[data-act=stop-placing]')) && (await page.$$('.overlay .shape.surface')).length > 0 && (await images()).length === 2, `${(await images()).length} symbols`);
+  await page.keyboard.press('Escape');
   // Move
   const before = (await images())[0], c0 = await toScreen([300, 300]);
   await page.mouse.move(...c0); await page.mouse.down(); await page.mouse.move(c0[0] + 40, c0[1] + 25, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(250);

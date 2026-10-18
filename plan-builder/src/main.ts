@@ -391,7 +391,7 @@ function endPointer(e: PointerEvent) {
   renderSharpSoon();
 }
 stage.addEventListener('pointerup', endPointer);
-stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('pointercancel', e => { moved = true; endPointer(e); }); // an OS-cancelled touch is not a tap
 stage.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') tool.hover(null); });
 // Trackpad: two-finger drag pans; pinch (reported as ctrl+wheel) zooms. Mouse wheel: ctrl+wheel zooms.
 stage.addEventListener('wheel', e => {

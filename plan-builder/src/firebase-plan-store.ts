@@ -1,12 +1,12 @@
 // Firestore + Cloud Storage PlanStore. Firestore writes resolve only on server ack, so they are
 // never awaited in user-facing paths: the persistent cache applies them locally and queues them.
 import {
-  collection, deleteDoc, doc, getDoc, getDocFromCache, getDocs, onSnapshot, query, setDoc, updateDoc, where,
+  collection, deleteDoc, deleteField, doc, getDoc, getDocFromCache, getDocs, onSnapshot, query, setDoc, updateDoc, where,
   type Firestore,
 } from 'firebase/firestore';
 import { deleteObject, getBytes, ref as storageRef, uploadBytesResumable, type FirebaseStorage, type UploadTask } from 'firebase/storage';
 import { getFirebase } from './firebase';
-import { cleanAddress, docBytes, downloadTimeoutMs, fromDoc, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
+import { cleanAddress, docBytes, downloadTimeoutMs, editorFields, fromDoc, planStateOf, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
 import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
 import { pdfCache } from './pdf-cache';
 
@@ -119,7 +119,7 @@ export class FirebasePlanStore implements PlanStore {
     if (!snap.exists()) throw new Error(NOT_FOUND);
     const d = fromDoc(snap.data());
     this.known.set(id, d);
-    return { meta: toMeta(id, d, snap.metadata.hasPendingWrites), state: structuredClone({ outlines: d.outlines, refs: d.refs }) };
+    return { meta: toMeta(id, d, snap.metadata.hasPendingWrites), state: planStateOf(d) };
   }
 
   save(id: string, state: PlanState): void {
@@ -133,7 +133,8 @@ export class FirebasePlanStore implements PlanStore {
     else if (!this.oversize.has(id)) { this.oversize.add(id); this.emit(new SizeWarning(bytes)); }
     // Only the editor's fields: a full set could clobber a newer pdf/address from another device.
     // updateDoc replaces each named field whole (no deep merge), so removed outlines go away.
-    updateDoc(this.docRef(id), { v: 1, outlines: next.outlines, refs: next.refs, updatedAt: next.updatedAt }).catch(this.report);
+    const { write, clear } = editorFields(next);
+    updateDoc(this.docRef(id), { ...write, ...Object.fromEntries(clear.map(k => [k, deleteField()])) }).catch(this.report);
     this.known.set(id, next);
   }
 

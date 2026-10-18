@@ -50,6 +50,23 @@ function checkOutline(key: string, o: unknown) {
   if (o.texScale !== undefined && !(typeof o.texScale === 'number' && o.texScale >= TEX_SCALE.min && o.texScale <= TEX_SCALE.max)) invalid(`outline ${key} texScale`);
 }
 
+/** The editor's part of a document (what the tool loads), as copies. */
+export const planStateOf = (d: PlanDoc): PlanState => structuredClone({
+  outlines: d.outlines, refs: d.refs,
+  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}),
+});
+
+const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols'] as const;
+/**
+ * The fields a save writes: only the editor's (a full set could clobber a newer pdf or address from another device). An
+ * optional field the plan no longer has is listed in `clear`, so the stored one is removed, not left behind.
+ */
+export function editorFields(next: PlanDoc): { write: Record<string, unknown>; clear: string[] } {
+  const write: Record<string, unknown> = { v: 1, outlines: next.outlines, refs: next.refs, updatedAt: next.updatedAt }, clear: string[] = [];
+  for (const k of OPTIONAL_EDITOR_FIELDS) if (next[k] !== undefined) write[k] = next[k]; else clear.push(k);
+  return { write, clear };
+}
+
 /** Validates by hand and returns the data typed; throws PlanFormatError. */
 export function fromDoc(data: unknown): PlanDoc {
   if (!isObj(data)) return invalid('not an object');

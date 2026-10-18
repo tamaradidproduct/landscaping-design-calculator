@@ -76,8 +76,8 @@ export class SymbolsSection {
     if (search) search.oninput = () => { this.query = search.value; el.querySelector('#symbol-results')!.innerHTML = pickerList(this.query); bindPicker(); };
     el.querySelector('form.layer-form')?.addEventListener('submit', e => e.preventDefault());
     const card = el.querySelector<HTMLElement>('[data-card]');
+    card?.querySelector<HTMLButtonElement>('[data-act=collapse]')?.addEventListener('click', () => { if (t.placing) t.stopPlacing(); else t.selectSymbol(null); });
     if (!card || !selId) return;
-    card.querySelector<HTMLButtonElement>('[data-act=collapse]')?.addEventListener('click', () => { if (t.placing) t.stopPlacing(); else t.selectSymbol(null); });
     const cur = () => t.symbols.placed[selId]?.rot ?? 0;
     card.querySelector<HTMLButtonElement>('[data-act=rot-down]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), -1)));
     card.querySelector<HTMLButtonElement>('[data-act=rot-up]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), 1)));

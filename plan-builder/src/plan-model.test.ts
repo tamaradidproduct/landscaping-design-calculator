@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { PlanFormatError, cleanAddress, docBytes, downloadTimeoutMs, editedAgo, fromDoc, sortPlans, toDoc, type PlanMeta, type PlanState } from './plan-model';
+import { PlanFormatError, cleanAddress, docBytes, downloadTimeoutMs, editedAgo, editorFields, fromDoc, planStateOf, sortPlans, toDoc, type PlanMeta, type PlanState } from './plan-model';
 
 const pdf = { name: 'plot.pdf', size: 1234, rev: 1, uploaded: true };
 const meta = { address: '12 Elm St', createdAt: 1000, updatedAt: 2000, pdf };
@@ -146,5 +146,28 @@ describe('editedAgo', () => {
   });
   test('older dates use a short date', () => {
     expect(editedAgo(new Date(2026, 9, 3, 9).getTime(), now)).toBe('Edited Oct 3');
+  });
+});
+
+describe('what the editor saves and loads', () => {
+  const full: PlanState = {
+    outlines: { s1: surface }, refs: [], hiddenLayers: ['s1', 'y1'], hiddenSections: ['symbols'],
+    symbols: { y1: { id: 'y1', symbol: 'hot-tub', x: 1, y: 2, rot: 45 } },
+  };
+  test('planStateOf returns every editor field of a document, as copies', () => {
+    const doc = fromDoc(toDoc(full, meta)), st = planStateOf(doc);
+    expect(st).toEqual(full);
+    expect(st.symbols).not.toBe(doc.symbols); expect(st.outlines).not.toBe(doc.outlines);
+  });
+  test('a plan without the optional fields loads without them', () => {
+    expect(planStateOf(fromDoc(valid()))).toEqual({ outlines: state.outlines, refs: state.refs });
+  });
+  test('editorFields lists what to write and which optional fields to clear', () => {
+    const f = editorFields(toDoc(full, meta));
+    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'outlines', 'refs', 'symbols', 'updatedAt', 'v']);
+    expect(f.clear).toEqual([]);
+    const bare = editorFields(toDoc(state, meta));
+    expect(Object.keys(bare.write).sort()).toEqual(['outlines', 'refs', 'updatedAt', 'v']);
+    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'symbols']);
   });
 });

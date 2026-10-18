@@ -310,6 +310,7 @@ export class OutlineTool {
   redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name, o.material); }
   private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
     if (this.drawing) this.cancel();
+    this.placing = null; this.selectedSymbol = null; // drawing takes over from placing
     this.record();
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
@@ -421,6 +422,15 @@ export class OutlineTool {
       this.render();
       return true;
     }
+    // A selected surface: press on a side to push it; then a plant or object under the press; then inside the zone to move it (a tap still selects).
+    const zone = this.selectedZone;
+    const before = zone ? zone.pts.map(q => ({ ...q })) : [];
+    const side = zone ? this.zoneSideAt(zone, p) : null;
+    if (zone && side !== null) {
+      const a = this.host.toScreen(zone.pts[side]), b = this.host.toScreen(zone.pts[(side + 1) % zone.pts.length]);
+      this.drag = { type: 'side', id: zone.id, i: side, start: p, before, moved: false, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 };
+      this.dragBefore = this.snapshot(); return true;
+    }
     const sid = this.symbolAt(p);
     if (sid) {
       const s = this.symbols.placed[sid];
@@ -428,16 +438,7 @@ export class OutlineTool {
       this.drag = { type: 'symbol', id: sid, start: p, before: { x: s.x, y: s.y }, moved: false };
       this.dragBefore = this.snapshot(); this.update(); return true;
     }
-    // A selected surface: press on a side to push it, or inside to move the whole zone (a tap still selects).
-    const zone = this.selectedZone;
     if (zone) {
-      const i = this.zoneSideAt(zone, p);
-      const before = zone.pts.map(q => ({ ...q }));
-      if (i !== null) {
-        const a = this.host.toScreen(zone.pts[i]), b = this.host.toScreen(zone.pts[(i + 1) % zone.pts.length]);
-        this.drag = { type: 'side', id: zone.id, i, start: p, before, moved: false, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 };
-        this.dragBefore = this.snapshot(); return true;
-      }
       if (insideShape(this.visible.get(zone.id) ?? [], this.host.toPage(p))) {
         this.drag = { type: 'move', id: zone.id, start: p, before, moved: false };
         this.dragBefore = this.snapshot(); return true;
@@ -1048,7 +1049,7 @@ export class OutlineTool {
     const activeLast = (list: Outline[]) => list.sort((a, b) => Number(a.id === active) - Number(b.id === active));
     const paint = [...activeLast(all.filter(o => o.kind === 'surface')), ...activeLast(all.filter(o => o.kind !== 'surface'))];
     const symbolsMarkup = symbolsSvg({
-      placed: Object.values(this.symbols.placed), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
+      placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
       selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
     let symbolsDone = false, top = '';
