@@ -801,7 +801,7 @@ export class OutlineTool {
     this.hoverCorner = near;
     if (cornerChanged && !changed && !this.drawing) this.render();
     // On the selected surface, say what a drag would do (and show it in the pointer).
-    const action = p && !this.drag ? this.zoneActionAt(p) : null;
+    const action = p && !this.drag ? this.zoneActionAt(p) ?? this.bendTipAt(p) : null;
     this.stageEl.style.cursor = action ? action.cursor : '';
     if (action && p) this.showTipText(action.label, p);
     else if (edge && p) this.showTip(edge, p); else this.hideTip();
@@ -822,6 +822,12 @@ export class OutlineTool {
     }
     if (insideShape(this.visible.get(o.id) ?? [], this.host.toPage(p))) return { label: 'Drag to move', cursor: 'move' };
     return null;
+  }
+  /** Hovering the bend handle on the selected plot-boundary or feature outline (surfaces are handled by zoneActionAt). */
+  private bendTipAt(p: Point): { label: string; cursor: string } | null {
+    const sel = this.selected && !this.drawing ? this.outlines[this.selected] : undefined;
+    if (!sel?.closed || sel.kind === 'surface') return null;
+    return this.bendHandleAt(p)?.id === sel.id ? { label: 'Drag to curve the side', cursor: 'grab' } : null;
   }
   /** The side of a surface whose drawn straight part is under p (screen); curved sides use their whole arc. */
   private zoneSideAt(o: Outline, p: Point): number | null {
