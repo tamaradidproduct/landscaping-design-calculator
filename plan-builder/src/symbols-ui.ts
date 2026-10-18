@@ -48,7 +48,7 @@ export class SymbolsSection {
     const size = lib.kind === 'plant' ? `${fmt(lib.size.w)} ft wide` : `${fmt(lib.size.w)} × ${fmt(lib.size.d)} ft`;
     return layerCard({
       id, swatch: { symbol: lib.thumb }, name: lib.name, sub: lib.category || undefined, done: true,
-      body: `${hint(`${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`)}${row(
+      body: `${hint(`${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`)}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${row(
         button('−', { mods: ['icon'], ariaLabel: 'Turn 15° left', data: { act: 'rot-down' } }),
         input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: 'Rotation in degrees' }),
         button('+', { mods: ['icon'], ariaLabel: 'Turn 15° right', data: { act: 'rot-up' } }))}${button('Delete', { variant: 'danger', mods: ['compact'], data: { act: 'delete-symbol' } })}`,

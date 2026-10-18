@@ -36,4 +36,14 @@ describe('symbolsSvg', () => {
     const svg = symbolsSvg({ ...base, ftPerPt: null, placed: [tub] }); // 7 ft × 2.4 pt/ft × 2 px/pt = 33.6 px
     expect(svg).toContain('width="33.6"');
   });
+  test('a utility marker is drawn at least 20 px long and turns to show its direction', () => {
+    const gas = { id: 'y3', symbol: 'gas-line', x: 10, y: 10, rot: 90 };
+    const svg = symbolsSvg({ ...base, ftPerPt: 0.5, pxPerPt: 1, toScreen: p => p, placed: [gas] }); // 1.03 ft is 2 pt: far under 20 px
+    expect(svg).toContain('height="20.0"'); expect(svg).toContain('rotate(90 10.0 10.0)');
+    expect(symbolsSvg({ ...base, ftPerPt: 0.5, pxPerPt: 1, toScreen: p => p, placed: [{ ...gas, symbol: 'hot-tub' }] })).toContain('width="14.0"'); // an object keeps the 6 px floor: 7 ft is 14 px
+  });
+  test('a stepping stone draws like an object at its Figma size (2 ft)', () => {
+    const svg = symbolsSvg({ ...base, ftPerPt: 0.05, pxPerPt: 2, placed: [{ id: 'y4', symbol: 'porcelain-pavers', x: 0, y: 0 }] });
+    expect(svg).toContain('width="80.0"'); // 2 ft ÷ 0.05 × 2 px/pt
+  });
 });

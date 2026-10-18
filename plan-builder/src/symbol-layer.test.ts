@@ -14,6 +14,11 @@ describe('symbol sizes', () => {
     expect(symbolSizePx({ w: 10, d: 10 }, null, 3).w).toBeCloseTo(72, 5);
   });
   test('never smaller than 6 px on screen', () => expect(symbolSizePx({ w: 0.5, d: 0.5 }, 0.5, 1).w).toBe(6));
+  test('a larger minimum (markers: 20 px) scales the long side up and keeps the proportions', () => {
+    const s = symbolSizePx({ w: 0.42, d: 1.03 }, 0.5, 1, 20);
+    expect(s.d).toBeCloseTo(20, 6); expect(s.w / s.d).toBeCloseTo(0.42 / 1.03, 6);
+    expect(symbolSizePx({ w: 0.42, d: 1.03 }, 0.05, 2, 20).d).toBeCloseTo(41.2, 6); // big enough already: true size
+  });
   test('normalizeDeg wraps into [0, 360)', () => {
     expect([normalizeDeg(-90), normalizeDeg(360), normalizeDeg(450), normalizeDeg(0), normalizeDeg(-720.5)]).toEqual([270, 0, 90, 0, 359.5]);
   });
