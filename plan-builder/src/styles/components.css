@@ -194,4 +194,5 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .plant-name { font-weight: var(--weight-strong); font-size: var(--text-base); }
 .plant-category { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted); }
 .plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }

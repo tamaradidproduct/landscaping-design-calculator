@@ -319,7 +319,8 @@ export class OutlineTool {
     if (prev && now - prev.t < GESTURE.doubleTapMs && dist(prev.at, screen) < 30 && d.points.length >= 2) { this.lastLineTap = null; this.finishLine(); return; }
     const raw = this.draftTarget(screen), next = draftWithPoint(d.points, this.host.toPage(raw), this.host.pxPerPt());
     if (!next) return;
-    d.points = next; this.lastLineTap = { t: now, at: screen }; this.update();
+    d.points = next; this.update();
+    this.lastLineTap = { t: performance.now(), at: screen }; // stamped after the redraw, so a slow redraw can't use up the double-tap window
   }
   /** Where the next point of the draft would land for a pointer at `screen`: Shift holds the run to 45° steps from the last point. */
   private draftTarget(screen: Point): Point {
