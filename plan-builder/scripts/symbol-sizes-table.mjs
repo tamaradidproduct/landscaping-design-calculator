@@ -10,7 +10,7 @@ const rows = kind => SYMBOL_SOURCES.filter(s => s.kind === kind).map(s => {
 const approx = SYMBOL_SOURCES.filter(s => SYMBOL_SIZES[s.id].approximate).length;
 console.log(`# Symbol sizes (for review)
 
-Researched ${new Date().toISOString().slice(0, 10)}. A plant's size is its typical **mature spread** (the plan symbol is a circle of that width); an object's is its **footprint** (width × depth). ⚠️ marks ${approx} approximate entries (an assumed cultivar or type, or a drawn length). Change a value in \`plan-builder/scripts/symbol-sizes.mjs\`.
+Researched ${new Date().toISOString().slice(0, 10)}. A plant's size is its typical **mature spread** (the plan symbol is a circle of that width); an object's is its **long side** (the other side follows the Figma art's proportions, e.g. the planter is about 4 × 1.7 ft). ⚠️ marks ${approx} approximate entries (an assumed cultivar or type, or a drawn length). Change a value in \`plan-builder/scripts/symbol-sizes.mjs\`.
 
 ## Plants (51)
 

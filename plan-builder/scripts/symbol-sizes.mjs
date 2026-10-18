@@ -66,7 +66,7 @@ export const SYMBOL_SIZES = {
   'bubbling-boulder': { w: 2.5, d: 2.5, url: 'https://www.costco.com/triple-handcrafted-boulder-fountains.product.100651499.html', note: 'Boulders 24–35 in across' },
   'seating-wall': { w: 6, d: 1.5, url: 'https://images.landscapingnetwork.com/walls/seat-walls.html', note: 'Top at least 12–18 in wide; length is the designer’s choice (6 ft shown)', approximate: true },
   'outdoor-lantern': { w: 1, d: 1, url: 'https://www.1stoplighting.com/p/small-post-mount-fix-incand-120v-by-dabmar-gm212-bz', note: 'Landscape fixtures 6–14 in wide (11.75 in post mount)' },
-  'outdoor-grill': { w: 3, d: 2, url: 'https://www.thebbqdepot.com/blog/complete-guide-to-builtin-grills/', note: 'A 36 in grill is about 3×2 ft; built-in islands run to 6.4×3 ft', approximate: true },
+  'outdoor-grill': { w: 6, d: 2, url: 'https://www.thebbqdepot.com/blog/complete-guide-to-builtin-grills/', note: 'The Figma art is a long grill island (3.3:1): built-in islands run about 6.4×3 ft (a 36 in grill alone is 3×2 ft)', approximate: true },
   'spigot': { w: 0.5, d: 0.5, url: 'https://nachi.org/gallery/general-6/frost-free-hose-bibb', note: 'A hose bibb is about 8 in; drawn as a small point symbol', approximate: true },
 };
 

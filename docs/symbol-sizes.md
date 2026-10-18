@@ -1,6 +1,6 @@
 # Symbol sizes (for review)
 
-Researched 2026-10-18. A plant's size is its typical **mature spread** (the plan symbol is a circle of that width); an object's is its **footprint** (width × depth). ⚠️ marks 14 approximate entries (an assumed cultivar or type, or a drawn length). Change a value in `plan-builder/scripts/symbol-sizes.mjs`.
+Researched 2026-10-18. A plant's size is its typical **mature spread** (the plan symbol is a circle of that width); an object's is its **long side** (the other side follows the Figma art's proportions, e.g. the planter is about 4 × 1.7 ft). ⚠️ marks 14 approximate entries (an assumed cultivar or type, or a drawn length). Change a value in `plan-builder/scripts/symbol-sizes.mjs`.
 
 ## Plants (51)
 
@@ -74,6 +74,6 @@ Researched 2026-10-18. A plant's size is its typical **mature spread** (the plan
 | Bubbling boulder | Objects | 2.5 × 2.5 ft | Boulders 24–35 in across | [source](https://www.costco.com/triple-handcrafted-boulder-fountains.product.100651499.html) |
 | Seating wall | Objects | 6 × 1.5 ft ⚠️ | Top at least 12–18 in wide; length is the designer’s choice (6 ft shown) | [source](https://images.landscapingnetwork.com/walls/seat-walls.html) |
 | Outdoor lantern | Objects | 1 × 1 ft | Landscape fixtures 6–14 in wide (11.75 in post mount) | [source](https://www.1stoplighting.com/p/small-post-mount-fix-incand-120v-by-dabmar-gm212-bz) |
-| Outdoor grill | Objects | 3 × 2 ft ⚠️ | A 36 in grill is about 3×2 ft; built-in islands run to 6.4×3 ft | [source](https://www.thebbqdepot.com/blog/complete-guide-to-builtin-grills/) |
+| Outdoor grill | Objects | 6 × 2 ft ⚠️ | The Figma art is a long grill island (3.3:1): built-in islands run about 6.4×3 ft (a 36 in grill alone is 3×2 ft) | [source](https://www.thebbqdepot.com/blog/complete-guide-to-builtin-grills/) |
 | Spigot | Objects | 0.5 × 0.5 ft ⚠️ | A hose bibb is about 8 in; drawn as a small point symbol | [source](https://nachi.org/gallery/general-6/frost-free-hose-bibb) |
 
