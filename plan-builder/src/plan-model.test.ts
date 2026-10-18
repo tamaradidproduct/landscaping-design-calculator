@@ -8,6 +8,31 @@ const state: PlanState = { outlines: { s1: surface }, refs: [{ id: 's1', i: 0, f
 const valid = () => JSON.parse(JSON.stringify(toDoc(state, meta)));
 const reasonOf = (data: unknown) => { try { fromDoc(data); } catch (e) { return e instanceof PlanFormatError ? e.reason : 'other'; } return null; };
 
+describe('placed symbols', () => {
+  const placed = { y1: { id: 'y1', symbol: 'blue-diamond-spruce', x: 10, y: 20 }, y2: { id: 'y2', symbol: 'hot-tub', x: 30.5, y: 40, rot: 90 } };
+  test('round-trip through toDoc / fromDoc', () => {
+    const doc = fromDoc(toDoc({ ...state, symbols: placed }, meta));
+    expect(doc.symbols).toEqual(placed);
+  });
+  test('a plan without symbols opens', () => expect(fromDoc(valid()).symbols).toBeUndefined());
+  test.each([
+    ['an unknown library id', (d: any) => { d.symbols.y1.symbol = 'nope'; }],
+    ['a non-finite x', (d: any) => { d.symbols.y1.x = null; }],
+    ['a non-finite y', (d: any) => { d.symbols.y1.y = 'a'; }],
+    ['a non-finite rot', (d: any) => { d.symbols.y2.rot = NaN; }],
+    ['an id that differs from its key', (d: any) => { d.symbols.y1.id = 'y9'; }],
+    ['a missing id', (d: any) => { delete d.symbols.y1.id; }],
+    ['symbols that are not an object', (d: any) => { d.symbols = []; }],
+  ])('%s is an invalid plan', (_, mutate) => {
+    const doc = JSON.parse(JSON.stringify(toDoc({ ...state, symbols: placed }, meta))); mutate(doc);
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+  test('hiding the symbols section is valid', () => {
+    const doc = valid(); doc.hiddenSections = ['symbols'];
+    expect(fromDoc(doc).hiddenSections).toEqual(['symbols']);
+  });
+});
+
 describe('texture scale and visibility', () => {
   test('texScale, hiddenLayers and hiddenSections round-trip', () => {
     const st: PlanState = { outlines: { s1: { ...surface, texScale: 1.5 } }, refs: [], hiddenLayers: ['s1'], hiddenSections: ['surfaces', 'outlines'] };
