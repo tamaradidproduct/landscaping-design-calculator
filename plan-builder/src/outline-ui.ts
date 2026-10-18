@@ -7,8 +7,11 @@ import {
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
-import type { PlanState } from './plan-model';
-import { groupOf, isHidden, type Group } from './sections';
+import type { PlacedSymbol, PlanState } from './plan-model';
+import { groupOf, isHidden, isSymbolHidden, type Group } from './sections';
+import { normalizeDeg, SymbolLayer } from './symbol-layer';
+import { symbolsSvg } from './symbols-render';
+import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
@@ -53,7 +56,9 @@ type Drag =
   // Surfaces only: move the whole zone, push one side, or round a corner (screen points from the press).
   | { type: 'move'; id: string; start: Point; before: Point[]; moved: boolean }
   | { type: 'side'; id: string; i: number; start: Point; before: Point[]; moved: boolean; fixed: 0 | 1 }
-  | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean };
+  | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean }
+  // A placed symbol being moved (the press in screen px, and where the symbol was in page points).
+  | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -102,6 +107,11 @@ export class OutlineTool {
   /** Hidden layers (by id) and sections: saved with the plan, but not undoable (like the view). */
   hiddenLayers = new Set<string>();
   hiddenSections = new Set<Group>();
+  /** Plants and objects dropped on the plan. */
+  symbols = new SymbolLayer();
+  /** The library symbol armed for placing (each tap drops one), or null. */
+  placing: string | null = null;
+  selectedSymbol: string | null = null;
 
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
@@ -151,7 +161,7 @@ export class OutlineTool {
   private snapshot(): Snapshot {
     return {
       outlines: structuredClone(this.outlines), drawing: this.drawing, refs: structuredClone(this.refs), selectedCorner: this.selectedCorner,
-      selected: this.selected, replaced: structuredClone(this.replaced),
+      selected: this.selected, replaced: structuredClone(this.replaced), symbols: structuredClone(this.symbols.placed),
     };
   }
   /** Call right before every change the user may want to undo. */
@@ -159,6 +169,7 @@ export class OutlineTool {
   private restore(s: Snapshot) {
     this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
     this.selected = s.selected; this.replaced = s.replaced;
+    this.symbols.placed = s.symbols; if (this.selectedSymbol && !s.symbols[this.selectedSymbol]) this.selectedSymbol = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
@@ -169,7 +180,8 @@ export class OutlineTool {
   /** Replace everything with a saved plan: no selection, no undo history; snap and shape preferences stay. */
   load(state: PlanState) {
     this.outlines = structuredClone(state.outlines); this.refs = structuredClone(state.refs);
-    this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id])); this.hiddenSections = new Set(state.hiddenSections);
+    this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
+    this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
     this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
@@ -181,8 +193,11 @@ export class OutlineTool {
   /** What to save: outlines and references, minus any outline still being drawn. */
   state(): PlanState {
     const outlines = committedOutlines(this.outlines, this.drawing, this.replaced);
-    const layers = [...this.hiddenLayers].filter(id => outlines[id]);
-    return { outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined };
+    const layers = [...this.hiddenLayers].filter(id => outlines[id] || this.symbols.placed[id]);
+    return {
+      outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined,
+      symbols: Object.keys(this.symbols.placed).length ? structuredClone(this.symbols.placed) : undefined,
+    };
   }
   isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
   /** Show or hide one layer; a hidden layer isn't drawn, selected, snapped to or tapped. Not an undo step. */
@@ -196,8 +211,59 @@ export class OutlineTool {
     if (!this.hiddenSections.delete(g)) this.hiddenSections.add(g);
     this.visibilityChanged();
   }
+  /** Whether a placed symbol is drawn and can be tapped. */
+  symbolShown = (s: PlacedSymbol): boolean => !isSymbolHidden(s, this.hiddenLayers, this.hiddenSections);
+  /** Show or hide every placed symbol of one library symbol (all hidden → show them, else hide them). Not an undo step. */
+  toggleSymbolGroup(symbol: string) {
+    const ids = this.symbols.groups().find(g => g.symbol === symbol)?.ids ?? []; if (!ids.length) return;
+    if (ids.every(id => this.hiddenLayers.has(id))) ids.forEach(id => this.hiddenLayers.delete(id)); else ids.forEach(id => this.hiddenLayers.add(id));
+    this.visibilityChanged();
+  }
+  // ---------- Plants and objects ----------
+  /** Arm a library symbol: each tap on the plan then drops one, until stopPlacing (Esc or Done). */
+  startPlacing(symbolId: string) {
+    if (!symbolById(symbolId)) return;
+    if (this.drawing) this.cancel();
+    this.hiddenSections.delete('symbols'); // placing into a hidden section shows it
+    this.placing = symbolId; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null;
+    this.revision++; this.update();
+  }
+  stopPlacing() { if (!this.placing) return; this.placing = null; this.update(); }
+  private placeSymbolAt(screen: Point) {
+    if (!this.placing) return;
+    this.record(); this.symbols.place(this.placing, this.host.toPage(screen)); this.update();
+  }
+  selectSymbol(id: string | null) {
+    const s = id ? this.symbols.placed[id] : null;
+    if (this.drawing || (id && (!s || !this.symbolShown(s)))) return;
+    this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = id;
+    this.update();
+  }
+  rotateSymbol(id: string, deg: number) {
+    const s = this.symbols.placed[id]; if (!s || normalizeDeg(deg) === (s.rot ?? 0)) return;
+    this.record(); this.symbols.setRotation(id, deg); this.update();
+  }
+  removeSymbol(id: string) {
+    if (!this.symbols.placed[id]) return;
+    this.record(); this.symbols.remove(id); this.hiddenLayers.delete(id);
+    if (this.selectedSymbol === id) this.selectedSymbol = null;
+    this.update();
+  }
+  /** Arrow keys move the selected symbol by screen px; a run within 1.5 s is one undo step. */
+  private nudgeSymbol(dx: number, dy: number) {
+    const id = this.selectedSymbol; if (!id) return;
+    const now = performance.now(), ln = this.lastNudge, key = -3;
+    if (!(ln && ln.id === id && ln.i === key && now - ln.t < 1500)) this.record(); else this.revision++;
+    this.lastNudge = { t: now, id, i: key };
+    const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
+    this.symbols.move(id, b.x - a.x, b.y - a.y); this.update();
+  }
+  private symbolAt(screen: Point): string | null {
+    return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
+  }
   private visibilityChanged() {
     if (this.selected && this.isHidden(this.selected)) { this.selected = null; this.selectedCorner = null; this.selectedEdge = null; }
+    const sym = this.selectedSymbol && this.symbols.placed[this.selectedSymbol]; if (sym && !this.symbolShown(sym)) this.selectedSymbol = null;
     this.revision++; // saved, but nothing to undo
     this.update();
   }
@@ -302,6 +368,7 @@ export class OutlineTool {
   // ---------- Pointer input (screen coordinates) ----------
   pointerDown(p: Point, pointerType: string): boolean {
     this.hideTip();
+    if (this.placing) return false; // armed: a tap places (see tap), a drag still pans
     this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p;
     if (!this.drawing) this.stick = null; // keep only the target the placing preview is showing
     if (pointerType !== 'mouse') {
@@ -354,6 +421,13 @@ export class OutlineTool {
       this.render();
       return true;
     }
+    const sid = this.symbolAt(p);
+    if (sid) {
+      const s = this.symbols.placed[sid];
+      this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = sid;
+      this.drag = { type: 'symbol', id: sid, start: p, before: { x: s.x, y: s.y }, moved: false };
+      this.dragBefore = this.snapshot(); this.update(); return true;
+    }
     // A selected surface: press on a side to push it, or inside to move the whole zone (a tap still selects).
     const zone = this.selectedZone;
     if (zone) {
@@ -380,6 +454,13 @@ export class OutlineTool {
 
   pointerMove(p: Point) {
     const d = this.drag; if (!d) return;
+    if (d.type === 'symbol') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
+      d.moved = true;
+      const a = this.host.toPage(d.start), b = this.host.toPage(p), s = this.symbols.placed[d.id];
+      if (s) { s.x = d.before.x + b.x - a.x; s.y = d.before.y + b.y - a.y; }
+      this.render(); return;
+    }
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {
       if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
       d.moved = true; this.editZone(d, p); return;
@@ -557,6 +638,10 @@ export class OutlineTool {
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
+    if (d.type === 'symbol') {
+      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
+      this.dragBefore = null; this.update(); return;
+    }
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {
       this.hideTip();
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
@@ -621,7 +706,7 @@ export class OutlineTool {
     if (this.drag && this.drag.type !== 'place' && this.drag.moved && this.dragBefore) {
       // Put a corner or bend back where it was before the accidental drag.
       const before = this.dragBefore;
-      this.outlines = before.outlines; this.refs = before.refs;
+      this.outlines = before.outlines; this.refs = before.refs; this.symbols.placed = before.symbols;
       this.revision++;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
@@ -636,8 +721,10 @@ export class OutlineTool {
    */
   tap(p: Point) {
     if (this.drawing) return;
+    if (this.placing) { this.placeSymbolAt(p); return; }
+    const hadSymbol = this.selectedSymbol !== null; this.selectedSymbol = null;
     const hit = this.featureAt(p);
-    if (hit === this.selected && !this.selectedEdge && !this.selectedCorner) return;
+    if (hit === this.selected && !this.selectedEdge && !this.selectedCorner) { if (hadSymbol) this.update(); return; }
     this.selectedEdge = null; this.selectedCorner = null; this.selected = hit;
     this.update();
   }
@@ -645,6 +732,7 @@ export class OutlineTool {
   selectOutline(id: string | null) {
     if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) return;
     if (id !== this.selected) this.aspectLock = false;
+    this.placing = null; this.selectedSymbol = null;
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
   }
   /** Switch between drawing corner by corner and dragging a rectangle; an outline already started starts over (undoable). */
@@ -679,8 +767,8 @@ export class OutlineTool {
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
   deselect() {
-    if (!this.selectedEdge && !this.selectedCorner && !this.selected) return;
-    this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.update();
+    if (!this.selectedEdge && !this.selectedCorner && !this.selected && !this.selectedSymbol) return;
+    this.selectedEdge = null; this.selectedCorner = null; this.selected = null; this.selectedSymbol = null; this.update();
   }
   /** The layer whose visible part is under p (visible parts never overlap; one wholly covered can't be tapped). */
   private featureAt(p: Point): string | null {
@@ -694,6 +782,7 @@ export class OutlineTool {
 
   hover(p: Point | null) {
     this.hoverAt = p;
+    if (this.placing) { this.render(); return; } // the ghost follows the pointer
     // Preview where a click would land, so snapping (and Shift) is visible before clicking.
     this.hoverPlaced = p && this.drawing ? this.placeAt(p, this.anchorFor(null)) : null;
     if (!this.hoverPlaced) { this.snapped = null; this.angle = null; if (!this.drag) this.stick = null; }
@@ -955,9 +1044,16 @@ export class OutlineTool {
     let svg = '';
     // Paint surfaces first so outlines' strokes sit on top, and the layer being drawn or edited last of all.
     const active = this.drawing ?? this.selected, all = Object.values(this.outlines);
-    const paint = [...all.filter(o => o.kind === 'surface'), ...all.filter(o => o.kind !== 'surface')];
-    paint.sort((a, b) => Number(a.id === active) - Number(b.id === active));
+    // Surfaces, then the plants and objects, then the outlines; within each group the layer being edited goes last. Handles go on top of all.
+    const activeLast = (list: Outline[]) => list.sort((a, b) => Number(a.id === active) - Number(b.id === active));
+    const paint = [...activeLast(all.filter(o => o.kind === 'surface')), ...activeLast(all.filter(o => o.kind !== 'surface'))];
+    const symbolsMarkup = symbolsSvg({
+      placed: Object.values(this.symbols.placed), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
+      selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
+    });
+    let symbolsDone = false, top = '';
     for (const o of paint) {
+      if (!symbolsDone && o.kind !== 'surface') { svg += symbolsMarkup; symbolsDone = true; }
       if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
@@ -976,22 +1072,24 @@ export class OutlineTool {
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
-        svg += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${colorOf(o)}"/>`;
+        top += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${colorOf(o)}"/>`;
       }
       // Only the outline being drawn or edited shows its handles; the rest are just shape and name.
       const handles = drawingThis || (!this.drawing && this.selected === o.id);
       if (o.closed && handles) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
-        svg += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${colorOf(o)}"/>`;
+        top += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${colorOf(o)}"/>`;
       });
       if (handles) o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
         const closeTarget = drawingThis && i === 0 && o.pts.length >= 3;
-        if (closeTarget) svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${colorOf(o)}"/>`;
-        svg += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${colorOf(o)}"/>`;
+        if (closeTarget) top += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="close-target" style="--c:${colorOf(o)}"/>`;
+        top += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${colorOf(o)}"/>`;
       });
     }
+    if (!symbolsDone) svg += symbolsMarkup;
+    svg += top;
     const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
     if (fe && feo?.kind === 'surface' && feo.closed) {
       // The end that stays put when a length is typed.
@@ -1191,6 +1289,12 @@ export class OutlineTool {
     if (mod && key === 'z') { e.preventDefault(); if (e.shiftKey) this.redo(); else this.undo(); return; }
     if (mod && key === 'y') { e.preventDefault(); this.redo(); return; }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (this.placing && e.key === 'Escape') { this.stopPlacing(); return; }
+    if (this.selectedSymbol && !this.drawing) {
+      if (arrows[e.key]) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudgeSymbol(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.removeSymbol(this.selectedSymbol); return; }
+      if (e.key === 'Escape') { this.deselect(); return; }
+    }
     if (arrows[e.key] && (this.selectedCorner || this.selectedZone)) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudge(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
     if (this.drawing) {
       if (e.key === 'Enter') { e.preventDefault(); this.close(); }
@@ -1219,4 +1323,5 @@ interface Snapshot {
   selectedCorner: { id: string; i: number } | null;
   selected: string | null;
   replaced: Outline | null;
+  symbols: Record<string, PlacedSymbol>;
 }

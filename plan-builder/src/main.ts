@@ -373,7 +373,7 @@ function endPointer(e: PointerEvent) {
   if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
-    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30) {
+    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing) { // placing: quick taps drop symbols, not a zoom
       lastTap.t = 0;
       if (view.scale > 1.05) fitToStage(); else applyView(zoomAt(view, 3, p));
       return;
