@@ -11,6 +11,12 @@ const MIN_HIT_PX = 14;
 
 export const normalizeDeg = (d: number): number => ((d % 360) + 360) % 360;
 
+/** One press of − (-1) or + (+1) on a symbol's rotation: onto the next multiple of 15° in that direction. */
+export const stepRotation = (deg: number, dir: 1 | -1): number => {
+  const d = normalizeDeg(deg), k = d / 15;
+  return normalizeDeg((dir > 0 ? Math.floor(k + 1e-9) + 1 : Math.ceil(k - 1e-9) - 1) * 15);
+};
+
 const validScale = (ftPerPt: number | null): ftPerPt is number => ftPerPt !== null && Number.isFinite(ftPerPt) && ftPerPt > 0;
 
 /** A symbol's footprint in page points. */

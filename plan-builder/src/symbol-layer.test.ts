@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { SymbolLayer, UNSCALED_FT_PT, normalizeDeg, symbolSizePt, symbolSizePx } from './symbol-layer';
+import { SymbolLayer, UNSCALED_FT_PT, normalizeDeg, stepRotation, symbolSizePt, symbolSizePx } from './symbol-layer';
 
 const all = () => true;
 
@@ -75,5 +75,14 @@ describe('SymbolLayer', () => {
     const l = new SymbolLayer(); l.place('hot-tub', { x: 0, y: 0 }); const a = l.place('blue-diamond-spruce', { x: 0, y: 0 }); const b = l.place('blue-diamond-spruce', { x: 1, y: 1 });
     expect(l.counts().get('blue-diamond-spruce')).toBe(2);
     expect(l.groups()).toEqual([{ symbol: 'blue-diamond-spruce', ids: [a, b] }, { symbol: 'hot-tub', ids: ['y1'] }]);
+  });
+});
+
+describe('stepRotation', () => {
+  test('one step turns to the next multiple of 15°', () => {
+    expect([stepRotation(0, 1), stepRotation(10, 1), stepRotation(14.9, 1), stepRotation(15, 1), stepRotation(350, 1)]).toEqual([15, 15, 15, 30, 0]);
+  });
+  test('and back to the previous one, wrapping at 0', () => {
+    expect([stepRotation(0, -1), stepRotation(10, -1), stepRotation(15, -1), stepRotation(30, -1)]).toEqual([345, 0, 0, 15]);
   });
 });

@@ -159,6 +159,7 @@ svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
 button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
 .swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
 .swatch.material svg { display: block; width: 100%; height: 100%; }
+.swatch.symbol img { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* ---------- Collapsible Layers section: a header button (chevron, title, count when collapsed) over its body ---------- */
 button.group-head {
   display: flex; align-items: center; gap: var(--space-4); width: 100%; min-height: var(--control-sm); margin-top: var(--space-3); padding: 0 var(--space-2);
