@@ -39,8 +39,8 @@
 | 3 | Mark existing features (any number, custom names, grey fill + label); house becomes one of them | 🔨 done, in review | `feat/step3-existing-features` |
 | 4 | Surfaces, stage 1: material zones (hardscape + softscape), solid fills, resize by typed edge length | 🔨 done, in review | `feat/material-zones` |
 | 4b | Surfaces stage 2 (Width × Depth in the zone card, optional aspect lock), stage 3 (move one corner) | 🔨 stage 2 done; stage 3 📝 next | `feat/surfaces-width-depth` |
-| 5 | Plants & objects (symbols at true mature size) and the Plant list | 🔨 done, in review | `feat/symbols` |
-| 5b | Edging, walls, fences, stepping stones, utility markers (the rest of the library's surfaces) | ❓ | — |
+| 5 | Plants & objects (symbols at true mature size) and the Plant list | ✅ done (merged) | `feat/symbols` |
+| 5b | Lines (fence, walls, edging, dry river), stepping stones, utility markers (the rest of the library's surfaces) | 🔨 done, in review | `feat/linear-point-surfaces` |
 | 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
@@ -134,6 +134,18 @@
 - Saved with the plan as `symbols` (library id, position, rotation). With no plan scale yet, a symbol is 2.4 page points per foot and still follows zoom.
 - **Plant list** panel under Layers, live: surfaces used (swatch, name), plants (symbol, name, category, quantity, photo), objects (symbol, name, quantity). The water-consumption table is 📝 later.
 - 📝 Later: plant growth over time, quantities with prices, per-symbol size overrides, the water table.
+
+### 6.11 Lines, stepping stones and utility markers ✅🔨
+- The rest of the library's surfaces: **5 linear items** (wood privacy fence, decorative veneer wall, Allen block retaining wall, white stone edging, dry river), **4 stepping stones** and **3 utility markers** (gas, electric, drainage). One ruling for every size read off Figma: **36 Figma px = 1 ft** (a 72 px stepping stone is 2 ft).
+- **Layers → Lines** (between Surfaces and Plants & objects). **Add line…** opens a picker with search. Picking one starts drawing: **tap a point for each corner of the run, then Done** (Enter, or double-tap the last point); Esc cancels, Backspace removes the last point; Shift holds 45°. Dragging still pans. A tap within 4 px of the last point is ignored; fewer than two distinct points saves nothing.
+- A drawn line: tap to select; drag a **point** to move it, a **square** to bend that segment into an arc; tap a point then **Delete point** (never below two); **Width** (− / typed feet or inches / +, 0.25 ft steps, 0.25–12 ft); **Delete line**. Every change undoes. Default widths are the Figma stroke: 0.33 ft (fence, walls, edging), 0.55 ft (dry river).
+- A run is drawn as its item's Figma texture at **true width**, turned to follow the run (grain follows bends; the width follows zoom and calibration), with round caps except the dry river; a run is never thinner than 2 px. Lines draw above surfaces and below plants and objects.
+- **Rows** group by item ("Wood privacy fence × 3") with an eye per item and one on the section header (saved with the plan; hidden lines still count).
+- **Stepping stones** are objects (2 × 2 ft; the Colorado buff stone 3.56 × 2 ft), placed one per tap like any symbol, with rotate.
+- **Utility markers** place one per tap; **rotation is the direction** (the art points along the run, 0° = up). True size (0.4 × 1 ft for gas and electric, 3.8 × 3 ft for drainage) but never shorter than **20 px** on screen.
+- Saved with the plan as `lines` (item, points, bends, width in feet); stones and markers are `symbols`. With no plan scale a width or length uses 2.4 page points per foot and the list says "no scale".
+- **Plant list** gains **Lines** (item, total feet, runs), stepping stones under **Objects**, and **Utility markers** (quantity).
+- 📝 Later: stones repeating along a path, fence posts and gates, widths per segment, utility depth and length, snapping lines to outlines.
 
 ### 6.9 Plans & sign-in ✅🔨
 - A contractor keeps **many plans, one per job/address**, and opens any of them on any of their devices.

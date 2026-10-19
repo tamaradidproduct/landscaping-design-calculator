@@ -71,4 +71,12 @@ export const SYMBOL_SOURCES = [
   s('outdoor-lantern', 'Outdoor lantern', 'object', 'Objects', '', '102:13184'),
   s('outdoor-grill', 'Outdoor grill', 'object', 'Objects', '', '102:13190'),
   s('spigot', 'Spigot', 'object', 'Objects', '', '102:13196'),
+  // Surfaces from the Figma Surfaces section (170:1977) that place one per tap: stepping stones (objects) and utility markers.
+  s('porcelain-pavers', 'Porcelain stepping stones', 'object', 'Stepping stones', '', '174:1360'),
+  s('concrete-pavers', 'Concrete stepping stones', 'object', 'Stepping stones', '', '174:1397'),
+  s('flagstone-pavers', 'Flagstone stepping stones', 'object', 'Stepping stones', '', '174:1513'),
+  s('colorado-buff-stone', 'Colorado buff stepping stones', 'object', 'Stepping stones', '', '175:1550'),
+  s('gas-line', 'Gas line', 'marker', 'Utility markers', '', '174:1425'),
+  s('electric-line', 'Electric line', 'marker', 'Utility markers', '', '175:1577'),
+  s('drainage-line', 'Drainage line', 'marker', 'Utility markers', '', '174:1526'),
 ];

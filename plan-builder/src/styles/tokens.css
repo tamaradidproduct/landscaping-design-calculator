@@ -106,6 +106,8 @@
   --opacity-surface-editing: 0.5; /* Fill of the surface being drawn, so the plan shows through while tracing. */
   --opacity-layer-off: 0.45; /* A hidden layer's row in the Layers panel, dimmed so it reads as off. */
   --opacity-symbol-ghost: 0.5; /* The plant or object armed for placing, shown see-through at the pointer. */
+  --opacity-line-halo: 0.35; /* The glow around a selected line, wider than the run, so its texture still shows. */
+  --opacity-line-draft: 0.6; /* The line being drawn: a dashed see-through run at its true width, with a rubber band to… */
 
   /* ---------- Layout and misc ---------- */
   --z-toast: 5; /* Toast: above the plan, the panel and popovers (it never takes taps). */

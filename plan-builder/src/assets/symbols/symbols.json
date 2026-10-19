@@ -258,5 +258,33 @@
   "spigot": {
     "w": 350,
     "h": 350
+  },
+  "porcelain-pavers": {
+    "w": 288,
+    "h": 288
+  },
+  "concrete-pavers": {
+    "w": 288,
+    "h": 288
+  },
+  "flagstone-pavers": {
+    "w": 288,
+    "h": 293
+  },
+  "colorado-buff-stone": {
+    "w": 512,
+    "h": 288
+  },
+  "gas-line": {
+    "w": 68,
+    "h": 156
+  },
+  "electric-line": {
+    "w": 68,
+    "h": 156
+  },
+  "drainage-line": {
+    "w": 472,
+    "h": 378
   }
 }

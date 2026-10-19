@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import { plantList } from './plant-list';
 import type { Outline } from './outline';
-import type { PlacedSymbol } from './plan-model';
+import type { PlacedLine, PlacedSymbol } from './plan-model';
 
 const sym = (id: string, symbol: string): PlacedSymbol => ({ id, symbol, x: 0, y: 0 });
 const placed = (...pairs: [string, string][]) => Object.fromEntries(pairs.map(([id, s]) => [id, sym(id, s)]));
 const out = (id: string, kind: Outline['kind'], material?: string): Outline => ({ id, kind, name: id, pts: [], closed: true, ...(material ? { material } : {}) });
 
 describe('plantList', () => {
-  test('nothing placed or drawn: empty lists', () => expect(plantList({}, {})).toEqual({ surfaces: [], plants: [], objects: [] }));
+  test('nothing placed or drawn: empty lists', () => expect(plantList({}, {})).toEqual({ surfaces: [], lines: [], plants: [], objects: [], markers: [] }));
   test('the same plant placed twice is one entry with quantity 2', () => {
     const l = plantList(placed(['y1', 'oak'], ['y2', 'oak']), {});
     expect(l.plants).toHaveLength(1); expect(l.plants[0].symbol.id).toBe('oak'); expect(l.plants[0].quantity).toBe(2);
@@ -28,4 +28,31 @@ describe('plantList', () => {
     expect(l.surfaces.map(s => s.name)).toEqual(['Sand', 'Deck wood']);
   });
   test('an unknown symbol id is skipped', () => expect(plantList(placed(['y1', 'nope']), {}).plants).toEqual([]));
+  test('stepping stones are objects, utility markers are listed apart with their quantity', () => {
+    const l = plantList(placed(['y1', 'porcelain-pavers'], ['y2', 'gas-line'], ['y3', 'gas-line'], ['y4', 'drainage-line']), {});
+    expect(l.objects.map(o => [o.symbol.id, o.quantity])).toEqual([['porcelain-pavers', 1]]);
+    expect(l.markers.map(m => [m.symbol.id, m.quantity])).toEqual([['gas-line', 2], ['drainage-line', 1]]);
+    expect(l.plants).toEqual([]);
+  });
+});
+
+describe('plantList lines', () => {
+  const run = (id: string, item: string, len: number): PlacedLine => ({ id, item, points: [{ x: 0, y: 0 }, { x: len, y: 0 }], widthFt: 1 });
+  const lines = (...ls: PlacedLine[]) => Object.fromEntries(ls.map(l => [l.id, l]));
+  test('runs of one item add up: two 100 pt fences at 0.1 ft/pt are 20 ft in 2 runs', () => {
+    const l = plantList({}, {}, lines(run('l1', 'wood-privacy-fence', 100), run('l2', 'wood-privacy-fence', 100)), 0.1);
+    expect(l.lines).toHaveLength(1);
+    expect(l.lines[0].item.id).toBe('wood-privacy-fence'); expect(l.lines[0].feet).toBeCloseTo(20, 6); expect(l.lines[0].runs).toBe(2); expect(l.lines[0].ptLength).toBeCloseTo(200, 6);
+  });
+  test('with no plan scale the feet are null and the page-point length is kept', () => {
+    const l = plantList({}, {}, lines(run('l1', 'dry-river', 100), run('l2', 'dry-river', 50)), null);
+    expect(l.lines[0].feet).toBeNull(); expect(l.lines[0].ptLength).toBeCloseTo(150, 6);
+  });
+  test('items come in library order, not drawing order', () => {
+    const ids = plantList({}, {}, lines(run('l1', 'dry-river', 10), run('l2', 'wood-privacy-fence', 10), run('l3', 'retaining-wall', 10)), 0.1).lines.map(x => x.item.id);
+    expect(ids).toEqual(['wood-privacy-fence', 'retaining-wall', 'dry-river']);
+  });
+  test('an unknown line item is skipped', () => {
+    expect(plantList({}, {}, lines(run('l1', 'nope', 10)), 0.1).lines).toEqual([]);
+  });
 });

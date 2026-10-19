@@ -1,9 +1,14 @@
-// The Plant list panel: what the plan contains, live: the surfaces used, then each plant (symbol, name, category, quantity, photo) and
-// each object (symbol, name, quantity).
-import { plantList } from './plant-list';
+// The Plant list panel: what the plan contains, live: the surfaces used, each kind of line (length and runs), then each plant (symbol,
+// name, category, quantity, photo), each object (stepping stones too) and each utility marker (symbol, name, quantity).
+import { plantList, type PlantList } from './plant-list';
+import { lengthText } from './lines-ui';
 import { caption, esc, hint, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import type { LibrarySymbol } from './symbols';
+
+const lineRow = (l: PlantList['lines'][number]) =>
+  `<div class="plant-surface">${swatch({ symbol: l.item.thumb })}<span class="plant-text"><span class="plant-name">${esc(l.item.name)}</span>`
+  + `<span class="plant-measure">${lengthText(l.feet)} · ${l.runs} ${l.runs === 1 ? 'run' : 'runs'}</span></span></div>`;
 
 const card = (s: LibrarySymbol, quantity: number) =>
   `<div class="plant-card"><img class="plant-art" src="${esc(s.art)}" alt="">`
@@ -12,11 +17,13 @@ const card = (s: LibrarySymbol, quantity: number) =>
   + `${s.photo ? `<img class="plant-photo" src="${esc(s.photo)}" alt="">` : ''}</div>`;
 
 export function renderPlantList(el: HTMLElement, tool: OutlineTool) {
-  const l = plantList(tool.symbols.placed, tool.outlines);
-  if (!l.surfaces.length && !l.plants.length && !l.objects.length) { el.innerHTML = hint('Placed plants and objects, and the surfaces you add, appear here.'); return; }
+  const l = plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null);
+  if (!l.surfaces.length && !l.lines.length && !l.plants.length && !l.objects.length && !l.markers.length) { el.innerHTML = hint('Placed plants and objects, lines, and the surfaces you add, appear here.'); return; }
   el.innerHTML = [
     l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(m => `<div class="plant-surface">${swatch({ material: m.id })}<span class="plant-name">${esc(m.name)}</span></div>`).join('')}` : '',
+    l.lines.length ? `${caption('Lines')}${l.lines.map(lineRow).join('')}` : '',
     l.plants.length ? `${caption('Plants')}${l.plants.map(p => card(p.symbol, p.quantity)).join('')}` : '',
     l.objects.length ? `${caption('Objects')}${l.objects.map(o => card(o.symbol, o.quantity)).join('')}` : '',
+    l.markers.length ? `${caption('Utility markers')}${l.markers.map(m => card(m.symbol, m.quantity)).join('')}` : '',
   ].join('');
 }

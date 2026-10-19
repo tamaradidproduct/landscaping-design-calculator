@@ -23,9 +23,9 @@ const validScale = (ftPerPt: number | null): ftPerPt is number => ftPerPt !== nu
 export const symbolSizePt = (size: { w: number; d: number }, ftPerPt: number | null): { w: number; d: number } =>
   validScale(ftPerPt) ? { w: size.w / ftPerPt, d: size.d / ftPerPt } : { w: size.w * UNSCALED_FT_PT, d: size.d * UNSCALED_FT_PT };
 
-/** A symbol's footprint on screen; a tiny one is scaled up (keeping its proportions) until its long side is 6 px. */
-export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | null, pxPerPt: number): { w: number; d: number } {
-  const pt = symbolSizePt(size, ftPerPt), w = pt.w * pxPerPt, d = pt.d * pxPerPt, k = Math.max(w, d) < MIN_SIZE_PX ? MIN_SIZE_PX / Math.max(w, d) : 1;
+/** A symbol's footprint on screen; a tiny one is scaled up (keeping its proportions) until its long side is `minPx` (6 px; a marker's is 20). */
+export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | null, pxPerPt: number, minPx = MIN_SIZE_PX): { w: number; d: number } {
+  const pt = symbolSizePt(size, ftPerPt), w = pt.w * pxPerPt, d = pt.d * pxPerPt, k = Math.max(w, d) < minPx ? minPx / Math.max(w, d) : 1;
   return { w: w * k, d: d * k };
 }
 

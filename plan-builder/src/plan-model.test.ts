@@ -33,6 +33,40 @@ describe('placed symbols', () => {
   });
 });
 
+describe('placed lines', () => {
+  const lines = {
+    l1: { id: 'l1', item: 'wood-privacy-fence', points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 30 }], widthFt: 0.33 },
+    l2: { id: 'l2', item: 'dry-river', points: [{ x: 5, y: 5 }, { x: 40, y: 9 }], bulges: [3], widthFt: 4 },
+  };
+  test('round-trip through toDoc / fromDoc, with and without bulges', () => {
+    const doc = fromDoc(toDoc({ ...state, lines }, meta));
+    expect(doc.lines).toEqual(lines);
+  });
+  test('a plan without lines opens and saves no lines key', () => {
+    expect(fromDoc(valid()).lines).toBeUndefined();
+    expect('lines' in valid()).toBe(false);
+  });
+  test.each([
+    ['an unknown item', (d: any) => { d.lines.l1.item = 'nope'; }],
+    ['one point', (d: any) => { d.lines.l1.points = [{ x: 0, y: 0 }]; }],
+    ['a non-finite coordinate', (d: any) => { d.lines.l1.points[1].x = null; }],
+    ['a point that is not an object', (d: any) => { d.lines.l1.points[0] = 5; }],
+    ['a width below 0.25', (d: any) => { d.lines.l1.widthFt = 0.2; }],
+    ['a width above 12', (d: any) => { d.lines.l1.widthFt = 12.5; }],
+    ['bulges of the wrong length', (d: any) => { d.lines.l2.bulges = [1, 2]; }],
+    ['a non-finite bulge', (d: any) => { d.lines.l2.bulges = [NaN]; }],
+    ['an id that differs from its key', (d: any) => { d.lines.l1.id = 'l9'; }],
+    ['lines that are not an object', (d: any) => { d.lines = []; }],
+  ])('%s is an invalid plan', (_, mutate) => {
+    const doc = JSON.parse(JSON.stringify(toDoc({ ...state, lines }, meta))); mutate(doc);
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+  test('hiding the lines section and a line id is valid', () => {
+    const doc = JSON.parse(JSON.stringify(toDoc({ ...state, lines }, meta))); doc.hiddenSections = ['lines']; doc.hiddenLayers = ['l1'];
+    expect(fromDoc(doc).hiddenSections).toEqual(['lines']);
+  });
+});
+
 describe('texture scale and visibility', () => {
   test('texScale, hiddenLayers and hiddenSections round-trip', () => {
     const st: PlanState = { outlines: { s1: { ...surface, texScale: 1.5 } }, refs: [], hiddenLayers: ['s1'], hiddenSections: ['surfaces', 'outlines'] };
@@ -153,6 +187,7 @@ describe('what the editor saves and loads', () => {
   const full: PlanState = {
     outlines: { s1: surface }, refs: [], hiddenLayers: ['s1', 'y1'], hiddenSections: ['symbols'],
     symbols: { y1: { id: 'y1', symbol: 'hot-tub', x: 1, y: 2, rot: 45 } },
+    lines: { l1: { id: 'l1', item: 'dry-river', points: [{ x: 0, y: 0 }, { x: 9, y: 9 }], widthFt: 2 } },
   };
   test('planStateOf returns every editor field of a document, as copies', () => {
     const doc = fromDoc(toDoc(full, meta)), st = planStateOf(doc);
@@ -164,10 +199,10 @@ describe('what the editor saves and loads', () => {
   });
   test('editorFields lists what to write and which optional fields to clear', () => {
     const f = editorFields(toDoc(full, meta));
-    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'outlines', 'refs', 'symbols', 'updatedAt', 'v']);
+    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'outlines', 'refs', 'symbols', 'updatedAt', 'v']);
     expect(f.clear).toEqual([]);
     const bare = editorFields(toDoc(state, meta));
     expect(Object.keys(bare.write).sort()).toEqual(['outlines', 'refs', 'updatedAt', 'v']);
-    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'symbols']);
+    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'symbols']);
   });
 });

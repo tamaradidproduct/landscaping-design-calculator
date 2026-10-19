@@ -22,7 +22,7 @@ export interface SymbolsSvgOptions {
 
 function one(symbol: string, at: Point, rot: number, o: SymbolsSvgOptions, extra: string, cls: string): { image: string; halo: string } | null {
   const lib = symbolById(symbol); if (!lib) return null;
-  const fp = symbolSizePx(lib.size, o.ftPerPt, o.pxPerPt);
+  const fp = symbolSizePx(lib.size, o.ftPerPt, o.pxPerPt, lib.minPx);
   const w = lib.kind === 'plant' ? fp.w * PLANT_ART_OVERSIZE : fp.w, h = lib.kind === 'plant' ? w / lib.artAspect : fp.d;
   const turn = rot ? ` transform="rotate(${rot} ${f(at.x)} ${f(at.y)})"` : '';
   const image = `<image href="${lib.art}" x="${f(at.x - w / 2)}" y="${f(at.y - h / 2)}" width="${f(w)}" height="${f(h)}" preserveAspectRatio="none"${turn} class="${cls}"${extra}/>`;

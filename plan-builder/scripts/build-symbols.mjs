@@ -5,14 +5,16 @@
 // The white behind the art is removed by flood fill from the border (so white petals inside stay); the soft grey shadow next to
 // it becomes translucent black. Neutral grey art (stones, metal) skips the shadow step (NO_SHADOW) so its rim isn't turned clear.
 // Usage: node scripts/build-symbols.mjs <dir>
-import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { SYMBOL_SOURCES } from './symbol-sources.mjs';
 
 const ART_PX = 512, THUMB_PX = 64, PHOTO_PX = 184;
 const WHITE_MATTE = new Set(['japanese-maple', 'korean-lilac-tree', 'lilac-tree', 'lilacs']); // art on a pure-white square inside the cream export
 const ALL_BACKDROP = new Set(['monkey-bars', 'swing-set']); // art with a frame that encloses backdrop
-const NO_SHADOW = new Set(['colorado-buff-boulder', 'bubbling-boulder', 'hot-tub', 'seating-wall', 'monkey-bars', 'outdoor-grill', 'spigot', 'planter-box', 'water-feature']);
+const NO_SHADOW = new Set(['colorado-buff-boulder', 'bubbling-boulder', 'hot-tub', 'seating-wall', 'monkey-bars', 'outdoor-grill', 'spigot', 'planter-box', 'water-feature', 'porcelain-pavers', 'concrete-pavers', 'flagstone-pavers', 'colorado-buff-stone']);
+const TRIM = new Set(['porcelain-pavers', 'concrete-pavers', 'flagstone-pavers', 'colorado-buff-stone', 'gas-line', 'electric-line', 'drainage-line']); // exported with a margin: cut to the art so its aspect is the Figma size's
+const RECT = new Set(['porcelain-pavers', 'concrete-pavers', 'colorado-buff-stone']); // rectangular art exported as its exact box (no backdrop to cut away; white pavers on a white backdrop would be eaten)
 const [dir] = process.argv.slice(2);
 if (!dir) { console.error('Usage: node scripts/build-symbols.mjs <dir>'); process.exit(1); }
 const out = new URL('../src/assets/symbols/', import.meta.url).pathname;
@@ -78,11 +80,12 @@ async function cutOut(file, keepShadow, allBackdrop, whiteMatte) {
   return sharp(data, { raw: { width: w, height: h, channels: 4 } });
 }
 
-const aspects = {};
+const aspects = existsSync(`${out}symbols.json`) ? JSON.parse(readFileSync(`${out}symbols.json`, 'utf8')) : {}; // kept for symbols whose art isn't in <dir> this run
 for (const s of SYMBOL_SOURCES) {
-  const art = `${dir}/art/${s.id}.png`; if (!existsSync(art)) { console.error('missing', art); process.exitCode = 1; continue; }
-  const img = (await cutOut(art, !NO_SHADOW.has(s.id), ALL_BACKDROP.has(s.id), WHITE_MATTE.has(s.id))).resize({ width: ART_PX, height: ART_PX, fit: 'inside', withoutEnlargement: true });
-  const buf = await img.png().toBuffer(), meta = await sharp(buf).metadata();
+  const art = `${dir}/art/${s.id}.png`; if (!existsSync(art)) { if (!aspects[s.id]) { console.error('missing', art); process.exitCode = 1; } continue; }
+  const img = (RECT.has(s.id) ? sharp(art).ensureAlpha() : await cutOut(art, !NO_SHADOW.has(s.id), ALL_BACKDROP.has(s.id), WHITE_MATTE.has(s.id))).resize({ width: ART_PX, height: ART_PX, fit: 'inside', withoutEnlargement: true });
+  const sized = await img.png().toBuffer();
+  const buf = TRIM.has(s.id) ? await sharp(sized).trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 10 }).png().toBuffer() : sized, meta = await sharp(buf).metadata();
   aspects[s.id] = { w: meta.width, h: meta.height };
   await sharp(buf).webp({ quality: 80, alphaQuality: 90 }).toFile(`${out}${s.id}.webp`);
   await sharp(buf).resize({ width: THUMB_PX, height: THUMB_PX, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).webp({ quality: 75 }).toFile(`${out}thumbs/${s.id}.webp`);
