@@ -27,7 +27,8 @@ for (const s of LINE_SOURCES) {
   await sharp({ create: { width: THUMB, height: THUMB, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: side, left: 0, top: s.strip ? (THUMB - 16) >> 1 : 0 }]).webp({ quality: 75 }).toFile(`${out}thumbs/${s.id}.webp`);
   const { channels } = await sharp(tile).stats();
-  info[s.id] = { w, h, color: `#${hex(channels[0].mean)}${hex(channels[1].mean)}${hex(channels[2].mean)}` };
+  const r = channels[0].mean, g = channels[1]?.mean ?? r, b = channels[2]?.mean ?? r;
+  info[s.id] = { w, h, color: `#${hex(r)}${hex(g)}${hex(b)}` };
 }
 writeFileSync(`${out}lines.json`, JSON.stringify(info, null, 2) + '\n');
 console.log(`${LINE_SOURCES.length} line tiles written to ${out}`);

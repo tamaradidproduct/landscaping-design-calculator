@@ -40,7 +40,8 @@ export class LineLayer {
   add(item: string, points: Point[], widthFt: number): string | null {
     const pts = points.filter((p, i) => i === 0 || dist(p, points[i - 1]) > SAME_POINT).map(p => ({ x: p.x, y: p.y }));
     if (pts.length < 2) return null;
-    const n = Math.max(0, ...Object.keys(this.placed).map(k => Number(k.slice(1)))) + 1, id = `l${n}`;
+    const ids = Object.keys(this.placed).map(k => Number(k.slice(1))).filter(Number.isFinite);
+    const n = Math.max(0, ...ids) + 1, id = `l${n}`;
     this.placed[id] = { id, item, points: pts, widthFt: clampLineWidth(widthFt) };
     return id;
   }

@@ -39,7 +39,7 @@ const thumbs = import.meta.glob<string>('./assets/lines/thumbs/*.webp', { eager:
 
 // A default width is the stroke weight in feet cut to 2 decimals (12 px → 0.33 ft, 20 px → 0.55 ft).
 export const LINE_ITEMS: readonly LineItem[] = LINE_SOURCES.map(s => {
-  const t = (tiles as Record<string, { w: number; h: number; color: string }>)[s.id];
+  const t = (tiles as Record<string, { w: number; h: number; color: string }>)[s.id] ?? { w: 1, h: 1, color: '#000000' };
   return {
     id: s.id, name: s.name, family: s.family,
     art: art[`./assets/lines/${s.id}.webp`], thumb: thumbs[`./assets/lines/thumbs/${s.id}.webp`],
