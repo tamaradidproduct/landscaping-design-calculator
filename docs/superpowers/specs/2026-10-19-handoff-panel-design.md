@@ -18,7 +18,7 @@ Date: 2026-10-19 · Branch: `feat/handoff-panel` · Status: draft for review
 - Water consumption is skipped for now (separate follow-up).
 
 ## Structure
-- Top controls unchanged: Undo/Redo, zoom − / + / Fit page.
+- Undo/Redo, zoom − / + and Fit page move off the panel onto a floating bar on the canvas, so the panel is only the sheet.
 - Section order: **Surfaces → Plants & objects → Lines → Outlines**. Today Lines sits above Plants & objects; this changes only the panel order, not the draw order on the plan.
 - Plants & objects splits into **Plants / Objects / Utility markers** by sub-captions, as on the sheet.
 - Sections keep chevron, count, eye and their "Add…" button.
