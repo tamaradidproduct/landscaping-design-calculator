@@ -34,6 +34,18 @@ describe('LineLayer', () => {
     const L = new LineLayer(); const id = L.add('wood-privacy-fence', [P(0, 0), P(9, 0), P(9, 9)], 1)!;
     L.movePoint(id, 1, P(12, 3)); expect(L.placed[id].points[1]).toEqual(P(12, 3));
   });
+  test('move shifts every point and keeps the bends, width and item', () => {
+    const L = new LineLayer(); const id = L.add('dry-river', [P(0, 0), P(10, 0), P(10, 10)], 3)!; L.setBulge(id, 0, 2);
+    L.move(id, 5, -4);
+    expect(L.placed[id].points).toEqual([P(5, -4), P(15, -4), P(15, 6)]); expect(L.placed[id].bulges).toEqual([2, 0]); expect(L.placed[id].widthFt).toBe(3); expect(L.placed[id].item).toBe('dry-river');
+    L.move('l99', 1, 1); // unknown id: nothing happens
+  });
+  test('moveFrom puts every point at its starting place plus the offset (a drag, however many moves)', () => {
+    const L = new LineLayer(); const id = L.add('dry-river', [P(0, 0), P(10, 0)], 3)!;
+    const start = L.placed[id].points.map(p => ({ ...p }));
+    L.moveFrom(id, start, 4, 4); L.moveFrom(id, start, 7, 1);
+    expect(L.placed[id].points).toEqual([P(7, 1), P(17, 1)]);
+  });
   test('removePoint refuses at two points, and keeps bulges one per segment', () => {
     const L = new LineLayer(); const id = L.add('wood-privacy-fence', [P(0, 0), P(10, 0), P(10, 10), P(20, 10)], 1)!;
     L.setBulge(id, 0, 2); L.setBulge(id, 2, -3);

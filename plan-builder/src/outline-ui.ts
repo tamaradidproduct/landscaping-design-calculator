@@ -12,6 +12,7 @@ import { LineLayer } from './line-layer';
 import { linesSvgParts } from './lines-render';
 import { draftReady, draftTap } from './line-draft';
 import { clampLineWidth, lineItemById } from './line-items';
+import { labelFontPx, labelHaloPx } from './label-size';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
@@ -65,7 +66,9 @@ type Drag =
   | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean }
   // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
   | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean }
-  | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean };
+  | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean }
+  // The whole line being moved: the press in screen px and the line's points when it began.
+  | { type: 'line-move'; id: string; start: Point; before: Point[]; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -277,6 +280,15 @@ export class OutlineTool {
     this.lastNudge = { t: now, id, i: key };
     const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
     this.symbols.move(id, b.x - a.x, b.y - a.y); this.update();
+  }
+  /** Arrow keys move the selected line by screen px; a run within 1.5 s is one undo step. */
+  private nudgeLine(dx: number, dy: number) {
+    const id = this.selectedLine; if (!id) return;
+    const now = performance.now(), ln = this.lastNudge, key = -4;
+    if (!(ln && ln.id === id && ln.i === key && now - ln.t < 1500)) this.record(); else this.revision++;
+    this.lastNudge = { t: now, id, i: key };
+    const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
+    this.lines.move(id, b.x - a.x, b.y - a.y); this.update();
   }
   private symbolAt(screen: Point): string | null {
     return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
@@ -546,7 +558,15 @@ export class OutlineTool {
       this.drag = { type: 'side', id: zone.id, i: side, start: p, before, moved: false, fixed: dist(p, a) <= dist(p, b) ? 0 : 1 };
       this.dragBefore = this.snapshot(); return true;
     }
-    const sid = this.symbolAt(p);
+    // A plant or object under the press first; then a line (press and drag to move the whole run; a tap selects it); then the zone.
+    const sid = this.symbolAt(p), lid = sid ? null : this.lineAt(p);
+    if (lid) {
+      const l = this.lines.placed[lid];
+      this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null;
+      this.selectedLine = lid; this.selectedLinePoint = null;
+      this.drag = { type: 'line-move', id: lid, start: p, before: l.points.map(q => ({ ...q })), moved: false };
+      this.dragBefore = this.snapshot(); this.update(); return true;
+    }
     if (sid) {
       const s = this.symbols.placed[sid];
       this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = sid; this.clearLines();
@@ -559,8 +579,6 @@ export class OutlineTool {
         this.dragBefore = this.snapshot(); return true;
       }
     }
-    // A line under the press wins over an outline edge beneath it (edging along a surface's edge, a fence on the property line): the tap selects the line.
-    if (!this.selectedEdge && this.lineAt(p)) return false;
     const edge = this.edgeAt(p);
     if (edge) {
       // The corner nearer the tap stays put if a length is typed for a surface edge.
@@ -577,6 +595,13 @@ export class OutlineTool {
       d.moved = true;
       const a = this.host.toPage(d.start), b = this.host.toPage(p);
       this.lines.movePoint(d.id, d.i, { x: d.before.x + b.x - a.x, y: d.before.y + b.y - a.y });
+      this.render(); return;
+    }
+    if (d.type === 'line-move') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
+      d.moved = true;
+      const a = this.host.toPage(d.start), b = this.host.toPage(p);
+      this.lines.moveFrom(d.id, d.before, b.x - a.x, b.y - a.y);
       this.render(); return;
     }
     if (d.type === 'line-bend') {
@@ -770,7 +795,7 @@ export class OutlineTool {
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
-    if (d.type === 'line-point' || d.type === 'line-bend') {
+    if (d.type === 'line-point' || d.type === 'line-bend' || d.type === 'line-move') {
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       else if (d.type === 'line-point') this.selectedLinePoint = this.selectedLinePoint === d.i ? null : d.i; // a tap selects (or drops) the point
       this.dragBefore = null; this.update(); return;
@@ -1256,7 +1281,8 @@ export class OutlineTool {
       const shown = this.visible.get(o.id), at = shown && shapeLabelPoint(shown);
       if (!at) continue;
       const c = h.toScreen(at);
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
+      const fs = labelFontPx(h.pxPerPt()); // scales with the plan, within limits
+      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}" style="font-size:${fs}px;stroke-width:${labelHaloPx(fs).toFixed(1)}px">${esc(o.name)}</text>`;
     }
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);
@@ -1447,6 +1473,7 @@ export class OutlineTool {
       if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.popDraftPoint(); return; }
     }
     if (this.selectedLine && !this.drawing) {
+      if (arrows[e.key]) { e.preventDefault(); const k = e.shiftKey ? 10 : 1; this.nudgeLine(arrows[e.key][0] * k, arrows[e.key][1] * k); return; }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); if (this.selectedLinePoint !== null) this.removeLinePoint(this.selectedLine, this.selectedLinePoint); else this.removeLine(this.selectedLine); return; }
       if (e.key === 'Escape') { this.deselect(); return; }
     }
