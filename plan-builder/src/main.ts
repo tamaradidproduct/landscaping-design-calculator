@@ -7,7 +7,7 @@ import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
 import { renderPlantList } from './plant-list-ui';
 import { LinesSection } from './lines-ui';
-import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
+import { groupCounts, groupToOpen, moveLabel, moveSection as moveInOrder, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
 import type { OutlineShape } from './outline';
@@ -139,6 +139,26 @@ function setGroupOpen(g: Group, open: boolean) {
   try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ }
   updateGroups();
 }
+// Each section header gets ↑ ↓ buttons; the panel's blocks follow tool.sectionOrder (top of the panel = top of the plan's stacking).
+document.querySelectorAll<HTMLElement>('.group-line').forEach(line => {
+  const g = line.querySelector<HTMLElement>('.group-head')!.dataset.group as Group, eye = line.querySelector('[data-eye-group]');
+  for (const dir of [-1, 1] as const) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', className: 'icon move', textContent: dir < 0 ? '↑' : '↓' });
+    b.dataset.moveGroup = g; b.dataset.dir = String(dir); b.onclick = () => tool.moveSection(g, dir);
+    line.insertBefore(b, eye);
+  }
+});
+function applySectionOrder() {
+  let ref: Element | null = document.querySelector('.layers .side-title');
+  for (const g of tool.sectionOrder) {
+    const line = document.querySelector<HTMLElement>(`.group-head[data-group=${g}]`)!.closest('.group-line')!, body = $(`group-${g}`);
+    if (ref) { ref.after(line); line.after(body); ref = body; }
+    for (const dir of [-1, 1] as const) {
+      const b = line.querySelector<HTMLButtonElement>(`[data-move-group=${g}][data-dir="${dir}"]`)!;
+      b.disabled = moveInOrder(tool.sectionOrder, g, dir) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
+    }
+  }
+}
 let activeLine: string | null = null; // the line being drawn (its item) or selected — the Lines section opens when it changes
 function updateGroups() {
   const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
@@ -147,6 +167,7 @@ function updateGroups() {
   activeLine = line;
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
+  applySectionOrder();
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;

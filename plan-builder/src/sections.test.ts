@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Outline } from './outline';
-import { DEFAULT_SECTION_ORDER, GROUPS, groupCounts, groupToOpen, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveSection, paintOrder, readOpen, type Group } from './sections';
+import { DEFAULT_SECTION_ORDER, GROUPS, groupCounts, groupToOpen, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveLabel, moveSection, paintOrder, readOpen, type Group } from './sections';
 
 const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, kind, name: id, pts: [], closed });
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
@@ -100,5 +100,12 @@ describe('section order', () => {
     expect(isSectionOrder(['symbols', 'symbols', 'lines', 'surfaces'])).toBe(false); expect(isSectionOrder(['symbols', 'outlines', 'lines'])).toBe(false);
     expect(isSectionOrder(['symbols', 'outlines', 'lines', 'surfaces', 'x'])).toBe(false); expect(isSectionOrder(['symbols', 'outlines', 'lines', 'nope'])).toBe(false);
     expect(isSectionOrder('symbols')).toBe(false); expect(isSectionOrder(undefined)).toBe(false);
+  });
+});
+
+describe('move button labels', () => {
+  test('say which section and which way', () => {
+    expect(moveLabel('symbols', -1)).toBe('Move Plants & objects up'); expect(moveLabel('lines', 1)).toBe('Move Lines down');
+    expect(moveLabel('outlines', -1)).toBe('Move Outlines up'); expect(moveLabel('surfaces', 1)).toBe('Move Surfaces down');
   });
 });
