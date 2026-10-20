@@ -45,6 +45,10 @@ export class LineLayer {
     this.placed[id] = { id, item, points: pts, widthFt: clampLineWidth(widthFt) };
     return id;
   }
+  /** Shift the whole run by an offset (page points). */
+  move(id: string, dx: number, dy: number) { const l = this.placed[id]; if (l) l.points = l.points.map(p => ({ x: p.x + dx, y: p.y + dy })); }
+  /** Put the run at `from` (its points when a drag began) plus an offset, so a drag that reports many moves never drifts. */
+  moveFrom(id: string, from: readonly Point[], dx: number, dy: number) { const l = this.placed[id]; if (l) l.points = from.map(p => ({ x: p.x + dx, y: p.y + dy })); }
   movePoint(id: string, i: number, to: Point) { const l = this.placed[id]; if (l?.points[i]) l.points[i] = { x: to.x, y: to.y }; }
   /** Drop point i (never below two points). The bends stay one per segment: a point between two segments leaves one straight segment. */
   removePoint(id: string, i: number): boolean {
