@@ -149,14 +149,23 @@ document.querySelectorAll<HTMLElement>('.group-line').forEach(line => {
   }
 });
 function applySectionOrder() {
+  const was = document.activeElement as HTMLElement | null;
   let ref: Element | null = document.querySelector('.layers .side-title');
   for (const g of tool.sectionOrder) {
     const line = document.querySelector<HTMLElement>(`.group-head[data-group=${g}]`)!.closest('.group-line')!, body = $(`group-${g}`);
-    if (ref) { ref.after(line); line.after(body); ref = body; }
+    // Move a block only when it is out of place: moving a node drops the focus from the buttons inside it.
+    if (ref && ref.nextElementSibling !== line) ref.after(line);
+    if (line.nextElementSibling !== body) line.after(body);
+    ref = body;
     for (const dir of [-1, 1] as const) {
       const b = line.querySelector<HTMLButtonElement>(`[data-move-group=${g}][data-dir="${dir}"]`)!;
       b.disabled = moveInOrder(tool.sectionOrder, g, dir) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
     }
+  }
+  // A button that was moved lost the focus: give it back (a move button that is now at an end passes it to its pair).
+  if (was && was !== document.body && document.activeElement === document.body && was.isConnected) {
+    const b = was as HTMLButtonElement;
+    if (!b.disabled) b.focus(); else b.closest('.group-line')?.querySelector<HTMLButtonElement>(`[data-move-group]:not(:disabled)`)?.focus();
   }
 }
 let activeLine: string | null = null; // the line being drawn (its item) or selected — the Lines section opens when it changes

@@ -32,13 +32,16 @@ function one(symbol: string, at: Point, rot: number, o: SymbolsSvgOptions, extra
   return { image, halo };
 }
 
-export function symbolsSvg(o: SymbolsSvgOptions): string {
-  let svg = '';
+/** The images, and apart from them the halo of the selected symbol and the ghost of the armed one, which belong over everything else. */
+export function symbolsSvgParts(o: SymbolsSvgOptions): { images: string; top: string } {
+  let images = '', top = '';
   for (const p of o.placed) {
     if (!o.shown(p)) continue;
     const r = one(p.symbol, o.toScreen({ x: p.x, y: p.y }), p.rot ?? 0, o, ` data-id="${p.id}"`, 'symbol');
-    if (r) svg += r.image + (o.selected === p.id ? r.halo : '');
+    if (r) { images += r.image; if (o.selected === p.id) top += r.halo; }
   }
-  if (o.ghost) svg += one(o.ghost.symbol, o.ghost.at, 0, o, '', 'symbol ghost')?.image ?? '';
-  return svg;
+  if (o.ghost) top += one(o.ghost.symbol, o.ghost.at, 0, o, '', 'symbol ghost')?.image ?? '';
+  return { images, top };
 }
+
+export function symbolsSvg(o: SymbolsSvgOptions): string { const { images, top } = symbolsSvgParts(o); return images + top; }

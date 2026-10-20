@@ -39,6 +39,22 @@ try {
   const all1 = await paintIds();
   check('By default the plants paint above the House shape', all1.indexOf('HOUSE') >= 0 && all1.indexOf('HOUSE') < all1.indexOf('creeping-phlox'), all1.join(' < '));
   check('The top section cannot move up; the bottom one cannot move down', await page.$eval('[data-move-group=symbols][data-dir="-1"]', b => b.disabled) && await page.$eval('[data-move-group=surfaces][data-dir="1"]', b => b.disabled), 'both disabled');
+  // Drawing an outline over the tree: its in-progress path is visible above the plants
+  await page.click('#outlines [data-act=name]'); await page.fill('#outline-name', 'Shed'); await page.press('#outline-name', 'Enter'); await page.waitForTimeout(250);
+  await page.mouse.click(...await at(0.45, 0.45)); await page.waitForTimeout(250); await page.mouse.move(...await at(0.55, 0.55)); await page.waitForTimeout(250);
+  const drawOrder = await page.$$eval('.overlay > *', els => els.map(e => e.tagName === 'image' ? 'IMG' : e.tagName === 'path' && e.classList.contains('feature') && !e.classList.contains('closed') ? 'DRAWING' : null).filter(Boolean));
+  check('An outline being drawn paints above the plants (rubber band visible over the tree)', drawOrder.includes('DRAWING') && drawOrder.lastIndexOf('IMG') < drawOrder.indexOf('DRAWING'), drawOrder.join(' < '));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  // Keyboard: a move button keeps focus after it is pressed
+  await page.focus('[data-move-group=lines][data-dir="-1"]'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+  const focused = await page.evaluate(() => document.activeElement?.dataset?.moveGroup ?? document.activeElement?.tagName);
+  check('A move button keeps focus after it moves a section', focused === 'lines', `focus on ${focused}`);
+  await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+  check('…so pressing it again moves it again', (await panelOrder()).join() === 'lines,symbols,outlines,surfaces', (await panelOrder()).join());
+  await page.focus('[data-eye-group=surfaces]'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+  check('An eye button keeps focus after it is pressed', await page.evaluate(() => document.activeElement?.dataset?.eyeGroup === 'surfaces'), 'focus kept');
+  await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+  await page.click('[data-move-group=lines][data-dir="1"]'); await page.click('[data-move-group=lines][data-dir="1"]'); await page.waitForTimeout(300); // back to the default order
   // Move Outlines up
   await page.click('[data-move-group=outlines][data-dir="-1"]'); await page.waitForTimeout(300);
   check('Move Outlines up swaps the panel blocks', (await panelOrder()).join() === 'outlines,symbols,lines,surfaces', (await panelOrder()).join());
@@ -46,6 +62,13 @@ try {
   check('…and the plan: the House now paints over the plants', all2.indexOf('HOUSE') > all2.indexOf('blue-diamond-spruce'), all2.join(' < '));
   check('The Plot plan block stays below all the sections', await page.evaluate(() => { const kids = [...document.querySelector('.layers').children]; return kids.indexOf(document.querySelector('.plan-layer')) === kids.length - 1; }), 'last in Layers');
   check('The button states follow (Outlines is now first)', await page.$eval('[data-move-group=outlines][data-dir="-1"]', b => b.disabled) && !(await page.$eval('[data-move-group=symbols][data-dir="-1"]', b => b.disabled)), 'updated');
+  // Plants & objects to the bottom: the selection halo is still on top of everything
+  for (let i = 0; i < 2; i++) { await page.click('[data-move-group=symbols][data-dir="1"]'); await page.waitForTimeout(150); }
+  await page.mouse.click(...await at(0.5, 0.5)); await page.waitForTimeout(300);
+  const topOrder = await page.$$eval('.overlay > *', els => els.map(e => e.classList.contains('symbol-halo') ? 'HALO' : e.tagName === 'image' ? 'IMG' : e.tagName === 'path' && e.classList.contains('closed') ? 'SHAPE' : null).filter(Boolean));
+  check('With Plants & objects at the bottom, the selection halo is still drawn last', topOrder.includes('HALO') && topOrder.lastIndexOf('SHAPE') < topOrder.indexOf('HALO'), topOrder.join(' < '));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  for (let i = 0; i < 2; i++) { await page.click('[data-move-group=symbols][data-dir="-1"]'); await page.waitForTimeout(150); }
   // Reopen
   await page.waitForTimeout(1800);
   await page.click('#back-to-plans'); await page.locator('.plan-row').first().waitFor();
@@ -57,7 +80,7 @@ try {
   const all3 = await paintIds();
   check('…and so is the stacking on the plan', all3.indexOf('HOUSE') > all3.indexOf('blue-diamond-spruce'), all3.join(' < '));
   await page.screenshot({ path: `${outDir}/layering-end.png` });
-} catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
+} catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); console.log('DEBUG outlines:', await page.$eval('#outlines', x => x.innerText.replace(/\n+/g, ' | ')).catch(() => '?')); }
 check('No page errors', errors.length === 0, errors.slice(0, 2).join(' | ') || 'none');
 console.table(results.map(([check, result]) => ({ check, result })));
 await browser.close();

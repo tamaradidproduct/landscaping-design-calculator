@@ -14,7 +14,7 @@ import { draftReady, draftTap } from './line-draft';
 import { clampLineWidth, lineItemById } from './line-items';
 import { DEFAULT_SECTION_ORDER, groupOf, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveSection as moveInOrder, paintOrder, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
-import { symbolsSvg } from './symbols-render';
+import { symbolsSvgParts } from './symbols-render';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -1206,13 +1206,15 @@ export class OutlineTool {
       selected: this.selectedLine, selectedPoint: this.selectedLinePoint,
       draft: this.lineDraft ? { ...this.lineDraft, hover: this.hoverAt ? this.draftTarget(this.hoverAt) : null } : undefined,
     });
-    const symbolsMarkup = symbolsSvg({
+    const sy = symbolsSvgParts({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
       selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
     // One block of markup per group; they are joined in the sections' order, bottom to top. Handles and hints (`top`) go over all of them.
-    const parts: Record<Group, string> = { surfaces: '', outlines: '', lines: ln.runs, symbols: symbolsMarkup };
-    let top = ln.top;
+    const parts: Record<Group, string> = { surfaces: '', outlines: '', lines: ln.runs, symbols: sy.images };
+    // What is being drawn or edited (the outline in progress, the selected outline's dashed trace) and the plant halo and ghost paint over every block.
+    let editing = '';
+    let top = ln.top + sy.top;
     for (const o of paint) {
       const g: Group = o.kind === 'surface' ? 'surfaces' : 'outlines';
       if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
@@ -1228,8 +1230,11 @@ export class OutlineTool {
         // A finished layer shows only its visible part; selected, its whole drawn outline shows too (dashed) so
         // it's clear what is being edited.
         if (shown.length) parts[g] += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}${fillOf(o)}"/>`;
-        if (sel) parts[g] += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
-      } else parts[g] += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}${drawingThis && o.kind === 'surface' ? ' drawing' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
+        if (sel) editing += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
+      } else {
+        const markup = `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}${drawingThis && o.kind === 'surface' ? ' drawing' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
+        if (drawingThis) editing += markup; else parts[g] += markup; // the outline being drawn stays visible over the plants
+      }
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
@@ -1259,7 +1264,7 @@ export class OutlineTool {
       const c = h.toScreen(at);
       parts.outlines += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}">${esc(o.name)}</text>`;
     }
-    let svg = paintOrder(this.sectionOrder).map(g => parts[g]).join('') + top;
+    let svg = paintOrder(this.sectionOrder).map(g => parts[g]).join('') + editing + top;
     const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
     if (fe && feo?.kind === 'surface' && feo.closed) {
       // The end that stays put when a length is typed.
