@@ -34,6 +34,8 @@ export function syncFill(outlines: Record<string, Outline>, boundaryDrawing: boo
   const b = outlines[BOUNDARY];
   if (!b) { const { [FILL_ID]: _gone, ...rest } = outlines; return rest; }
   if (boundaryDrawing || !b.closed) return outlines;
+  const shape = shapeOf(b);
+  if (JSON.stringify([fill.pts, fill.bulges, fill.radii]) === JSON.stringify([shape.pts, shape.bulges, shape.radii])) return keepFillLast(outlines); // already in step
   const { bulges: _b, radii: _r, ...kept } = fill;
-  return keepFillLast({ ...outlines, [FILL_ID]: { ...kept, ...shapeOf(b) } });
+  return keepFillLast({ ...outlines, [FILL_ID]: { ...kept, ...shape } });
 }

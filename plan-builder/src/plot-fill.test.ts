@@ -51,6 +51,10 @@ describe('syncFill', () => {
     const b = boundary(), m = map(b, house, fillOutline(b, 'sand'), zone('s1'), zone('s2'));
     expect(Object.keys(syncFill(m, false))).toEqual(['boundary', 'f1', 's1', 's2', FILL_ID]);
   });
+  test('a fill already in step with the boundary (and last) comes back as the same map', () => {
+    const b = boundary({ bulges: [0, 3, 0, 0], radii: [1, 1, 1, 1] }), m = map(b, zone('s1'), fillOutline(b, 'sand'));
+    expect(syncFill(m, false)).toBe(m);
+  });
   test('does not change its input', () => {
     const b = boundary(), m = map(b, fillOutline(b, 'sand')); m.boundary = boundary({ pts: [P(0, 0), P(9, 0), P(9, 9)] });
     const before = JSON.stringify(m); syncFill(m, false); expect(JSON.stringify(m)).toBe(before);
