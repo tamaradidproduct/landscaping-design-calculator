@@ -33,6 +33,23 @@ describe('placed symbols', () => {
   });
 });
 
+describe('section order', () => {
+  const order = ['surfaces', 'symbols', 'lines', 'outlines'] as const;
+  test('round-trips, and a plan without it opens', () => {
+    expect(fromDoc(toDoc({ ...state, sectionOrder: [...order] }, meta)).sectionOrder).toEqual(order);
+    expect(fromDoc(valid()).sectionOrder).toBeUndefined(); expect('sectionOrder' in valid()).toBe(false);
+  });
+  test.each([
+    ['a duplicate', (d: any) => { d.sectionOrder = ['symbols', 'symbols', 'lines', 'outlines']; }],
+    ['a short list', (d: any) => { d.sectionOrder = ['symbols', 'lines']; }],
+    ['an unknown group', (d: any) => { d.sectionOrder = ['symbols', 'lines', 'outlines', 'nope']; }],
+    ['a string', (d: any) => { d.sectionOrder = 'symbols'; }],
+  ])('%s is an invalid plan', (_, mutate) => {
+    const doc = JSON.parse(JSON.stringify(toDoc({ ...state, sectionOrder: [...order] }, meta))); mutate(doc);
+    expect(reasonOf(doc)).toBe('invalid');
+  });
+});
+
 describe('placed lines', () => {
   const lines = {
     l1: { id: 'l1', item: 'wood-privacy-fence', points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 30 }], widthFt: 0.33 },
@@ -188,6 +205,7 @@ describe('what the editor saves and loads', () => {
     outlines: { s1: surface }, refs: [], hiddenLayers: ['s1', 'y1'], hiddenSections: ['symbols'],
     symbols: { y1: { id: 'y1', symbol: 'hot-tub', x: 1, y: 2, rot: 45 } },
     lines: { l1: { id: 'l1', item: 'dry-river', points: [{ x: 0, y: 0 }, { x: 9, y: 9 }], widthFt: 2 } },
+    sectionOrder: ['surfaces', 'symbols', 'lines', 'outlines'],
   };
   test('planStateOf returns every editor field of a document, as copies', () => {
     const doc = fromDoc(toDoc(full, meta)), st = planStateOf(doc);
@@ -199,10 +217,10 @@ describe('what the editor saves and loads', () => {
   });
   test('editorFields lists what to write and which optional fields to clear', () => {
     const f = editorFields(toDoc(full, meta));
-    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'outlines', 'refs', 'symbols', 'updatedAt', 'v']);
+    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'outlines', 'refs', 'sectionOrder', 'symbols', 'updatedAt', 'v']);
     expect(f.clear).toEqual([]);
     const bare = editorFields(toDoc(state, meta));
     expect(Object.keys(bare.write).sort()).toEqual(['outlines', 'refs', 'updatedAt', 'v']);
-    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'symbols']);
+    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'sectionOrder', 'symbols']);
   });
 });
