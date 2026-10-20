@@ -44,6 +44,18 @@ export const SYMBOLS: readonly LibrarySymbol[] = SYMBOL_SOURCES.map(s => {
   };
 });
 
+const TREE_FAMILIES = new Set(['Evergreen trees', 'Deciduous trees', 'Accent trees']);
+const SHRUB_FAMILIES = new Set(['Accent shrubs', 'Privacy shrubs', 'Large shrubs']);
+/**
+ * Where a symbol sits in the stacking on the plan, bottom to top: 1 utility marker, 2 object, 3 perennial / ground cover / grass /
+ * other plant, 4 shrub, 5 tree. Taller things are drawn (and tapped) above lower ones.
+ */
+export function tierOf(s: Pick<LibrarySymbol, 'kind' | 'family'>): 1 | 2 | 3 | 4 | 5 {
+  if (s.kind === 'marker') return 1;
+  if (s.kind === 'object') return 2;
+  return TREE_FAMILIES.has(s.family) ? 5 : SHRUB_FAMILIES.has(s.family) ? 4 : 3;
+}
+
 export const symbolById = (id: string): LibrarySymbol | undefined => SYMBOLS.find(s => s.id === id);
 
 /** The symbols grouped by family, in library order (all of them, or only plants, objects or markers). */

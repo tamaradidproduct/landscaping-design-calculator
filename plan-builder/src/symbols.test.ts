@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { SYMBOL_SIZES } from '../scripts/symbol-sizes.mjs';
-import { FIGMA_PX_PER_FT, SYMBOLS, searchSymbols, symbolById, symbolFamilies } from './symbols';
+import { FIGMA_PX_PER_FT, SYMBOLS, tierOf, searchSymbols, symbolById, symbolFamilies } from './symbols';
 
 describe('symbol library', () => {
   test('72 symbols: 51 plants, 18 objects and 3 markers', () => {
@@ -57,5 +57,16 @@ describe('symbol library', () => {
   test('only markers have a 20 px minimum on-screen size', () => {
     expect(FIGMA_PX_PER_FT).toBe(36);
     for (const s of SYMBOLS) { if (s.kind === 'marker') expect(s.minPx, s.id).toBe(20); else expect(s.minPx, s.id).toBeUndefined(); }
+  });
+  test('tierOf: trees 5, shrubs 4, perennials/ground covers/grasses/other 3, objects 2, markers 1', () => {
+    const tiers = (family: string) => [...new Set(SYMBOLS.filter(s => s.family === family).map(tierOf))];
+    for (const f of ['Evergreen trees', 'Deciduous trees', 'Accent trees']) expect(tiers(f), f).toEqual([5]);
+    for (const f of ['Accent shrubs', 'Privacy shrubs', 'Large shrubs']) expect(tiers(f), f).toEqual([4]);
+    for (const f of ['Perennials', 'Ground covers', 'Ornamental grasses', 'Other']) expect(tiers(f), f).toEqual([3]);
+    for (const f of ['Objects', 'Stepping stones']) expect(tiers(f), f).toEqual([2]);
+    expect(tiers('Utility markers')).toEqual([1]);
+  });
+  test('every library symbol has a tier from 1 to 5', () => {
+    for (const s of SYMBOLS) expect([1, 2, 3, 4, 5], s.id).toContain(tierOf(s));
   });
 });
