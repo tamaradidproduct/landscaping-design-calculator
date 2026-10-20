@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Outline } from './outline';
-import { GROUPS, groupCounts, groupToOpen, isHidden, isLineHidden, isSymbolHidden, readOpen, type Group } from './sections';
+import { GROUPS, groupAvailable, groupCounts, groupToOpen, isHidden, isLineHidden, isSymbolHidden, readOpen, type Group } from './sections';
 
 const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, kind, name: id, pts: [], closed });
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
@@ -74,5 +74,19 @@ describe('lines section', () => {
   test('counts include the lines passed in; the section is open by default', () => {
     expect(groupCounts(Object.values(all), 2, 3).lines).toBe(3);
     expect(readOpen(null).lines).toBe(true);
+  });
+});
+
+describe('which sections show', () => {
+  const none = { outlines: 0, surfaces: 0, symbols: 0, lines: 0 }, some = { ...none, symbols: 2, lines: 1 };
+  test('Lines and Plants & objects wait for a closed plot boundary', () => {
+    expect(groupAvailable('lines', false, none)).toBe(false); expect(groupAvailable('symbols', false, none)).toBe(false);
+    expect(groupAvailable('lines', true, none)).toBe(true); expect(groupAvailable('symbols', true, none)).toBe(true);
+  });
+  test('a plan that already has lines or symbols always shows them', () => {
+    expect(groupAvailable('lines', false, some)).toBe(true); expect(groupAvailable('symbols', false, some)).toBe(true);
+  });
+  test('Surfaces (which explains itself) and Outlines always show', () => {
+    expect(groupAvailable('surfaces', false, none)).toBe(true); expect(groupAvailable('outlines', false, none)).toBe(true);
   });
 });

@@ -7,7 +7,7 @@ import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
 import { renderPlantList } from './plant-list-ui';
 import { LinesSection } from './lines-ui';
-import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
+import { groupAvailable, groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
 import type { OutlineShape } from './outline';
@@ -150,8 +150,10 @@ function updateGroups() {
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
+    const available = groupAvailable(g, tool.boundaryClosed, counts);
+    b.closest<HTMLElement>('.group-line')!.hidden = !available; // no header, eye or rows until the plot boundary is outlined
     b.setAttribute('aria-expanded', String(isOpen));
-    $(`group-${g}`).hidden = !isOpen;
+    $(`group-${g}`).hidden = !isOpen || !available;
     count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {

@@ -14,6 +14,10 @@ export const isSymbolHidden = (p: { id: string }, layers: ReadonlySet<string>, g
 export const isLineHidden = (l: { id: string }, layers: ReadonlySet<string>, groups: ReadonlySet<Group>): boolean => layers.has(l.id) || groups.has('lines');
 export const isHidden = (o: Outline, layers: ReadonlySet<string>, groups: ReadonlySet<Group>): boolean => layers.has(o.id) || groups.has(groupOf(o));
 
+/** Whether a Layers section shows at all: Lines and Plants & objects wait for a closed plot boundary (unless the plan already has some). */
+export const groupAvailable = (g: Group, boundaryClosed: boolean, counts: Record<Group, number>): boolean =>
+  (g !== 'lines' && g !== 'symbols') || boundaryClosed || counts[g] > 0;
+
 /** Layers per section for the collapsed header: Outlines = the plot boundary + features (not the plot plan). */
 export function groupCounts(outlines: Outline[], symbols = 0, lines = 0): Record<Group, number> {
   const n = { outlines: 0, surfaces: 0, symbols, lines };
