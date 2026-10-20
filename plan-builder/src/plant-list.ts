@@ -18,7 +18,7 @@ export interface PlantList {
 }
 
 export function plantList(symbols: Record<string, PlacedSymbol>, outlines: Record<string, Outline>, lines: Record<string, PlacedLine> = {}, ftPerPt: number | null = null, areas: ReadonlyMap<string, number> | null = null): PlantList {
-  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.material).map(o => o.material));
+  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.closed && o.material).map(o => o.material));
   const counts = new Map<string, number>();
   for (const s of Object.values(symbols)) if (symbolById(s.symbol)) counts.set(s.symbol, (counts.get(s.symbol) ?? 0) + 1);
   // Library order is family by family; within a family, by name (markers stay in library order: gas, electric, drainage).

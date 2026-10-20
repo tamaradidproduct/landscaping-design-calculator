@@ -68,9 +68,25 @@ try {
   check('Delete removes the fill and brings the offer back', (await fillPaths()) === 0 && !!(await page.$('[data-act=fill-plot]')) && (await sqft('Premium sod')) === null, 'gone');
   await pickFill('white-river-rock');
   check('Filling again works with another material', (await fillPaths()) >= 1 && (await sqft('White river rock')) !== null, `${await sqft('White river rock')} sq ft`);
+  // Fill into a hidden section, and after a stale hidden id: the new fill is always visible
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  await page.click('#surfaces [data-eye=fill]'); await page.waitForTimeout(200);          // hide this fill's eye (not an undo step)…
+  await undoUntil(async () => (await fillPaths()) === 0 && !!(await page.$('[data-act=fill-plot]')));   // …undo back past the fill
+  await pickFill('premium-sod');
+  check('A new fill is drawn even though an earlier one was hidden', (await fillPaths()) >= 1, `${await fillPaths()} path(s)`);
+  await page.click('#surfaces [data-act=delete]'); await page.waitForTimeout(300);
+  await page.click('[data-eye-group=surfaces]'); await page.waitForTimeout(200);          // hide the whole Surfaces section
+  await pickFill('premium-sod');
+  check('Filling while the Surfaces section is hidden shows it again', (await fillPaths()) >= 1 && (await page.$eval('[data-eye-group=surfaces]', b => b.getAttribute('aria-pressed'))) === 'true', `${await fillPaths()} path(s)`);
+  // A drag on the fill moves nothing
+  const dNow = await page.$eval('.overlay path[data-id=fill]', p => p.getAttribute('d')), boxNow = await pageBox();
+  await drag(await at(0.5, 0.6), await at(0.55, 0.65));
+  const boxAfter = await pageBox(), dAfter = await page.$eval('.overlay path[data-id=fill]', p => p.getAttribute('d'));
+  check('A drag on the fill moves nothing (the view pans, the fill stays on the lot)', boxNow.join() !== boxAfter.join() ? true : dNow === dAfter, `page moved ${boxNow.join() !== boxAfter.join()}, path same ${dNow === dAfter}`);
+  await page.click('[data-act=fit], #fit').catch(() => {});
   // Hide, reopen
   await page.keyboard.press('Escape'); await page.click('#surfaces [data-eye=fill]'); await page.waitForTimeout(250);
-  check('Hiding the fill hides it but its area still counts', (await fillPaths()) === 0 && (await sqft('White river rock')) !== null, 'not drawn; still listed');
+  check('Hiding the fill hides it but its area still counts', (await fillPaths()) === 0 && (await sqft('Premium sod')) !== null, 'not drawn; still listed');
   await page.click('#surfaces [data-eye=fill]'); await page.waitForTimeout(250);
   await page.waitForTimeout(1800);
   await page.click('#back-to-plans'); await page.locator('.plan-row').first().waitFor();
@@ -78,7 +94,7 @@ try {
   await page.locator('.plan-row .plan-open').first().click();
   await page.waitForFunction(() => { const t = document.getElementById('toast'); return !t.hidden && t.textContent.startsWith('Opened'); }, null, { timeout: 60000 });
   await page.waitForTimeout(600);
-  check('After reopening: the fill and its area are still there', (await fillPaths()) >= 1 && Math.abs((await sqft('White river rock')) - (await lotSqft())) <= 1, `fill ${await sqft('White river rock')}, lot ${await lotSqft()}`);
+  check('After reopening: the fill and its area are still there', (await fillPaths()) >= 1 && Math.abs((await sqft('Premium sod')) - (await lotSqft())) <= 1, `fill ${await sqft('Premium sod')}, lot ${await lotSqft()}`);
   await page.screenshot({ path: `${outDir}/plot-fill-end.png` });
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
 check('No page errors', errors.length === 0, errors.slice(0, 2).join(' | ') || 'none');

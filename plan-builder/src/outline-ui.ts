@@ -406,6 +406,7 @@ export class OutlineTool {
     if (!this.fillable) return;
     this.record();
     this.outlines = { ...this.outlines, [FILL_ID]: fillOutline(this.outlines[BOUNDARY]!, m) };
+    this.hiddenLayers.delete(FILL_ID); this.hiddenSections.delete('surfaces'); // a new fill is always shown (as drawing a surface does)
     this.placing = null; this.selectedSymbol = null; this.clearLines();
     this.selected = FILL_ID; this.selectedCorner = null; this.selectedEdge = null;
     this.host.toast('Plot fill added. It follows the plot boundary.');
