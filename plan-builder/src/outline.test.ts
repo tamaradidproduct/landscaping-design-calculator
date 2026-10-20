@@ -214,3 +214,20 @@ describe('stepTexScale', () => {
     expect(s).toBe(1);
   });
 });
+
+describe('the plot fill in layer order', () => {
+  const fill: Outline = { id: 'fill', kind: 'surface', name: 'Plot fill', pts: [], closed: true, base: true };
+  const o = (id: string, kind: Outline['kind']): Outline => ({ id, kind, name: id, pts: [], closed: true });
+  const all = Object.fromEntries([o('boundary', 'boundary'), o('s1', 'surface'), o('s2', 'surface'), fill].map(x => [x.id, x]));
+  const ids = ['boundary', 's1', 's2', 'fill'];
+  test('the fill cannot be moved, and no zone can be swapped with it', () => {
+    expect(moveInSection(ids, all, 'fill', -1)).toBeNull(); expect(moveInSection(ids, all, 'fill', 1)).toBeNull();
+    expect(moveInSection(ids, all, 's2', 1)).toBeNull();
+    expect(moveInSection(ids, all, 's2', -1)).toEqual(['boundary', 's2', 's1', 'fill']);
+  });
+  test('positions ignore the fill: the zone above it is last; the fill itself is first and last', () => {
+    expect(sectionPosition(ids, all, 's2')).toEqual({ first: false, last: true });
+    expect(sectionPosition(ids, all, 's1')).toEqual({ first: true, last: false });
+    expect(sectionPosition(ids, all, 'fill')).toEqual({ first: true, last: true });
+  });
+});
