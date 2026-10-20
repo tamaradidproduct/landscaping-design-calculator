@@ -13,6 +13,7 @@ import { linesSvgParts } from './lines-render';
 import { draftReady, draftTap } from './line-draft';
 import { clampLineWidth, lineItemById } from './line-items';
 import { FILL_ID, fillOutline, syncFill } from './plot-fill';
+import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
@@ -1181,9 +1182,18 @@ export class OutlineTool {
   }
   /** Area of a closed outline in square feet (null before the scale is set). */
   areaSqft(o: Outline) {
+    const k = this.sqftPerPt2(); return k === null ? null : areaPt2(o.pts, o.bulges) * k;
+  }
+  /** Square feet in one square page point (the stretch correction included); null until the scale is set. */
+  private sqftPerPt2(): number | null {
     const c = this.cal; if (!c) return null;
     const m = c.correction;
-    return areaPt2(o.pts, o.bulges) * Math.abs(m.a * m.d - m.b * m.c) * c.ftPerPt * c.ftPerPt;
+    return Math.abs(m.a * m.d - m.b * m.c) * c.ftPerPt * c.ftPerPt;
+  }
+  /** What each material's zones show, in square feet: clipped to the lot, with the house, features and surfaces above cut out. Null before the scale is set. */
+  surfaceAreasSqft(): Map<string, number> | null {
+    const k = this.sqftPerPt2(); if (k === null) return null;
+    return new Map([...surfaceAreasPt2(Object.values(this.outlines), this.visible)].map(([m, a]) => [m, a * k]));
   }
   /** Refit the scale to the typed lengths; tell the host when the plan's stretch correction changes. */
   private recalibrate() {

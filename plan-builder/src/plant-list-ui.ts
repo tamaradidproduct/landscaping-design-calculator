@@ -2,6 +2,7 @@
 // name, category, quantity, photo), each object (stepping stones too) and each utility marker (symbol, name, quantity).
 import { plantList, type PlantList } from './plant-list';
 import { lengthText } from './lines-ui';
+import { formatArea } from './outline';
 import { caption, esc, hint, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import type { LibrarySymbol } from './symbols';
@@ -17,10 +18,10 @@ const card = (s: LibrarySymbol, quantity: number) =>
   + `${s.photo ? `<img class="plant-photo" src="${esc(s.photo)}" alt="">` : ''}</div>`;
 
 export function renderPlantList(el: HTMLElement, tool: OutlineTool) {
-  const l = plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null);
+  const l = plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null, tool.surfaceAreasSqft());
   if (!l.surfaces.length && !l.lines.length && !l.plants.length && !l.objects.length && !l.markers.length) { el.innerHTML = hint('Placed plants and objects, lines, and the surfaces you add, appear here.'); return; }
   el.innerHTML = [
-    l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(m => `<div class="plant-surface">${swatch({ material: m.id })}<span class="plant-name">${esc(m.name)}</span></div>`).join('')}` : '',
+    l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(r => `<div class="plant-surface">${swatch({ material: r.material.id })}<span class="plant-text"><span class="plant-name">${esc(r.material.name)}</span>${r.sqft !== null ? `<span class="plant-measure">${formatArea(r.sqft)}</span>` : ''}</span></div>`).join('')}` : '',
     l.lines.length ? `${caption('Lines')}${l.lines.map(lineRow).join('')}` : '',
     l.plants.length ? `${caption('Plants')}${l.plants.map(p => card(p.symbol, p.quantity)).join('')}` : '',
     l.objects.length ? `${caption('Objects')}${l.objects.map(o => card(o.symbol, o.quantity)).join('')}` : '',
