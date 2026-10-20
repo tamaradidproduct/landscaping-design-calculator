@@ -1252,7 +1252,7 @@ export class OutlineTool {
         top += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${colorOf(o)}"/>`;
       }
       // Only the outline being drawn or edited shows its handles; the rest are just shape and name.
-      const handles = drawingThis || (!this.drawing && this.selected === o.id);
+      const handles = drawingThis || (!this.drawing && this.selected === o.id && !o.base); // the plot fill has none: its corners are the boundary's
       if (o.closed && handles) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
