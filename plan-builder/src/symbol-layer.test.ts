@@ -100,3 +100,35 @@ describe('stepRotation', () => {
     expect([stepRotation(0, -1), stepRotation(10, -1), stepRotation(15, -1), stepRotation(30, -1)]).toEqual([345, 0, 0, 15]);
   });
 });
+
+describe('automatic stacking (bottom to top: markers, objects, perennials, shrubs, trees; larger below smaller)', () => {
+  const stack = (...symbols: string[]) => { const l = new SymbolLayer(); symbols.forEach(s => l.place(s, { x: 0, y: 0 })); return l.ordered().map(p => p.symbol); };
+  test('a tree is above a shrub is above a perennial, whatever the placing order', () => {
+    const want = ['creeping-phlox', 'boxwood', 'blue-diamond-spruce'];
+    expect(stack('blue-diamond-spruce', 'boxwood', 'creeping-phlox')).toEqual(want);
+    expect(stack('creeping-phlox', 'blue-diamond-spruce', 'boxwood')).toEqual(want);
+    expect(stack('boxwood', 'creeping-phlox', 'blue-diamond-spruce')).toEqual(want);
+  });
+  test('markers are lowest, then objects, then plants', () => {
+    expect(stack('creeping-phlox', 'hot-tub', 'gas-line', 'porcelain-pavers')).toEqual(['gas-line', 'hot-tub', 'porcelain-pavers', 'creeping-phlox']);
+  });
+  test('within a tier the larger mature spread is below the smaller', () => {
+    expect(stack('blue-diamond-spruce', 'austrian-pine', 'oak')).toEqual(['oak', 'austrian-pine', 'blue-diamond-spruce']); // 60, 30, 10 ft
+  });
+  test('equal sizes keep placing order (id number, not text order)', () => {
+    const l = new SymbolLayer(); for (let i = 0; i < 11; i++) l.place('oak', { x: i, y: 0 });
+    expect(l.ordered().map(p => p.id)).toEqual(Array.from({ length: 11 }, (_, i) => `y${i + 1}`));
+  });
+  test('a tap where a tree and a perennial overlap picks the tree, even though the perennial was placed later', () => {
+    const l = new SymbolLayer(); const tree = l.place('blue-diamond-spruce', { x: 100, y: 100 }); l.place('creeping-phlox', { x: 100, y: 100 });
+    expect(l.hitTest({ x: 100, y: 100 }, () => true, 0.05, 1)).toBe(tree);
+  });
+  test('removing a symbol is reflected straight away', () => {
+    const l = new SymbolLayer(); const a = l.place('oak', { x: 0, y: 0 }); l.place('boxwood', { x: 0, y: 0 });
+    l.remove(a); expect(l.ordered().map(p => p.symbol)).toEqual(['boxwood']);
+  });
+  test('an unknown symbol id sorts as a plant of tier 3 and does not throw', () => {
+    const l = new SymbolLayer(); l.placed = { y1: { id: 'y1', symbol: 'nope', x: 0, y: 0 }, y2: { id: 'y2', symbol: 'oak', x: 0, y: 0 } };
+    expect(l.ordered().map(p => p.id)).toEqual(['y1', 'y2']);
+  });
+});

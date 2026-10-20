@@ -5,6 +5,23 @@ export type Group = 'surfaces' | 'lines' | 'symbols' | 'outlines';
 export type OpenState = Record<Group, boolean>;
 
 export const GROUPS: readonly Group[] = ['surfaces', 'lines', 'symbols', 'outlines'];
+/** The sections' order from the top of the Layers panel (and of the plan's stacking) to the bottom. */
+export const DEFAULT_SECTION_ORDER: readonly Group[] = ['symbols', 'outlines', 'lines', 'surfaces'];
+/** The order with `group` swapped with its neighbour above (-1) or below (+1); null at the ends or for an unknown group. */
+export function moveSection(order: readonly Group[], group: Group, dir: -1 | 1): Group[] | null {
+  const at = order.indexOf(group), to = at + dir;
+  if (at < 0 || to < 0 || to >= order.length) return null;
+  const next = [...order]; [next[at], next[to]] = [next[to], next[at]];
+  return next;
+}
+const GROUP_NAMES: Record<Group, string> = { symbols: 'Plants & objects', outlines: 'Outlines', lines: 'Lines', surfaces: 'Surfaces' };
+/** The label of a section's move button: "Move Lines up". */
+export const moveLabel = (g: Group, dir: -1 | 1): string => `Move ${GROUP_NAMES[g]} ${dir < 0 ? 'up' : 'down'}`;
+/** The order the plan paints in: bottom to top (the panel's order, reversed). */
+export const paintOrder = (order: readonly Group[]): Group[] => [...order].reverse();
+/** Whether a value is a section order: each of the four groups exactly once. */
+export const isSectionOrder = (v: unknown): v is Group[] =>
+  Array.isArray(v) && v.length === GROUPS.length && GROUPS.every(g => v.includes(g)) && new Set(v).size === v.length;
 export const groupOf = (o: Outline): Group => sectionOf(o.kind) === 'surfaces' ? 'surfaces' : 'outlines';
 
 /** Whether a layer is hidden: its own eye is off, or its whole section's is. A section's eye leaves each layer's own state alone. */

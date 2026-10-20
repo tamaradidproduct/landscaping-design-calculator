@@ -15,9 +15,9 @@ import { clampLineWidth, lineItemById } from './line-items';
 import { FILL_ID, fillOutline, syncFill } from './plot-fill';
 import { surfaceAreasPt2 } from './surface-area';
 import { labelFontPx, labelHaloPx } from './label-size';
-import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
+import { DEFAULT_SECTION_ORDER, groupOf, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveSection as moveInOrder, paintOrder, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
-import { symbolsSvg } from './symbols-render';
+import { symbolsSvgParts } from './symbols-render';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -119,6 +119,8 @@ export class OutlineTool {
   /** Hidden layers (by id) and sections: saved with the plan, but not undoable (like the view). */
   hiddenLayers = new Set<string>();
   hiddenSections = new Set<Group>();
+  /** The Layers sections from the top of the panel (and of the plan's stacking) to the bottom; saved with the plan. */
+  sectionOrder: Group[] = [...DEFAULT_SECTION_ORDER];
   /** Plants and objects dropped on the plan. */
   symbols = new SymbolLayer();
   /** The library symbol armed for placing (each tap drops one), or null. */
@@ -206,6 +208,7 @@ export class OutlineTool {
     this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
     this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
     this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id] || this.lines.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
+    this.sectionOrder = isSectionOrder(state.sectionOrder) ? [...state.sectionOrder] : [...DEFAULT_SECTION_ORDER];
     this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
@@ -220,9 +223,15 @@ export class OutlineTool {
     const layers = [...this.hiddenLayers].filter(id => outlines[id] || this.symbols.placed[id] || this.lines.placed[id]);
     return {
       outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined,
+      sectionOrder: this.sectionOrder.join() === DEFAULT_SECTION_ORDER.join() ? undefined : [...this.sectionOrder],
       symbols: Object.keys(this.symbols.placed).length ? structuredClone(this.symbols.placed) : undefined,
       lines: Object.keys(this.lines.placed).length ? structuredClone(this.lines.placed) : undefined,
     };
+  }
+  /** Move a Layers section up (-1) or down (+1); the plan stacks in the panel's order. Saved, not an undo step. */
+  moveSection(g: Group, dir: -1 | 1) {
+    const next = moveInOrder(this.sectionOrder, g, dir); if (!next) return;
+    this.sectionOrder = next; this.revision++; this.update();
   }
   isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
   /** Show or hide one layer; a hidden layer isn't drawn, selected, snapped to or tapped. Not an undo step. */
@@ -1239,7 +1248,6 @@ export class OutlineTool {
     // Cutting only depends on the shapes and their order, not the view: redo it only when those change.
     const key = JSON.stringify(Object.values(this.outlines).map(o => [o.id, o.closed, o.pts, o.bulges, o.radii]));
     if (key !== this.visibleKey) { this.visibleKey = key; this.visible = visibleShapes(Object.values(this.outlines)); }
-    let svg = '';
     // Paint surfaces first so outlines' strokes sit on top, and the layer being drawn or edited last of all.
     const active = this.drawing ?? this.selected, all = Object.values(this.outlines);
     // Surfaces, then the plants and objects, then the outlines; within each group the layer being edited goes last. Handles go on top of all.
@@ -1250,13 +1258,17 @@ export class OutlineTool {
       selected: this.selectedLine, selectedPoint: this.selectedLinePoint,
       draft: this.lineDraft ? { ...this.lineDraft, hover: this.hoverAt ? this.draftTarget(this.hoverAt) : null } : undefined,
     });
-    const symbolsMarkup = ln.runs + symbolsSvg({
+    const sy = symbolsSvgParts({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
       selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
-    let symbolsDone = false, top = ln.top;
+    // One block of markup per group; they are joined in the sections' order, bottom to top. Handles and hints (`top`) go over all of them.
+    const parts: Record<Group, string> = { surfaces: '', outlines: '', lines: ln.runs, symbols: sy.images };
+    // What is being drawn or edited (the outline in progress, the selected outline's dashed trace) and the plant halo and ghost paint over every block.
+    let editing = '';
+    let top = ln.top + sy.top;
     for (const o of paint) {
-      if (!symbolsDone && o.kind !== 'surface') { svg += symbolsMarkup; symbolsDone = true; }
+      const g: Group = o.kind === 'surface' ? 'surfaces' : 'outlines';
       if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
@@ -1269,9 +1281,12 @@ export class OutlineTool {
       if (shown) {
         // A finished layer shows only its visible part; selected, its whole drawn outline shows too (dashed) so
         // it's clear what is being edited.
-        if (shown.length) svg += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}${fillOf(o)}"/>`;
-        if (sel) svg += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
-      } else svg += `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}${drawingThis && o.kind === 'surface' ? ' drawing' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
+        if (shown.length) parts[g] += `<path d="${shapePath(shown, h.toScreen)}" data-id="${esc(o.id)}" class="shape ${o.kind} closed${sel ? ' selected' : ''}" style="--c:${colorOf(o)}${fillOf(o)}"/>`;
+        if (sel) editing += `<path d="${d}" class="shape ${o.kind} drawn" style="--c:${colorOf(o)}"/>`;
+      } else {
+        const markup = `<path d="${d}" class="shape ${o.kind}${o.closed ? ' closed' : ''}${sel || (drawingThis && o.kind === 'surface') ? ' selected' : ''}${drawingThis && o.kind === 'surface' ? ' drawing' : ''}" style="--c:${colorOf(o)}${o.closed ? fillOf(o) : ''}"/>`;
+        if (drawingThis) editing += markup; else parts[g] += markup; // the outline being drawn stays visible over the plants
+      }
       for (const e of [this.hoverEdge, this.selectedEdge]) {
         if (e?.id !== o.id || !o.closed) continue;
         const b = o.pts[(e.i + 1) % o.pts.length], seg = [...edgePoints(o.pts[e.i], b, o.bulges?.[e.i] ?? 0), b].map(p => h.toScreen(p));
@@ -1291,16 +1306,7 @@ export class OutlineTool {
         top += `<circle cx="${s.x}" cy="${s.y}" r="${closeTarget ? MARK.cornerClose : MARK.corner}" class="corner" style="--c:${colorOf(o)}"/>`;
       });
     }
-    if (!symbolsDone) svg += symbolsMarkup;
-    svg += top;
-    const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
-    if (fe && feo?.kind === 'surface' && feo.closed) {
-      // The end that stays put when a length is typed.
-      const s = h.toScreen(feo.pts[(fe.i + fe.fixed) % feo.pts.length]);
-      svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="fixed-end" style="--c:${colorOf(feo)}"/>`;
-    }
-    const rh = this.drag?.type === 'move' || this.drag?.type === 'side' ? null : this.roundHandlePos();
-    if (rh) svg += `<circle cx="${rh.at.x.toFixed(1)}" cy="${rh.at.y.toFixed(1)}" r="${MARK.roundHandle}" class="round-handle" style="--c:${colorOf(this.outlines[rh.id]!)}"/>`;
+    // Feature names go on top of every shape of the outlines block so overlapping features stay readable.
     for (const o of Object.values(this.outlines)) {
       // Feature names go on top of every shape so overlapping features stay readable, inside each one's visible
       // part. Surfaces carry no label: their fill says what they are, and the row names them.
@@ -1309,8 +1315,17 @@ export class OutlineTool {
       if (!at) continue;
       const c = h.toScreen(at);
       const fs = labelFontPx(h.pxPerPt()); // scales with the plan, within limits
-      svg += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}" style="font-size:${fs}px;stroke-width:${labelHaloPx(fs).toFixed(1)}px">${esc(o.name)}</text>`;
+      parts.outlines += `<text x="${c.x.toFixed(1)}" y="${c.y.toFixed(1)}" class="label feature${this.selected === o.id ? ' selected' : ''}" style="font-size:${fs}px;stroke-width:${labelHaloPx(fs).toFixed(1)}px">${esc(o.name)}</text>`;
     }
+    let svg = paintOrder(this.sectionOrder).map(g => parts[g]).join('') + editing + top;
+    const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
+    if (fe && feo?.kind === 'surface' && feo.closed) {
+      // The end that stays put when a length is typed.
+      const s = h.toScreen(feo.pts[(fe.i + fe.fixed) % feo.pts.length]);
+      svg += `<circle cx="${s.x}" cy="${s.y}" r="${MARK.closeRing}" class="fixed-end" style="--c:${colorOf(feo)}"/>`;
+    }
+    const rh = this.drag?.type === 'move' || this.drag?.type === 'side' ? null : this.roundHandlePos();
+    if (rh) svg += `<circle cx="${rh.at.x.toFixed(1)}" cy="${rh.at.y.toFixed(1)}" r="${MARK.roundHandle}" class="round-handle" style="--c:${colorOf(this.outlines[rh.id]!)}"/>`;
     if (this.dragAt) svg += this.renderGuides(this.dragAt);
     else if (this.drawing && this.hoverPlaced) svg += this.renderGuides(this.hoverPlaced);
     const sel = this.selectedCorner && !this.dragAt ? this.outlines[this.selectedCorner.id]?.pts[this.selectedCorner.i] : null;

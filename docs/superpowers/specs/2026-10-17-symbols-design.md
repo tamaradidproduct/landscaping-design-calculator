@@ -62,7 +62,7 @@ interface PlacedSymbol { id: string; symbol: string; x: number; y: number; rot?:
 - **Place:** pick a symbol, a ghost follows the pointer at true size, each tap places one; Done or Esc ends. Plants are circles of the mature spread (`size.w` ÷ `ftPerPt` × px per point); objects use their footprint. With no plan scale yet, a default size in page points is used (like textures), and the symbol follows zoom.
 - **Edit:** tap a symbol to select (a halo), drag to move, arrow keys nudge. The row's card shows name, **Rotate** (− / + 15° and a typed angle) and Delete. Hidden symbols can't be selected or tapped.
 - **Layers rows** are grouped by symbol ("Blue spruce × 3") with an eye per group and one on the section header. Selecting a symbol on the plan opens its group.
-- Symbols draw above surfaces and below outline strokes; no clipping.
+- Symbols draw above surfaces and below outline strokes; no clipping. *(Superseded by `2026-10-19-layering-design.md`: sections are reorderable, Plants & objects is on top by default, and symbols stack by type and size.)*
 
 ## Plant list
 

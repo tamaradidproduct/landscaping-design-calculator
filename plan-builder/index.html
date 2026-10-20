@@ -91,7 +91,9 @@
           </div>
           <div class="group-body" id="group-outlines">
             <div class="layer-list" id="outlines"></div>
-            <div class="plan-layer">
+          </div>
+          <!-- The plot plan (the PDF) is its own block below the sections, whatever their order, and stays when Outlines collapses. -->
+          <div class="plan-layer">
               <h3 class="side-subtitle">Plot plan</h3>
               <div class="layer-item">
                 <button type="button" class="icon" id="plan-visible" aria-pressed="true" aria-label="Hide the plot plan" title="Hide the plot plan">
@@ -114,7 +116,6 @@
                 <input type="range" id="plan-opacity" min="10" max="100" step="5" value="100" />
                 <span class="text-figure" id="plan-opacity-value">100%</span>
               </div>
-            </div>
           </div>
         </section>
         <details class="side-section plant-list" id="plant-list-section" open>

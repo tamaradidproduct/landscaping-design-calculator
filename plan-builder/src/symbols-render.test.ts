@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { symbolsSvg } from './symbols-render';
+import { symbolsSvg, symbolsSvgParts } from './symbols-render';
 import { symbolById } from './symbols';
 
 const base = { toScreen: (p: { x: number; y: number }) => ({ x: p.x * 2, y: p.y * 2 }), ftPerPt: 0.05, pxPerPt: 2, selected: null as string | null, shown: () => true };
@@ -45,5 +45,11 @@ describe('symbolsSvg', () => {
   test('a stepping stone draws like an object at its Figma size (2 ft)', () => {
     const svg = symbolsSvg({ ...base, ftPerPt: 0.05, pxPerPt: 2, placed: [{ id: 'y4', symbol: 'porcelain-pavers', x: 0, y: 0 }] });
     expect(svg).toContain('width="80.0"'); // 2 ft ÷ 0.05 × 2 px/pt
+  });
+  test('symbolsSvgParts keeps the images apart from the halo and the ghost, which are meant to go over everything', () => {
+    const { images, top } = symbolsSvgParts({ ...base, placed: [tub, spruce], selected: 'y1', ghost: { symbol: 'hot-tub', at: { x: 300, y: 300 } } });
+    expect(images.match(/<image /g)).toHaveLength(2); expect(images).not.toContain('symbol-halo'); expect(images).not.toContain('ghost');
+    expect(top).toContain('symbol-halo'); expect(top).toContain('class="symbol ghost"'); expect(top).not.toContain('data-id');
+    expect(symbolsSvg({ ...base, placed: [tub, spruce], selected: 'y1', ghost: { symbol: 'hot-tub', at: { x: 300, y: 300 } } })).toBe(images + top);
   });
 });

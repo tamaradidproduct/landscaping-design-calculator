@@ -131,8 +131,8 @@
 
 ### 6.10 Plants & objects ✅🔨
 - The library's **51 plants and 14 objects** (families: evergreen, deciduous and accent trees, accent, privacy and large shrubs, perennials, ground covers, ornamental grasses, other). Each has its plan-view art, a photo (plants), a category and a researched size: a plant is a circle of its **typical mature spread**, an object its footprint (long side researched, the other from the art's proportions). Every size has a source and a range in `docs/symbol-sizes.md`; ⚠️ marks approximate ones.
-- **Layers → Plants & objects** (between Surfaces and Outlines). **Add plant or object…** opens a list picker with search, then families. Picking one arms placing: **each tap drops one** at its true size until **Done** or Esc; dragging still pans.
-- A placed symbol: tap to select, drag to move, arrow keys nudge, **Rotate** (− / typed angle / +, 15° steps), **Delete**; every change undoes (a drag or a run of nudges is one step). Where symbols overlap, the last placed is on top.
+- **Layers → Plants & objects** (the top section by default; see §6.12). **Add plant or object…** opens a list picker with search, then families. Picking one arms placing: **each tap drops one** at its true size until **Done** or Esc; dragging still pans.
+- A placed symbol: tap to select, drag to move, arrow keys nudge, **Rotate** (− / typed angle / +, 15° steps), **Delete**; every change undoes (a drag or a run of nudges is one step). Where symbols overlap, they stack automatically (see §6.12), not by placing order.
 - **Rows** group by kind ("Blue Diamond Spruce × 3") with an eye per kind and one on the section header (saved with the plan, like the other eyes; hidden symbols still count in the list).
 - Saved with the plan as `symbols` (library id, position, rotation). With no plan scale yet, a symbol is 2.4 page points per foot and still follows zoom.
 - **Plant list** panel under Layers, live: surfaces used (swatch, name), plants (symbol, name, category, quantity, photo), objects (symbol, name, quantity). The water-consumption table is 📝 later.
@@ -140,7 +140,7 @@
 
 ### 6.11 Lines, stepping stones and utility markers ✅🔨
 - The rest of the library's surfaces: **5 linear items** (wood privacy fence, decorative veneer wall, Allen block retaining wall, white stone edging, dry river), **4 stepping stones** and **3 utility markers** (gas, electric, drainage). One ruling for every size read off Figma: **36 Figma px = 1 ft** (a 72 px stepping stone is 2 ft).
-- **Layers → Lines** (between Surfaces and Plants & objects). **Add line…** opens a picker with search. Picking one starts drawing: **tap a point for each corner of the run, then Done** (Enter, or double-tap the last point); Esc cancels, Backspace removes the last point; Shift holds 45°. Dragging still pans. A tap within 4 px of the last point is ignored; fewer than two distinct points saves nothing.
+- **Layers → Lines** (see §6.12 for the section order). **Add line…** opens a picker with search. Picking one starts drawing: **tap a point for each corner of the run, then Done** (Enter, or double-tap the last point); Esc cancels, Backspace removes the last point; Shift holds 45°. Dragging still pans. A tap within 4 px of the last point is ignored; fewer than two distinct points saves nothing.
 - A drawn line: tap to select, **press and drag its body to move the whole run** (like a zone or an object; one undo step; arrow keys nudge it, Shift ×10; a drag that starts off the line still pans); drag a **point** to move it, a **square** to bend that segment into an arc; tap a point then **Delete point** (never below two); **Width** (− / typed feet or inches / +, 0.25 ft steps, 0.25–12 ft); **Delete line**. Every change undoes. Default widths are the Figma stroke: 0.33 ft (fence, walls, edging), 0.55 ft (dry river).
 - A run is drawn as its item's Figma texture at **true width**, turned to follow the run (grain follows bends; the width follows zoom and calibration), with round caps except the dry river; a run is never thinner than 2 px. Lines draw above surfaces and below plants and objects.
 - **Rows** group by item ("Wood privacy fence × 3") with an eye per item and one on the section header (saved with the plan; hidden lines still count).
@@ -149,6 +149,11 @@
 - Saved with the plan as `lines` (item, points, bends, width in feet); stones and markers are `symbols`. With no plan scale a width or length uses 2.4 page points per foot and the list says "no scale".
 - **Plant list** gains **Lines** (item, total feet, runs), stepping stones under **Objects**, and **Utility markers** (quantity).
 - 📝 Later: stones repeating along a path, fence posts and gates, widths per segment, utility depth and length, snapping lines to outlines.
+
+### 6.12 Layering ✅🔨
+- **Section order:** the four Layers sections (Plants & objects, Outlines, Lines, Surfaces) can be moved up and down with ↑ ↓ buttons on each header (disabled at the ends). The panel's top-to-bottom order is the plan's stacking, top to bottom. Default: **Plants & objects, Outlines, Lines, Surfaces**, so plants and objects draw over the house outline. Saved with the plan (`sectionOrder`), not an undo step. The Plot plan block stays below the sections. What cuts what (features cut surfaces) and the surface areas do not change; **tapping** keeps its priority (plants and objects, then lines, then zones and outlines).
+- **Plants stack automatically** by type, then size, not by placing order. Bottom to top: utility markers, objects (stepping stones too), perennials / ground covers / ornamental grasses / other, shrubs, trees. Within a tier a larger mature spread sits below a smaller one; equal sizes keep placing order. A tap where a tree and a perennial overlap picks the tree. No manual Bring to front / Send to back.
+- 📝 Later: tapping that follows the section order, reordering rows inside Lines and Plants & objects.
 
 ### 6.9 Plans & sign-in ✅🔨
 - A contractor keeps **many plans, one per job/address**, and opens any of them on any of their devices.

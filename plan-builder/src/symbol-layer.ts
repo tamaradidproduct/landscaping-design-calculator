@@ -1,7 +1,7 @@
 // Placed plants and objects: where each is, how it is turned, and what a tap on the plan hits. Pure (no DOM); OutlineTool holds one,
 // so undo, saving and pointer routing stay in the tool. Page points throughout, except where a name says Px (screen).
 import type { PlacedSymbol } from './plan-model';
-import { SYMBOLS, symbolById } from './symbols';
+import { SYMBOLS, symbolById, tierOf } from './symbols';
 import type { Point } from './view';
 
 /** Page points per foot while the plan has no scale yet (24 pt for 10 ft, about 1″ = 30′ on a letter sheet). */
@@ -32,8 +32,14 @@ export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | n
 export class SymbolLayer {
   placed: Record<string, PlacedSymbol> = {};
 
-  /** The symbols bottom to top: by the number in their id (a saved map may come back in any key order). */
-  ordered(): PlacedSymbol[] { return Object.values(this.placed).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1))); }
+  /**
+   * The symbols bottom to top: by tier (markers, objects, perennials, shrubs, trees), then a larger mature spread below a smaller one,
+   * then placing order (the number in the id: a saved map may come back in any key order). Placing order alone never decides a tier.
+   */
+  ordered(): PlacedSymbol[] {
+    const key = (s: PlacedSymbol) => { const lib = symbolById(s.symbol); return { tier: lib ? tierOf(lib) : 3, size: lib ? Math.max(lib.size.w, lib.size.d) : 0, n: Number(s.id.slice(1)) }; };
+    return Object.values(this.placed).map(s => ({ s, k: key(s) })).sort((a, b) => a.k.tier - b.k.tier || b.k.size - a.k.size || a.k.n - b.k.n).map(x => x.s);
+  }
 
   /** Drop a symbol on top at a page point; returns its new id (y1, y2 …: one past the highest, so it is always on top). */
   place(symbol: string, at: Point): string {

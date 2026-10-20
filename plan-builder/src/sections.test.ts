@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Outline } from './outline';
-import { GROUPS, groupAvailable, groupCounts, groupToOpen, isHidden, isLineHidden, isSymbolHidden, readOpen, type Group } from './sections';
+import { DEFAULT_SECTION_ORDER, GROUPS, groupAvailable, groupCounts, groupToOpen, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveLabel, moveSection, paintOrder, readOpen, type Group } from './sections';
 
 const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, kind, name: id, pts: [], closed });
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
@@ -88,5 +88,38 @@ describe('which sections show', () => {
   });
   test('Surfaces (which explains itself) and Outlines always show', () => {
     expect(groupAvailable('surfaces', false, none)).toBe(true); expect(groupAvailable('outlines', false, none)).toBe(true);
+  });
+});
+
+describe('section order', () => {
+  test('default, top to bottom: Plants & objects, Outlines, Lines, Surfaces', () => {
+    expect(DEFAULT_SECTION_ORDER).toEqual(['symbols', 'outlines', 'lines', 'surfaces']);
+  });
+  test('moveSection swaps with the neighbour above or below', () => {
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'lines', -1)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'outlines', 1)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
+  });
+  test('at the ends, or for an unknown group, there is nothing to move (null)', () => {
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'symbols', -1)).toBeNull(); expect(moveSection(DEFAULT_SECTION_ORDER, 'surfaces', 1)).toBeNull();
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'nope' as Group, 1)).toBeNull();
+  });
+  test('moveSection does not change its input', () => {
+    const o = [...DEFAULT_SECTION_ORDER]; moveSection(o, 'lines', -1); expect(o).toEqual(DEFAULT_SECTION_ORDER);
+  });
+  test('paintOrder is bottom to top: the reverse', () => {
+    expect(paintOrder(DEFAULT_SECTION_ORDER)).toEqual(['surfaces', 'lines', 'outlines', 'symbols']);
+  });
+  test('isSectionOrder accepts every permutation of the four groups and nothing else', () => {
+    expect(isSectionOrder(['surfaces', 'lines', 'symbols', 'outlines'])).toBe(true); expect(isSectionOrder([...DEFAULT_SECTION_ORDER])).toBe(true);
+    expect(isSectionOrder(['symbols', 'symbols', 'lines', 'surfaces'])).toBe(false); expect(isSectionOrder(['symbols', 'outlines', 'lines'])).toBe(false);
+    expect(isSectionOrder(['symbols', 'outlines', 'lines', 'surfaces', 'x'])).toBe(false); expect(isSectionOrder(['symbols', 'outlines', 'lines', 'nope'])).toBe(false);
+    expect(isSectionOrder('symbols')).toBe(false); expect(isSectionOrder(undefined)).toBe(false);
+  });
+});
+
+describe('move button labels', () => {
+  test('say which section and which way', () => {
+    expect(moveLabel('symbols', -1)).toBe('Move Plants & objects up'); expect(moveLabel('lines', 1)).toBe('Move Lines down');
+    expect(moveLabel('outlines', -1)).toBe('Move Outlines up'); expect(moveLabel('surfaces', 1)).toBe('Move Surfaces down');
   });
 });

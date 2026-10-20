@@ -195,3 +195,5 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
 .plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
+/* A section's ↑ ↓ buttons (move it up or down the plan's stacking), smaller than the eye so the title keeps its room */
+.group-line > button.move { width: 36px; min-width: 36px; padding: 0; font-size: var(--text-base); }

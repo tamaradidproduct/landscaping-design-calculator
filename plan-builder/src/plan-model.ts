@@ -1,6 +1,6 @@
 // Pure model for a saved plan document (Firestore). No Firebase imports.
 import { TEX_SCALE, type Outline, type OutlineKind } from './outline';
-import { GROUPS, type Group } from './sections';
+import { GROUPS, isSectionOrder, type Group } from './sections';
 import { symbolById } from './symbols';
 import { LINE_WIDTH_FT, lineItemById } from './line-items';
 import type { Reference } from './scale';
@@ -12,7 +12,7 @@ export interface PdfInfo { name: string; size: number; rev: number; uploaded: bo
 export interface PlacedSymbol { id: string; symbol: string; x: number; y: number; rot?: number }
 /** A run drawn on the plan (a fence, a wall, edging, a dry river): its points (page points), a bend per segment (as an outline's bulges) and its width in feet. */
 export interface PlacedLine { id: string; item: string; points: { x: number; y: number }[]; bulges?: number[]; widthFt: number }
-export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[]; symbols?: Record<string, PlacedSymbol>; lines?: Record<string, PlacedLine> }
+export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[]; symbols?: Record<string, PlacedSymbol>; lines?: Record<string, PlacedLine>; sectionOrder?: Group[] }
 /** `archived` is absent on plans that were never archived. */
 export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; archived?: boolean }
 export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean; archived: boolean }
@@ -33,8 +33,8 @@ export function cleanAddress(raw: string): string | null {
 /** Deep copy; JSON drops `undefined` keys, which Firestore rejects. */
 const strip = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections' | 'symbols' | 'lines'>): PlanDoc =>
-  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections, symbols: state.symbols, lines: state.lines });
+export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections' | 'symbols' | 'lines' | 'sectionOrder'>): PlanDoc =>
+  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections, symbols: state.symbols, lines: state.lines, sectionOrder: state.sectionOrder });
 
 const invalid = (what: string): never => { throw new PlanFormatError('invalid', `Invalid plan: ${what}`); };
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -57,10 +57,10 @@ function checkOutline(key: string, o: unknown) {
 /** The editor's part of a document (what the tool loads), as copies. */
 export const planStateOf = (d: PlanDoc): PlanState => structuredClone({
   outlines: d.outlines, refs: d.refs,
-  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}), ...(d.lines ? { lines: d.lines } : {}),
+  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}), ...(d.lines ? { lines: d.lines } : {}), ...(d.sectionOrder ? { sectionOrder: d.sectionOrder } : {}),
 });
 
-const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols', 'lines'] as const;
+const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols', 'lines', 'sectionOrder'] as const;
 /**
  * The fields a save writes: only the editor's (a full set could clobber a newer pdf or address from another device). An
  * optional field the plan no longer has is listed in `clear`, so the stored one is removed, not left behind.
@@ -87,6 +87,7 @@ export function fromDoc(data: unknown): PlanDoc {
   if (Object.values(data.outlines).filter(o => (o as Record<string, unknown>).base).length > 1) invalid('more than one plot fill');
   if (data.hiddenLayers !== undefined && !(Array.isArray(data.hiddenLayers) && data.hiddenLayers.every(x => typeof x === 'string'))) invalid('hiddenLayers');
   if (data.hiddenSections !== undefined && !(Array.isArray(data.hiddenSections) && data.hiddenSections.every(x => GROUPS.includes(x as Group)))) invalid('hiddenSections');
+  if (data.sectionOrder !== undefined && !isSectionOrder(data.sectionOrder)) invalid('sectionOrder');
   if (data.symbols !== undefined) {
     if (!isObj(data.symbols)) return invalid('symbols');
     Object.entries(data.symbols).forEach(([k, p]) => {
