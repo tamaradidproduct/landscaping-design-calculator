@@ -198,6 +198,18 @@ export function nearestEdge(pts: Point[], p: Point, tol: number, bulges?: number
   return best;
 }
 
+/**
+ * Whether a quick repeat tap on the outline's last point should close it, instead of adding (or leaving
+ * behind) a spurious extra corner there — and whether that point must be dropped first. `recent` is whether
+ * the previous tap counts as the first half of this double-tap (close enough in time, and — for a tap that
+ * missed every existing corner — in screen position too). `addedLast` is whether that previous tap placed
+ * the point now at the end of `pts` only to signal the possible double-tap, rather than it already existing.
+ */
+export function closesOnRepeatTap(ptsLen: number, recent: boolean, addedLast: boolean): { close: boolean; popLast: boolean } {
+  if (!recent || ptsLen - (addedLast ? 1 : 0) < 3) return { close: false, popLast: false };
+  return { close: true, popLast: addedLast };
+}
+
 export const formatFeet = (ft: number) => `${ft.toFixed(2)}′`;
 export const formatArea = (sqft: number) => `${Math.round(sqft).toLocaleString('en-US')} sq ft`;
 /** ftPerPt → "1 in on paper = 40.3 ft". */

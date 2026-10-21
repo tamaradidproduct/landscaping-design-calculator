@@ -38,10 +38,10 @@ export function runPlanStoreContract(make: () => PlanStore) {
       expect(plans[0]).toMatchObject({ id, address: '12 Elm St', pdf: { rev: 1, name: 'plan.pdf', size: 4 } });
     });
 
-    it('create rejects blank address, non-PDF and oversize', async () => {
+    it('create rejects blank address, an unsupported file type and oversize', async () => {
       const s = fresh();
       expect(await inputReason(s.create('   ', pdfFile()))).toBe('address');
-      expect(await inputReason(s.create('x', pdfFile(4, 'a.png', 'image/png')))).toBe('not-pdf');
+      expect(await inputReason(s.create('x', pdfFile(4, 'a.gif', 'image/gif')))).toBe('not-pdf');
       const big = pdfFile(4);
       Object.defineProperty(big, 'size', { value: MAX_PDF_BYTES + 1 });
       expect(await inputReason(s.create('x', big))).toBe('too-big');
@@ -52,6 +52,13 @@ export function runPlanStoreContract(make: () => PlanStore) {
       const s = fresh();
       const id = await s.create('x', pdfFile(4, 'Plan.PDF', ''));
       expect(await waitForPlans(s, p => p.some(m => m.id === id))).toHaveLength(1);
+    });
+
+    it('accepts a JPG or PNG plot plan (#20)', async () => {
+      const s = fresh();
+      const jpg = await s.create('x', pdfFile(4, 'plan.jpg', 'image/jpeg'));
+      const png = await s.create('y', pdfFile(4, 'plan.png', 'image/png'));
+      expect((await waitForPlans(s, p => p.length === 2)).map(m => m.id).sort()).toEqual([jpg, png].sort());
     });
 
     it('save then load returns the state', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
+import { areaPt2, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
 import { edgeAt } from './fillet';
 
 describe('parseFeet', () => {
@@ -232,6 +232,27 @@ describe('review fixes', () => {
 describe('parseRadius', () => {
   test.each([['', 0], ['0', 0], ["0'", 0], ['2', 2], ["2' 6\"", 2.5]])('%s → %d ft', (v, ft) => expect(parseRadius(v)).toBe(ft));
   test('rejects nonsense', () => expect(parseRadius('abc')).toBeNull());
+});
+
+describe('closesOnRepeatTap (double-tap closing, #22/#24)', () => {
+  test('not a repeat tap: never closes, however many points', () => {
+    expect(closesOnRepeatTap(5, false, false)).toEqual({ close: false, popLast: false });
+    expect(closesOnRepeatTap(5, false, true)).toEqual({ close: false, popLast: false });
+  });
+  test('a repeat tap on a point the first tap only placed to signal it: closes and drops that point', () => {
+    // 4 points include the spurious one from tap 1 of the pair; 3 real corners remain once it's dropped.
+    expect(closesOnRepeatTap(4, true, true)).toEqual({ close: true, popLast: true });
+  });
+  test('too few real corners once the spurious point is dropped: does not close', () => {
+    // Only 3 points total — 2 real corners once the spurious one is dropped — can't make a closed shape.
+    expect(closesOnRepeatTap(3, true, true)).toEqual({ close: false, popLast: false });
+  });
+  test('a repeat tap directly on an already-placed corner (nothing spurious to drop): closes as-is', () => {
+    expect(closesOnRepeatTap(3, true, false)).toEqual({ close: true, popLast: false });
+  });
+  test('fewer than 3 points and nothing spurious: does not close', () => {
+    expect(closesOnRepeatTap(2, true, false)).toEqual({ close: false, popLast: false });
+  });
 });
 
 describe('stepTexScale', () => {
