@@ -1,6 +1,9 @@
 import './style.css';
 import { registerSW } from 'virtual:pwa-register';
 import { PdfClient } from './pdf-client';
+import { ImageClient } from './image-client';
+import type { PageEngine } from './page-engine';
+import { sniffPlanFileType } from './plan-store';
 import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
@@ -25,6 +28,8 @@ const stage = $('stage'), pageEl = $('page'), base = $<HTMLCanvasElement>('base'
 document.querySelector('.app')!.insertAdjacentHTML('beforeend', `<svg class="defs" aria-hidden="true" width="0" height="0"><defs>${patternDefs()}</defs><defs id="zone-defs"></defs></svg>`);
 const pdf = new PdfClient();
 pdf.warmup();
+const img = new ImageClient(); // JPG/PNG plot plans: a parallel, PDFium-free render path (#20)
+let engine: PageEngine = pdf;   // whichever of the two produced the plot plan now open
 
 let page = false;                        // a plot plan is open
 let pageSize: Size = { w: 1, h: 1 };   // PDF points
@@ -245,8 +250,13 @@ async function openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult> 
   let swapped = false; // the page state now describes the new document
   try {
     const mark = (label: string) => console.debug(`[open] ${label}: ${Math.round(performance.now() - t0)} ms`);
-    const opened = await pdf.open(bytes);
+    // Pick the engine by the bytes' own header, not the plan's saved name: works for a fresh pick
+    // and for bytes read back later (store/cache keep no separate file-type field).
+    const prev = engine, next = sniffPlanFileType(bytes) === 'application/pdf' ? pdf : img;
+    const opened = await next.open(bytes);
     if (v !== openVersion) return 'stale';
+    engine = next; // commit only once it has actually opened, same as the PDF path's own "load first"
+    if (prev === img && next !== img) img.close(); // only now that img is no longer the open plot plan
     mark('document loaded');
     pageSize = opened.pageSize;
     page = true; swapped = true;
@@ -280,11 +290,11 @@ async function renderBase() {
   const t = shown(), m = correction;
   const scale = Math.min(fitScale * dpr() * 2, 4096 / Math.max(t.w, t.h));
   const w = Math.floor(t.w * scale), h = Math.floor(t.h * scale);
-  const img = await pdf.render(w, h, [m.a * scale, m.c * scale, m.b * scale, m.d * scale, 0, 0]);
+  const pixels = await engine.render(w, h, [m.a * scale, m.c * scale, m.b * scale, m.d * scale, 0, 0]);
   if (version !== baseVersion) return;
   pageEl.style.width = `${c.w}px`; pageEl.style.height = `${c.h}px`;
   base.width = w; base.height = h;
-  base.getContext('2d')!.putImageData(img, 0, 0);
+  base.getContext('2d')!.putImageData(pixels, 0, 0);
 }
 
 // Sharp layer: only what is on screen, at full device resolution for the current zoom.
@@ -298,10 +308,10 @@ async function renderSharp() {
   const version = viewVersion, r = dpr();
   const w = Math.round(stageSize.w * r), h = Math.round(stageSize.h * r);
   const k = fitScale * view.scale * r, m = correction;
-  const img = await pdf.render(w, h, [m.a * k, m.c * k, m.b * k, m.d * k, view.x * r, view.y * r]).catch(() => null);
-  if (!img || version !== viewVersion) return; // a newer gesture moved the view
+  const pixels = await engine.render(w, h, [m.a * k, m.c * k, m.b * k, m.d * k, view.x * r, view.y * r]).catch(() => null);
+  if (!pixels || version !== viewVersion) return; // a newer gesture moved the view
   sharp.width = w; sharp.height = h;
-  sharp.getContext('2d')!.putImageData(img, 0, 0);
+  sharp.getContext('2d')!.putImageData(pixels, 0, 0);
   sharp.hidden = false;
 }
 

@@ -9,8 +9,9 @@ service firebase.storage {
 
     match /users/{uid}/plans/{planId}/plan.pdf {
       allow read, delete: if invited() && request.auth.uid == uid;
+      // A plot plan is a PDF, or (#20) a JPG/PNG rendered as a flat image layer.
       allow write: if invited() && request.auth.uid == uid
-        && request.resource.contentType == 'application/pdf'
+        && request.resource.contentType in ['application/pdf', 'image/jpeg', 'image/png']
         && request.resource.size <= 25 * 1024 * 1024;
     }
   }

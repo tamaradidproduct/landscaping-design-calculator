@@ -1,6 +1,8 @@
-// Pure logic behind the New-plan and Rename duplicate-name handling (see address-extract.test.ts for dedupeName itself).
+// Pure logic behind the New-plan and Rename duplicate-name handling (see address-extract.test.ts for dedupeName itself),
+// plus a light smoke test of the drag-and-drop helper (no DOM test harness exists in this codebase yet, so drag events
+// themselves aren't driven through jsdom).
 import { describe, expect, test } from 'vitest';
-import { activePlanNames } from './plans-ui';
+import { activePlanNames, droppedFile } from './plans-ui';
 import { dedupeName } from './address-extract';
 import type { PlanMeta } from './plan-model';
 
@@ -70,5 +72,18 @@ describe('archived plans never block a name', () => {
   test('rename: a matching archived plan is ignored', () => {
     const plans = [plan({ id: 'a', address: 'Smith residence', archived: true }), plan({ id: 'b', address: '12 Oak Ln' })];
     expect(finalName(plans, 'Smith residence', 'b')).toBe('Smith residence');
+  });
+});
+
+describe('droppedFile', () => {
+  const dataTransfer = (files: File[]) => ({ files } as unknown as DataTransfer);
+
+  test('reads the first dropped file', () => {
+    const file = new File(['%PDF-1.4'], 'plot.pdf', { type: 'application/pdf' });
+    expect(droppedFile(dataTransfer([file]))).toBe(file);
+  });
+  test('null when nothing was dropped', () => {
+    expect(droppedFile(dataTransfer([]))).toBeNull();
+    expect(droppedFile(null)).toBeNull();
   });
 });
