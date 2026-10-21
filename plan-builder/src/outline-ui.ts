@@ -888,7 +888,8 @@ export class OutlineTool {
       const before = this.dragBefore;
       this.outlines = before.outlines; this.refs = before.refs; this.symbols.placed = before.symbols; this.lines.placed = before.lines;
       if (d.type === 'corner') this.selectedCorner = before.selectedCorner;
-      if (d.type === 'line-point') this.selectedLinePoint = null; // the inserted point is gone; nothing else to restore it to
+      // An inserted point is gone (nothing to restore it to); an existing point being dragged stays selected.
+      if (d.type === 'line-point' && d.inserted) this.selectedLinePoint = null;
       this.revision++;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
