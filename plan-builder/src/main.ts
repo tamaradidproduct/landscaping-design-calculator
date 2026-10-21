@@ -148,6 +148,8 @@ function updateGroups() {
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
+  // The Plant list waits with the sections it lists: nothing but Outlines shows until the plot boundary is added.
+  $('plant-list-section').hidden = !(['surfaces', 'lines', 'symbols'] as const).some(g => groupAvailable(g, tool.boundaryClosed, counts));
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
     const available = groupAvailable(g, tool.boundaryClosed, counts);
