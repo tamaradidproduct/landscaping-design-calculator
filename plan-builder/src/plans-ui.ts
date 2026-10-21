@@ -20,6 +20,11 @@ const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
 
+/** Whether a drag carries files (not text, a reordered row, …) — the only thing `dataTransfer` exposes before 'drop'. */
+const draggingFiles = (dt: DataTransfer | null) => !!dt?.types.includes('Files');
+/** The first dropped file; `dataTransfer.files` only reads once 'drop' fires (empty during dragenter/dragover). */
+export const droppedFile = (dt: DataTransfer | null): File | null => dt?.files[0] ?? null;
+
 const panel = (html: string) => screenPanel('Plan Builder', html);
 
 export function renderLoading(root: HTMLElement): void {
@@ -88,6 +93,11 @@ export class PlansScreen {
     root.addEventListener('keydown', e => this.onKey(e));
     root.addEventListener('input', e => { if ((e.target as HTMLElement).id === 'new-address') this.userEdited = true; });
     root.addEventListener('submit', e => e.preventDefault());
+    // Drag-and-drop (desktop convenience): dropping anywhere on the page feeds the New-plan form, opening it first if needed.
+    root.addEventListener('dragenter', e => this.onDragOver(e));
+    root.addEventListener('dragover', e => this.onDragOver(e));
+    root.addEventListener('dragleave', e => this.onDragLeave(e));
+    root.addEventListener('drop', e => this.onDrop(e));
   }
 
   show(): void {
@@ -102,6 +112,7 @@ export class PlansScreen {
 
   hide(): void {
     this.root.hidden = true;
+    this.root.classList.remove('drag-over');
     this.unwatch?.(); this.unwatch = null;
     clearInterval(this.tick);
     this.closeNew();
@@ -270,6 +281,29 @@ export class PlansScreen {
   /** While the New plan form is open, a picked file is held until Create plan. */
   private armNew(): HTMLInputElement {
     return armFilePicker(file => this.pick(file));
+  }
+
+  private onDragOver(e: DragEvent) {
+    if (!draggingFiles(e.dataTransfer)) return;
+    e.preventDefault(); // lets 'drop' fire
+    e.dataTransfer!.dropEffect = 'copy';
+    this.root.classList.add('drag-over');
+  }
+
+  private onDragLeave(e: DragEvent) {
+    if (e.relatedTarget instanceof Node && this.root.contains(e.relatedTarget)) return; // still over a child
+    this.root.classList.remove('drag-over');
+  }
+
+  /** Dropped onto the open New-plan card: same as picking it there. Dropped elsewhere: open the card with it attached. */
+  private onDrop(e: DragEvent) {
+    if (!draggingFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    this.root.classList.remove('drag-over');
+    const file = droppedFile(e.dataTransfer);
+    if (!file) return;
+    if (!this.newOpen) { this.newOpen = true; this.armNew(); }
+    this.pick(file);
   }
 
   private setAddress(text: string) {
