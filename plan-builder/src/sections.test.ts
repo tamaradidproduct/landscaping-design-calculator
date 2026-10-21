@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Outline } from './outline';
-import { DEFAULT_SECTION_ORDER, GROUPS, groupAvailable, groupCounts, groupToOpen, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveLabel, moveSection, paintOrder, readOpen, type Group } from './sections';
+import { DEFAULT_SECTION_ORDER, GROUPS, groupAvailable, groupCounts, groupToOpen, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveAmong, moveLabel, moveSection, paintOrder, readOpen, type Group } from './sections';
 
 const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, kind, name: id, pts: [], closed });
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
@@ -121,5 +121,24 @@ describe('move button labels', () => {
   test('say which section and which way', () => {
     expect(moveLabel('symbols', -1)).toBe('Move Plants & objects up'); expect(moveLabel('lines', 1)).toBe('Move Lines down');
     expect(moveLabel('outlines', -1)).toBe('Move Outlines up'); expect(moveLabel('surfaces', 1)).toBe('Move Surfaces down');
+  });
+});
+
+describe('moving among the sections that are showing', () => {
+  const order = DEFAULT_SECTION_ORDER; // symbols, lines, surfaces, outlines
+  test('with every section showing it is moveSection', () => {
+    expect(moveAmong(order, 'surfaces', -1, [...order])).toEqual(moveSection(order, 'surfaces', -1));
+  });
+  test('a hidden section is skipped: Outlines moves up past Lines and Plants & objects to swap with Surfaces', () => {
+    const showing: Group[] = ['surfaces', 'outlines']; // no boundary yet: Lines and Plants & objects are not shown
+    expect(moveAmong(order, 'outlines', -1, showing)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
+    expect(moveAmong(order, 'surfaces', 1, showing)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
+  });
+  test('the top showing section cannot move up, the bottom one cannot move down (null), even with hidden ones beyond', () => {
+    const showing: Group[] = ['surfaces', 'outlines'];
+    expect(moveAmong(order, 'surfaces', -1, showing)).toBeNull(); expect(moveAmong(order, 'outlines', 1, showing)).toBeNull();
+  });
+  test('a section that is not showing, or the only one showing, has nothing to swap with', () => {
+    expect(moveAmong(order, 'lines', 1, ['surfaces', 'outlines'])).toBeNull(); expect(moveAmong(order, 'surfaces', 1, ['surfaces'])).toBeNull();
   });
 });

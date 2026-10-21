@@ -7,7 +7,7 @@ import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
 import { renderPlantList } from './plant-list-ui';
 import { LinesSection } from './lines-ui';
-import { groupAvailable, groupCounts, groupToOpen, moveLabel, moveSection as moveInOrder, readOpen, type Group } from './sections';
+import { groupAvailable, groupCounts, groupToOpen, moveAmong, moveLabel, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
 import type { OutlineShape } from './outline';
@@ -144,11 +144,17 @@ document.querySelectorAll<HTMLElement>('.group-line').forEach(line => {
   const g = line.querySelector<HTMLElement>('.group-head')!.dataset.group as Group, eye = line.querySelector('[data-eye-group]');
   for (const dir of [-1, 1] as const) {
     const b = Object.assign(document.createElement('button'), { type: 'button', className: 'icon move', textContent: dir < 0 ? '↑' : '↓' });
-    b.dataset.moveGroup = g; b.dataset.dir = String(dir); b.onclick = () => tool.moveSection(g, dir);
+    b.dataset.moveGroup = g; b.dataset.dir = String(dir); b.onclick = () => tool.moveSection(g, dir, showingGroups());
     line.insertBefore(b, eye);
   }
 });
+/** The sections the panel is showing now (Lines and Plants & objects wait for a closed plot boundary). */
+const showingGroups = (): Group[] => {
+  const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
+  return tool.sectionOrder.filter(g => groupAvailable(g, tool.boundaryClosed, counts));
+};
 function applySectionOrder() {
+  const showing = showingGroups();
   const was = document.activeElement as HTMLElement | null;
   let ref: Element | null = document.querySelector('.layers .side-title');
   for (const g of tool.sectionOrder) {
@@ -159,7 +165,7 @@ function applySectionOrder() {
     ref = body;
     for (const dir of [-1, 1] as const) {
       const b = line.querySelector<HTMLButtonElement>(`[data-move-group=${g}][data-dir="${dir}"]`)!;
-      b.disabled = moveInOrder(tool.sectionOrder, g, dir) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
+      b.disabled = moveAmong(tool.sectionOrder, g, dir, showing) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
     }
   }
   // A button that was moved lost the focus: give it back (a move button that is now at an end passes it to its pair).

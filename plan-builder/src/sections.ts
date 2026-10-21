@@ -17,6 +17,16 @@ export function moveSection(order: readonly Group[], group: Group, dir: -1 | 1):
 const GROUP_NAMES: Record<Group, string> = { symbols: 'Plants & objects', outlines: 'Outlines', lines: 'Lines', surfaces: 'Surfaces' };
 /** The label of a section's move button: "Move Lines up". */
 export const moveLabel = (g: Group, dir: -1 | 1): string => `Move ${GROUP_NAMES[g]} ${dir < 0 ? 'up' : 'down'}`;
+/** Like moveSection, but over the sections that are showing: it swaps with the nearest showing one in that direction, skipping any hidden between. */
+export function moveAmong(order: readonly Group[], group: Group, dir: -1 | 1, showing: readonly Group[]): Group[] | null {
+  const at = order.indexOf(group); if (at < 0 || !showing.includes(group)) return null;
+  for (let i = at + dir; i >= 0 && i < order.length; i += dir) {
+    if (!showing.includes(order[i])) continue;
+    const next = [...order]; [next[at], next[i]] = [next[i], next[at]];
+    return next;
+  }
+  return null;
+}
 /** The order the plan paints in: bottom to top (the panel's order, reversed). */
 export const paintOrder = (order: readonly Group[]): Group[] => [...order].reverse();
 /** Whether a value is a section order: each of the four groups exactly once. */

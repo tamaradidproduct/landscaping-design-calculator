@@ -15,7 +15,7 @@ import { clampLineWidth, lineItemById } from './line-items';
 import { FILL_ID, fillOutline, syncFill } from './plot-fill';
 import { surfaceAreasPt2 } from './surface-area';
 import { labelFontPx, labelHaloPx } from './label-size';
-import { DEFAULT_SECTION_ORDER, groupOf, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveSection as moveInOrder, paintOrder, type Group } from './sections';
+import { DEFAULT_SECTION_ORDER, groupOf, isHidden, isLineHidden, isSectionOrder, isSymbolHidden, moveAmong, paintOrder, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvgParts } from './symbols-render';
 import { symbolById } from './symbols';
@@ -229,8 +229,8 @@ export class OutlineTool {
     };
   }
   /** Move a Layers section up (-1) or down (+1); the plan stacks in the panel's order. Saved, not an undo step. */
-  moveSection(g: Group, dir: -1 | 1) {
-    const next = moveInOrder(this.sectionOrder, g, dir); if (!next) return;
+  moveSection(g: Group, dir: -1 | 1, showing: readonly Group[] = this.sectionOrder) {
+    const next = moveAmong(this.sectionOrder, g, dir, showing); if (!next) return;
     this.sectionOrder = next; this.revision++; this.update();
   }
   isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
