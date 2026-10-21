@@ -1,7 +1,7 @@
 // Drawn lines (fence, walls, edging, dry river): their points, bends and widths, and what a tap on the plan hits. Pure (no DOM);
 // OutlineTool holds one, so undo, saving and pointer routing stay in the tool. Page points throughout, except where a name says Px.
 import { clampLineWidth, LINE_ITEMS } from './line-items';
-import { dist, edgeLengthPt, outlinePath } from './outline';
+import { dist, edgeLengthPt, insertCorner, outlinePath } from './outline';
 import type { PlacedLine } from './plan-model';
 import { UNSCALED_FT_PT } from './symbol-layer';
 import type { Point } from './view';
@@ -55,6 +55,15 @@ export class LineLayer {
       if (l.bulges.every(b => b === 0)) delete l.bulges;
     }
     return true;
+  }
+  /** Insert a point splitting segment `seg` at fraction t (0 < t < 1, default its middle): a bent segment splits
+   * into two that still match its curve. Returns the new point's index, or null if `seg` is out of range. */
+  insertPoint(id: string, seg: number, t = 0.5): number | null {
+    const l = this.placed[id]; if (!l || seg < 0 || seg >= l.points.length - 1) return null;
+    const { pts, bulges } = insertCorner(l.points, l.bulges, seg, t);
+    l.points = pts;
+    l.bulges = bulges?.every(b => b === 0) ? undefined : bulges;
+    return seg + 1;
   }
   /** Bend segment `seg` (the arc's rise over its chord, as an outline's bulge); 0 everywhere clears them. */
   setBulge(id: string, seg: number, h: number) {

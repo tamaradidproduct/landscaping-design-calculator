@@ -52,11 +52,26 @@ function run(l: PlacedLine, o: LinesSvgOptions): string {
 
 const polyline = (pts: Point[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${f(p.x)} ${f(p.y)}`).join(' ');
 
+/** A rough "inside" reference point for offHandle: the average of the run's own points. */
+const avgPoint = (pts: Point[]): Point => pts.reduce((s, p) => ({ x: s.x + p.x / pts.length, y: s.y + p.y / pts.length }), { x: 0, y: 0 });
+/** An insert-point "+" off segment a→b at its midpoint `mid`, away from reference point `ref`, so it never
+ * sits on top of the bend handle (which sits on the segment itself — see outline-ui.ts's own copy of this). */
+function offHandle(a: Point, b: Point, mid: Point, ref: Point): Point {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const sign = (mid.x - ref.x) * nx + (mid.y - ref.y) * ny >= 0 ? 1 : -1;
+  return { x: mid.x + nx * MARK.insertOffset * sign, y: mid.y + ny * MARK.insertOffset * sign };
+}
+
 function handles(l: PlacedLine, o: LinesSvgOptions): string {
   let svg = `<path d="${polyline(linePathPt(l).map(o.toScreen))}" class="line-halo" style="stroke-width:${f(widthPx(l.widthFt, o) + 8)}px"/>`;
+  const ref = o.toScreen(avgPoint(l.points));
   for (let i = 0; i + 1 < l.points.length; i++) {
     const m = o.toScreen(edgeMid(l.points, i, l.bulges)), bent = !!l.bulges?.[i];
     svg += `<rect data-bend="${i}" x="${f(m.x - MARK.bendHandle / 2)}" y="${f(m.y - MARK.bendHandle / 2)}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle line-bend${bent ? ' bent' : ''}" style="--c:var(--color-accent)"/>`;
+    // The segment's own "+": tap to insert a point there.
+    const ip = offHandle(o.toScreen(l.points[i]), o.toScreen(l.points[i + 1]), m, ref), k = MARK.insertHandle * 0.6;
+    svg += `<g data-insert="${i}" class="insert-handle" style="--c:var(--color-accent)"><circle cx="${f(ip.x)}" cy="${f(ip.y)}" r="${MARK.insertHandle}"/><path d="M${f(ip.x - k)} ${f(ip.y)}H${f(ip.x + k)}M${f(ip.x)} ${f(ip.y - k)}V${f(ip.y + k)}"/></g>`;
   }
   l.points.forEach((p, i) => {
     const s = o.toScreen(p);

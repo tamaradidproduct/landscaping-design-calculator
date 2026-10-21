@@ -2,7 +2,7 @@
 import type { Point } from './view';
 import type { MaterialId } from './materials';
 import { cornerRound } from './shape-edit';
-import { edgeBetween } from './fillet';
+import { edgeAt, edgeBetween } from './fillet';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -113,6 +113,34 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
   const out: Point[] = [];
   for (let k = 0; k < samples; k++) { const ang = a0 + dir * theta * k / samples; out.push({ x: center.x + r * Math.cos(ang), y: center.y + r * Math.sin(ang) }); }
   return out;
+}
+
+/**
+ * Splitting edge a→b (bulge h) at fraction t (0 < t < 1) into two: the new corner, and the two edges' bulges,
+ * chosen so each sub-edge's own arc is part of the original circle — the split shows no kink. A straight edge
+ * (h ≈ 0) splits into two straight edges at the lerp point.
+ */
+export function splitEdge(a: Point, b: Point, h: number, t: number): { point: Point; h1: number; h2: number } {
+  if (Math.abs(h) < 1e-9) return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, h1: 0, h2: 0 };
+  const point = edgeAt(a, b, h, t);
+  // Each sub-edge's own arc midpoint (at half its own fraction of the original arc) sits exactly on the original
+  // circle, so the bulge that reconstructs it from the sub-chord is exact: no visible kink at `point`.
+  const mid1 = edgeAt(a, b, h, t / 2), mid2 = edgeAt(a, b, h, t + (1 - t) / 2);
+  return { point, h1: bulgeToward(a, point, mid1), h2: bulgeToward(point, b, mid2) };
+}
+
+/**
+ * Insert a corner splitting edge i (pts[i] → pts[(i+1) % n], bulge bulges[i]) at fraction t (0 < t < 1): works on
+ * an open run (a line) or a closed ring (an outline/zone) alike, since edge i never wraps for an open run's last
+ * point. A bent edge splits into two edges whose combined shape still matches the original curve.
+ */
+export function insertCorner(pts: Point[], bulges: number[] | undefined, i: number, t: number): { pts: Point[]; bulges: number[] | undefined } {
+  const n = pts.length, a = pts[i], b = pts[(i + 1) % n], h = bulges?.[i] ?? 0;
+  const { point, h1, h2 } = splitEdge(a, b, h, t);
+  const newPts = [...pts.slice(0, i + 1), point, ...pts.slice(i + 1)];
+  if (!bulges) return { pts: newPts, bulges: undefined };
+  const newBulges = [...bulges]; newBulges.splice(i, 1, h1, h2);
+  return { pts: newPts, bulges: newBulges };
 }
 
 /**
