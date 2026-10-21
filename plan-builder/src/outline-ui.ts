@@ -191,6 +191,7 @@ export class OutlineTool {
   private restore(s: Snapshot) {
     this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
     this.selected = s.selected; this.replaced = s.replaced;
+    if (s.drawing && this.outlines[s.drawing]) this.shape = this.shapePrefs[shapeGroup(this.outlines[s.drawing].kind)]; // a drawing resumed by undo or redo gets its kind's tool
     this.symbols.placed = s.symbols; if (this.selectedSymbol && !s.symbols[this.selectedSymbol]) this.selectedSymbol = null;
     this.lines.placed = s.lines; this.lineDraft = null; this.lastLineTap = null;
     if (this.selectedLine && !s.lines[this.selectedLine]) { this.selectedLine = null; this.selectedLinePoint = null; }
@@ -917,7 +918,7 @@ export class OutlineTool {
   }
   /** Switch between drawing corner by corner and dragging a rectangle; an outline already started starts over (undoable). */
   setShape(shape: OutlineShape) {
-    if (shape === this.shape) return;
+    if (!this.drawing || shape === this.shape) return; // only what is being drawn has a drawing tool to switch (and to remember)
     const o = this.current();
     if (o?.pts.length) { this.record(); o.pts = []; this.selectedCorner = null; this.lastTap = null; }
     this.shape = shape; this.dragAt = null; this.hoverPlaced = null;
@@ -944,7 +945,7 @@ export class OutlineTool {
   /** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
   layerPosition(id: string) { return sectionPosition(Object.keys(this.outlines), this.outlines, id); }
   /** True while a finished outline has a corner, edge or feature selected. */
-  get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
+  get selecting() { return (this.selected !== null && !this.outlines[this.selected]?.base) || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
   deselect() {
     if (!this.selectedEdge && !this.selectedCorner && !this.selected && !this.selectedSymbol && !this.selectedLine) return;

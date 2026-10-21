@@ -164,12 +164,16 @@ function applySectionOrder() {
     if (!b.disabled) b.focus(); else b.closest('.group-line')?.querySelector<HTMLButtonElement>(`[data-move-group]:not(:disabled)`)?.focus();
   }
 }
+let activeSymbol: string | null = null; // the plant or object being placed or selected — the Plants & objects section opens when it changes
 let activeLine: string | null = null; // the line being drawn (its item) or selected — the Lines section opens when it changes
 function updateGroups() {
   const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
   activeLayer = next;
   const line = tool.lineDraft ? tool.lineDraft.item : tool.selectedLine, lineChanged = line !== null && line !== activeLine;
   activeLine = line;
+  const symbol = tool.placing ?? tool.selectedSymbol, symbolChanged = symbol !== null && symbol !== activeSymbol;
+  activeSymbol = symbol;
+  if (symbolChanged && !groupsOpen.symbols) { setGroupOpen('symbols', true); return; }
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
   applySectionOrder();
@@ -224,6 +228,7 @@ $('redo').onclick = () => tool.redo();
 // Freehand for outlines and Rectangle for surfaces). X switches.
 tool.shapePrefs = loadShapes(k => localStorage.getItem(k));
 const pickShape = (shape: OutlineShape) => {
+  if (!tool.drawing) return; // the choice belongs to what is being drawn: nothing is remembered (or changed) otherwise
   tool.setShape(shape);
   try { localStorage.setItem(shapeKey(shapeGroup(tool.editingKind)), shape); } catch { /* storage blocked */ }
 };
@@ -231,7 +236,7 @@ $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => {
   b.onclick = () => pickShape(b.dataset.shape === 'rect' ? 'rect' : 'freehand');
 });
 window.addEventListener('keydown', e => {
-  if (e.key.toLowerCase() !== 'x' || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea')) return;
+  if (e.key.toLowerCase() !== 'x' || e.metaKey || e.ctrlKey || e.altKey || (e.target as HTMLElement).closest('input, textarea') || !tool.drawing) return;
   e.preventDefault(); pickShape(tool.shape === 'rect' ? 'freehand' : 'rect');
 });
 

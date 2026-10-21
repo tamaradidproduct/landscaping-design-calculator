@@ -1,5 +1,5 @@
 // Collapsible Layers sections on Riesberg: collapsed headers show counts (Outlines = boundary + features, not the
-// plot plan); the plot plan collapses with Outlines; selecting a layer on the plan opens its section; the state
+// plot plan); the plot plan block stays when a section collapses; selecting a layer on the plan opens its section; the state
 // survives a reload.
 // Usage: node scripts/check-collapse.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
