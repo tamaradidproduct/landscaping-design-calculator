@@ -1,0 +1,22 @@
+# Plan Builder: inserting a point on an existing outline (2026-10-21)
+
+Issue: [#26](https://github.com/tamaradidproduct/landscaping-design-calculator/issues/26) — "Allow adding additional points to an existing outline." A corner count was fixed once an outline closed; the only ways to add geometry were redrawing from scratch or bending an edge into a curve.
+
+## Thread
+- **Interaction with curves** — does inserting a point on an already-bent edge (`bulges[i] !== 0`) split the arc in two, or only work on straight edges? → **Split in two**: the new corner sits on the original arc, and each half keeps its own bulge from that point forward, chosen so the two halves together still trace the original curve exactly (no visible kink at the new corner).
+- **Which outlines** — plot boundary, features, and surfaces all share `Outline.pts`/`bulges` (`src/outline.ts`); lines (`src/line-layer.ts`) have their own `PlacedLine.points`/`bulges`. Does the feature apply to all of them? → **Yes — all outlines, surfaces, and lines.**
+
+## Decisions
+- **The curve-split math is one pure helper, shared by both editors.** `splitEdge(a, b, h, t)` (`src/outline.ts`) finds the point at fraction `t` of edge a→b (bulge `h`) and the two bulges either side of it. It reuses `edgeAt` from `src/fillet.ts` (the same arc math `cornerFillet` already relies on) to find the split point and each half's own arc-midpoint, then `bulgeToward` (already in `outline.ts`) to turn those into the two new bulges. Because both midpoints sit on the *original* circle, the reconstructed halves are exact — not an approximation — so there's no kink. `insertCorner(pts, bulges, i, t)` wraps `splitEdge` to splice the new point and bulges into a points/bulges array; it works unchanged on a closed ring (an outline, edge `i` may wrap) or an open run (a line, edge `i` never wraps).
+- **One `insertCorner` call, two call sites.** Outlines/zones call it directly on `Outline.pts`/`bulges` (`OutlineTool`, `src/outline-ui.ts`) and also splice a `0` into `radii` at the new corner (surfaces only — a new corner starts sharp) and shift/drop any typed edge-length reference (`refs`) past the split. `LineLayer.insertPoint(id, seg, t)` (`src/line-layer.ts`) wraps the same call for `PlacedLine.points`/`bulges`. The two editors' hit-testing and drag gestures stayed separate (they already were, for every other handle) — only the curve math is shared.
+- **A new, distinct handle, not the bend handle.** The bend-handle square already means "drag to curve this edge." Reusing its hit target for "split this edge" would make one gesture do two unrelated things depending on timing. Instead, a small "+" sits off the edge (away from the shape, `MARK.insertOffset` px clear of the bend handle), at the same spot an edge's bend handle occupies but never overlapping its hit circle. Tapping it inserts the corner at the edge's middle and immediately starts dragging it — sliding it to where it's wanted is the same motion as moving any other corner.
+- **One undo step**, insert-then-drag together: the corner is created at pointer-down (so a plain tap already changed the outline/line), and the drag that may follow is the ordinary corner/point drag. The existing `Drag` union gained an optional `inserted` flag (on the `corner` and `line-point` variants) so `pointerUp`/`cancelPointer` push exactly one history entry — covering the insert and any immediate reposition — instead of two, and so a second-finger cancel mid-gesture removes the new point cleanly.
+- **Snapping is unchanged**: the point lands at the edge's exact middle on creation (not the tap location, which is off the edge by design), then any further drag goes through the same `resolve()`/`placeAt()` (outlines) that every other corner uses, so it snaps like any placed point.
+
+## Build rulings
+- Insert handles are drawn only on the selected, finished outline/zone (same scope as the bend handle) and on the selected line's segments; never while drawing.
+- A split edge drops its own typed reference length (it no longer refers to one edge) and shifts later references' edge indices by one — the same rule a redrawn outline already applies to stale references.
+- Hover tips ("Tap to add a corner here") and the edge popover / line card hints mention the new "+" alongside the existing curve and move hints.
+
+## Later
+- 📝 Letting the insert land exactly under the tap (rather than always the edge's middle) if contractors want finer placement than drag-after-insert gives.

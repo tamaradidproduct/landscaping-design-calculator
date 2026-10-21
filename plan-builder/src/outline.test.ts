@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, stepTexScale, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
+import { edgeAt } from './fillet';
+import { MARK } from './overlay-tokens';
 
 describe('parseFeet', () => {
   test.each([
@@ -89,6 +91,40 @@ describe('curved edges (bend)', () => {
     expect(p[0].x).toBeCloseTo(0, 9); expect(p[0].y).toBeCloseTo(0, 9);
     expect(p.at(-1)!.x).toBeCloseTo(2, 9);
     expect(Math.max(...p.map(q => Math.abs(q.y)))).toBeCloseTo(1, 2);
+  });
+});
+
+describe('splitEdge / insertCorner (inserting a new corner on an edge)', () => {
+  test('a straight edge splits into two straight edges at the lerp point', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 };
+    const { point, h1, h2 } = splitEdge(a, b, 0, 0.3);
+    expect(point).toEqual({ x: 3, y: 0 }); expect(h1).toBe(0); expect(h2).toBe(0);
+  });
+  test('a bent edge splits into two arcs that together trace the original curve, with no kink at the split', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, h = bulgeToward(a, b, { x: 5, y: 4 }), t = 0.35;
+    const { point, h1, h2 } = splitEdge(a, b, h, t);
+    // Every point of the first sub-edge (reparametrised 0..1) matches the corresponding point of the original arc up to t…
+    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
+      const onOriginal = edgeAt(a, b, h, t * s), onSub = edgeAt(a, point, h1, s);
+      expect(onSub.x).toBeCloseTo(onOriginal.x, 9); expect(onSub.y).toBeCloseTo(onOriginal.y, 9);
+    }
+    // …and the second sub-edge matches the rest of it, so the join at `point` shows no kink.
+    for (const s of [0, 0.25, 0.5, 0.75, 1]) {
+      const onOriginal = edgeAt(a, b, h, t + (1 - t) * s), onSub = edgeAt(point, b, h2, s);
+      expect(onSub.x).toBeCloseTo(onOriginal.x, 9); expect(onSub.y).toBeCloseTo(onOriginal.y, 9);
+    }
+  });
+  test('insertCorner splits a closed outline\'s edge, dropping its own bulge in two and shifting later edges along', () => {
+    const square = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+    const { pts, bulges } = insertCorner(square, [0, 0, 5, 0], 0, 0.5); // edge 0 (straight) splits; edge 2 is bent
+    expect(pts).toEqual([{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }]);
+    expect(bulges).toEqual([0, 0, 0, 5, 0]); // edge 2's bulge is now at index 3
+  });
+  test('insertCorner works the same on an open run (a line): the edge never wraps', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+    const { pts: np, bulges } = insertCorner(pts, undefined, 1, 0.5);
+    expect(np).toEqual([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 5 }, { x: 10, y: 10 }]);
+    expect(bulges).toBeUndefined();
   });
 });
 
@@ -233,5 +269,67 @@ describe('stepTexScale', () => {
   test('does not drift over repeated presses', () => {
     let s = 1; for (let i = 0; i < 5; i++) s = stepTexScale(s, 1); for (let i = 0; i < 5; i++) s = stepTexScale(s, -1);
     expect(s).toBe(1);
+  });
+});
+
+describe('avgPoint', () => {
+  test('returns origin for empty points', () => {
+    expect(avgPoint([])).toEqual({ x: 0, y: 0 });
+  });
+
+  test('single point returns that point', () => {
+    expect(avgPoint([{ x: 12, y: 34 }])).toEqual({ x: 12, y: 34 });
+  });
+
+  test('average of multiple points computes centroid', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+    expect(avgPoint(pts)).toEqual({ x: 5, y: 5 });
+  });
+
+  test('average of a triangle', () => {
+    const triangle = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 0, y: 9 }];
+    expect(avgPoint(triangle)).toEqual({ x: 2, y: 3 });
+  });
+});
+
+describe('offHandle', () => {
+  test('offsets outward away from the reference point for a horizontal edge', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, mid = { x: 5, y: 0 };
+    // Reference point below the edge (y = -10): offset pushes handle upward (+y) away from ref
+    const posAbove = offHandle(a, b, mid, { x: 5, y: -10 }, 20);
+    expect(posAbove.x).toBeCloseTo(5);
+    expect(posAbove.y).toBeCloseTo(20);
+
+    // Reference point above the edge (y = 10): offset pushes handle downward (-y) away from ref
+    const posBelow = offHandle(a, b, mid, { x: 5, y: 10 }, 20);
+    expect(posBelow.x).toBeCloseTo(5);
+    expect(posBelow.y).toBeCloseTo(-20);
+  });
+
+  test('offsets outward away from reference point for a vertical edge', () => {
+    const a = { x: 0, y: 0 }, b = { x: 0, y: 10 }, mid = { x: 0, y: 5 };
+    // Reference point to the right (x = 10): offset pushes handle leftward (-x) away from ref
+    const posLeft = offHandle(a, b, mid, { x: 10, y: 5 }, 15);
+    expect(posLeft.x).toBeCloseTo(-15);
+    expect(posLeft.y).toBeCloseTo(5);
+
+    // Reference point to the left (x = -10): offset pushes handle rightward (+x) away from ref
+    const posRight = offHandle(a, b, mid, { x: -10, y: 5 }, 15);
+    expect(posRight.x).toBeCloseTo(15);
+    expect(posRight.y).toBeCloseTo(5);
+  });
+
+  test('uses MARK.insertOffset by default', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, mid = { x: 5, y: 0 };
+    const pos = offHandle(a, b, mid, { x: 5, y: -10 });
+    expect(pos.x).toBeCloseTo(5);
+    expect(pos.y).toBeCloseTo(MARK.insertOffset);
+  });
+
+  test('handles zero-length edge without NaN', () => {
+    const a = { x: 5, y: 5 }, b = { x: 5, y: 5 }, mid = { x: 5, y: 5 };
+    const pos = offHandle(a, b, mid, { x: 0, y: 0 });
+    expect(Number.isNaN(pos.x)).toBe(false);
+    expect(Number.isNaN(pos.y)).toBe(false);
   });
 });

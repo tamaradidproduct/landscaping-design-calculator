@@ -48,12 +48,21 @@ describe('linesSvg', () => {
   test('hidden lines are not drawn', () => {
     expect(linesSvg(base([make('wood-privacy-fence', [P(0, 0), P(100, 0)], 1)], { shown: () => false }))).toBe('');
   });
-  test('selected: a halo, point handles and bend handles; unselected draws none of them', () => {
+  test('selected: a halo, point handles, bend handles and insert-point handles; unselected draws none of them', () => {
     const line = make('wood-privacy-fence', [P(0, 0), P(100, 0), P(100, 50)], 1);
     const plain = linesSvg(base([line])), sel = linesSvg(base([line], { selected: 'l1', selectedPoint: 1 }));
     expect(plain).not.toContain('line-halo'); expect(plain).not.toContain('data-point');
     expect(sel).toContain('line-halo'); expect(sel.match(/data-point="/g)).toHaveLength(3); expect(sel.match(/data-bend="/g)).toHaveLength(2);
+    expect(sel.match(/data-insert="/g)).toHaveLength(2); // one per segment, same as the bend handles
     expect(sel.match(/line-point selected/g)).toHaveLength(1);
+  });
+  test('an insert-point handle sits off the segment, clear of its bend handle', () => {
+    const line = make('wood-privacy-fence', [P(0, 0), P(100, 0)], 1);
+    const sel = linesSvg(base([line], { selected: 'l1', selectedPoint: null }));
+    const bend = /x="(-?[\d.]+)" y="(-?[\d.]+)" width="10" height="10"/.exec(sel)!;
+    const insert = /<g data-insert="0"[^>]*><circle cx="(-?[\d.]+)" cy="(-?[\d.]+)"/.exec(sel)!;
+    const bx = Number(bend[1]) + 5, by = Number(bend[2]) + 5, ix = Number(insert[1]), iy = Number(insert[2]);
+    expect(Math.hypot(ix - bx, iy - by)).toBeGreaterThan(15); // clear of the bend handle's own hit area
   });
   test('a draft is drawn dashed with a rubber band to the pointer', () => {
     const svg = linesSvg(base([], { draft: { item: 'wood-privacy-fence', points: [P(0, 0), P(50, 0)], widthFt: 1, hover: P(50, 40) } }));

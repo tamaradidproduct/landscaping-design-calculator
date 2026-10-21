@@ -1,8 +1,8 @@
 // Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  areaPt2, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
-  edgeTapOrder, moveInSection, nearestOnRing, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
+  areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
+  edgeTapOrder, moveInSection, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -55,7 +55,9 @@ const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
   | { type: 'place'; finger: Point; start: Point; touch: boolean; offsetY: number; rectStart?: boolean }
-  | { type: 'corner'; id: string; i: number; grab: Point; moved: boolean }
+  // `inserted`: this corner was just created by tapping the insert-point "+" (see insertHandleAt): the
+  // resulting corner is one undo step whether or not it's then dragged, unlike an ordinary corner press.
+  | { type: 'corner'; id: string; i: number; grab: Point; moved: boolean; inserted?: boolean }
   | { type: 'bend'; id: string; i: number; grab: Point; moved: boolean }
   // Surfaces only: move the whole zone, push one side, or round a corner (screen points from the press).
   | { type: 'move'; id: string; start: Point; before: Point[]; moved: boolean }
@@ -64,7 +66,8 @@ type Drag =
   // A placed symbol being moved (the press in screen px, and where the symbol was in page points).
   | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean }
   // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
-  | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean }
+  // `inserted`: see the outline corner's own flag above.
+  | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean; inserted?: boolean }
   | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean };
 
 export class OutlineTool {
@@ -353,14 +356,17 @@ export class OutlineTool {
   private lineAt(screen: Point): string | null {
     return this.lines.hitTest(this.host.toPage(screen), this.lineShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
   }
-  /** The selected line's point or bend handle under a press: points win, being the finer target. */
-  private lineHandleAt(p: Point): { kind: 'point' | 'bend'; i: number } | null {
+  /** The selected line's point, bend handle or insert-point "+" under a press: points win, being the finer target. */
+  private lineHandleAt(p: Point): { kind: 'point' | 'bend' | 'insert'; i: number } | null {
     const l = this.selectedLine ? this.lines.placed[this.selectedLine] : null; if (!l) return null;
-    let best: { kind: 'point' | 'bend'; i: number } | null = null, bd: number = HIT.corner;
+    let best: { kind: 'point' | 'bend' | 'insert'; i: number } | null = null, bd: number = HIT.corner;
     l.points.forEach((q, i) => { const d = dist(this.host.toScreen(q), p); if (d < bd) { bd = d; best = { kind: 'point', i }; } });
     if (best) return best;
     bd = HIT.bend;
     for (let i = 0; i + 1 < l.points.length; i++) { const d = dist(this.host.toScreen(edgeMid(l.points, i, l.bulges)), p); if (d < bd) { bd = d; best = { kind: 'bend', i }; } }
+    if (best) return best;
+    bd = HIT.insert;
+    for (let i = 0; i + 1 < l.points.length; i++) { const d = dist(this.lineInsertHandlePos(l, i), p); if (d < bd) { bd = d; best = { kind: 'insert', i }; } }
     return best;
   }
   private visibilityChanged() {
@@ -498,6 +504,29 @@ export class OutlineTool {
       this.dragBefore = this.snapshot();
       return true;
     }
+    // Tapping the "+" inserts a corner there (at the edge's middle) and grabs it immediately, so sliding it
+    // off to one side is the same gesture as moving any other corner. One undo step either way (see `inserted`).
+    const insert = this.drawing ? null : this.insertHandleAt(p);
+    if (insert) {
+      this.dragBefore = this.snapshot();
+      const o = this.outlines[insert.id]!;
+      const { pts, bulges } = insertCorner(o.pts, o.bulges, insert.i, 0.5);
+      o.pts = pts; o.bulges = bulges;
+      if (o.radii) { const nr = [...o.radii]; nr.splice(insert.i + 1, 0, 0); o.radii = nr; }
+      this.refs = this.refs.filter(r => !(r.id === insert.id && r.i === insert.i))
+        .map(r => r.id === insert.id && r.i > insert.i ? { ...r, i: r.i + 1 } : r);
+      // The split edge's own popover (if open) no longer refers to one whole edge; an edge further along shifts too.
+      if (this.selectedEdge?.id === insert.id) {
+        const se = this.selectedEdge;
+        this.selectedEdge = se.i === insert.i ? null : { ...se, i: se.i > insert.i ? se.i + 1 : se.i };
+      }
+      const i = insert.i + 1;
+      this.selectedCorner = { id: insert.id, i };
+      const s = this.host.toScreen(o.pts[i]);
+      this.drag = { type: 'corner', id: insert.id, i, grab: { x: s.x - p.x, y: s.y - p.y }, moved: false, inserted: true };
+      this.rawAt = s; this.dragAt = s; this.snapped = null; this.showMagnifier(); this.render();
+      return true;
+    }
     const hit = this.cornerAt(p);
     if (hit) {
       const s = this.host.toScreen(this.outlines[hit.id]!.pts[hit.i]);
@@ -519,6 +548,15 @@ export class OutlineTool {
     const lh = !this.drawing && this.selectedLine ? this.lineHandleAt(p) : null;
     if (lh && this.selectedLine) {
       const l = this.lines.placed[this.selectedLine];
+      if (lh.kind === 'insert') {
+        this.dragBefore = this.snapshot();
+        const i = this.lines.insertPoint(l.id, lh.i, 0.5);
+        if (i === null) return false; // shouldn't happen: lh.i came from a valid segment
+        this.selectedLinePoint = i;
+        this.drag = { type: 'line-point', id: l.id, i, start: p, before: { ...l.points[i] }, moved: false, inserted: true };
+        this.render();
+        return true;
+      }
       this.drag = lh.kind === 'point'
         ? { type: 'line-point', id: l.id, i: lh.i, start: p, before: { ...l.points[lh.i] }, moved: false }
         : { type: 'line-bend', id: l.id, i: lh.i, start: p, moved: false };
@@ -772,7 +810,8 @@ export class OutlineTool {
     this.magnifier.hidden = true;
     if (!d) return;
     if (d.type === 'line-point' || d.type === 'line-bend') {
-      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
+      // An inserted point is one undo step whether or not it's then dragged (it already changed the line).
+      if ((d.moved || (d.type === 'line-point' && d.inserted)) && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       else if (d.type === 'line-point') this.selectedLinePoint = this.selectedLinePoint === d.i ? null : d.i; // a tap selects (or drops) the point
       this.dragBefore = null; this.update(); return;
     }
@@ -809,7 +848,8 @@ export class OutlineTool {
           this.close(); return;
         }
       }
-      if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
+      // An inserted corner is one undo step whether or not it's then dragged (it already changed the outline).
+      if ((d.moved || d.inserted) && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       // A plain tap on the last corner doesn't close it yet, but is stamped so a quick repeat tap can.
       else if (tapped && d.i === o.pts.length - 1) this.lastTap = { t: now, finger: this.dragAt ?? { x: 0, y: 0 }, added: false };
       this.dragBefore = null;
@@ -855,10 +895,16 @@ export class OutlineTool {
     clearTimeout(this.holdTimer); this.downFinger = null; this.bypassHold = false;
     // A rectangle's first corner, placed by the finger that turned out to be the start of a pinch: take it back.
     if (this.drag?.type === 'place' && this.drag.rectStart) { this.current()?.pts.pop(); this.revision++; }
-    if (this.drag && this.drag.type !== 'place' && this.drag.moved && this.dragBefore) {
-      // Put a corner or bend back where it was before the accidental drag.
+    const d = this.drag;
+    // An inserted corner/point already changed the outline or line at pointerDown, even before any drag.
+    const inserted = !!d && ((d.type === 'corner' || d.type === 'line-point') && d.inserted);
+    if (d && d.type !== 'place' && (d.moved || inserted) && this.dragBefore) {
+      // Put a corner or bend back where it was before the accidental drag (or drop the inserted one).
       const before = this.dragBefore;
       this.outlines = before.outlines; this.refs = before.refs; this.symbols.placed = before.symbols; this.lines.placed = before.lines;
+      if (d.type === 'corner') this.selectedCorner = before.selectedCorner;
+      // An inserted point is gone (nothing to restore it to); an existing point being dragged stays selected.
+      if (d.type === 'line-point' && d.inserted) this.selectedLinePoint = null;
       this.revision++;
     }
     this.dragBefore = null; this.stick = null; this.snapped = null; this.angle = null;
@@ -967,6 +1013,7 @@ export class OutlineTool {
     const o = this.selectedZone; if (!o) return null;
     if (this.roundHandleAt(p)) return { label: 'Drag to round the corner', cursor: 'grab' };
     if (this.cornerAt(p)?.id === o.id) return { label: 'Drag to move the corner', cursor: 'grab' };
+    if (this.insertHandleAt(p)?.id === o.id) return { label: 'Tap to add a corner here', cursor: 'copy' };
     if (this.bendHandleAt(p)?.id === o.id) return { label: 'Drag to curve the side', cursor: 'grab' };
     const i = this.zoneSideAt(o, p);
     if (i !== null) {
@@ -981,6 +1028,7 @@ export class OutlineTool {
   private bendTipAt(p: Point): { label: string; cursor: string } | null {
     const sel = this.selected && !this.drawing ? this.outlines[this.selected] : undefined;
     if (!sel?.closed || sel.kind === 'surface') return null;
+    if (this.insertHandleAt(p)?.id === sel.id) return { label: 'Tap to add a corner here', cursor: 'copy' };
     return this.bendHandleAt(p)?.id === sel.id ? { label: 'Drag to curve the side', cursor: 'grab' } : null;
   }
   /** The side of a surface whose drawn straight part is under p (screen); curved sides use their whole arc. */
@@ -1024,6 +1072,28 @@ export class OutlineTool {
       o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
+  }
+  /** Where edge i's insert-point "+" sits (screen): off the edge, away from the shape, so it never sits on
+   * top of the bend-handle square (which sits on the edge itself — a different gesture, a different target). */
+  private insertHandlePos(o: Outline, i: number): Point {
+    const n = o.pts.length, a = this.host.toScreen(o.pts[i]), b = this.host.toScreen(o.pts[(i + 1) % n]);
+    const mid = this.host.toScreen(edgeMid(o.pts, i, o.bulges));
+    return offHandle(a, b, mid, this.host.toScreen(avgPoint(o.pts)));
+  }
+  /** The selected outline's insert-point handle under p, if any (any kind: boundary, feature or surface). */
+  private insertHandleAt(p: Point): { id: string; i: number } | null {
+    let best: { id: string; i: number } | null = null, bd: number = HIT.insert;
+    for (const o of Object.values(this.outlines)) {
+      if (!o?.closed || o.id !== this.selected) continue;
+      o.pts.forEach((_, i) => { const d = dist(this.insertHandlePos(o, i), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
+    }
+    return best;
+  }
+  /** Where segment i's insert-point "+" sits on the selected line (screen), off the run the same way. */
+  private lineInsertHandlePos(l: PlacedLine, i: number): Point {
+    const a = this.host.toScreen(l.points[i]), b = this.host.toScreen(l.points[i + 1]);
+    const mid = this.host.toScreen(edgeMid(l.points, i, l.bulges));
+    return offHandle(a, b, mid, this.host.toScreen(avgPoint(l.points)));
   }
   private cornerAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd: number = HIT.corner;
@@ -1246,6 +1316,9 @@ export class OutlineTool {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
         top += `<rect x="${m.x - MARK.bendHandle / 2}" y="${m.y - MARK.bendHandle / 2}" width="${MARK.bendHandle}" height="${MARK.bendHandle}" rx="${MARK.bendHandleRadius}" class="bend-handle${bent ? ' bent' : ''}" style="--c:${colorOf(o)}"/>`;
+        // The edge's own "+": tap to insert a corner there (off the edge, clear of the bend handle above).
+        const ip = this.insertHandlePos(o, i), k = MARK.insertHandle * 0.6;
+        top += `<g class="insert-handle" style="--c:${colorOf(o)}"><circle cx="${ip.x.toFixed(1)}" cy="${ip.y.toFixed(1)}" r="${MARK.insertHandle}"/><path d="M${(ip.x - k).toFixed(1)} ${ip.y.toFixed(1)}H${(ip.x + k).toFixed(1)}M${ip.x.toFixed(1)} ${(ip.y - k).toFixed(1)}V${(ip.y + k).toFixed(1)}"/></g>`;
       });
       if (handles) o.pts.forEach((p, i) => {
         const s = h.toScreen(p);
@@ -1378,7 +1451,7 @@ export class OutlineTool {
     this.popover.innerHTML = `
       ${cardHead(`${esc(o.name)} edge`)}
       ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
-      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it.')}
+      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it, or tap the + to add a corner.')}
       ${formStack(`
         ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { readonly: true, placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
         ${numericKeypad()}

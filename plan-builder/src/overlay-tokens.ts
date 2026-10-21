@@ -22,6 +22,8 @@ export const MARK = {
   guideSpan: 100000,    // rectangle tool: the guides run this far each way (the plan clips them)
   roundHandle: 8,       // surfaces: radius of the round-corner handle on the selected corner's bisector
   roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
+  insertHandle: 7,      // "+" mark that inserts a new corner on an edge
+  insertOffset: 22,     // …its distance off the edge (screen px): clear of the bend-handle square sitting on the edge itself
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;
@@ -34,6 +36,7 @@ export const HIT = {
   corner: 24,           // a corner dot
   edge: 16,             // an edge (tap to see or type its length)
   bend: 20,             // an edge's middle square
+  insert: 18,           // the "+" that inserts a new corner on an edge (finger-sized; floats clear of the bend handle)
   zoneCorner: 14,       // a selected surface's corner dot (tighter, so its sides and round handle stay reachable)
   zoneSide: 10,         // the drawn straight part of a selected surface's side (push it)
   roundHandle: 18,      // the round handle on a sharp corner (finger-sized; it floats clear of the corner dot and the sides)
