@@ -41,3 +41,23 @@ export function fileNameToTitle(fileName: string): string {
 export function suggestName(parts: { typed: string; extracted: string | null; fileName: string }): string {
   return cleanAddress(parts.typed) ?? cleanAddress(parts.extracted ?? '') ?? (cleanAddress(fileNameToTitle(parts.fileName)) ?? UNTITLED);
 }
+
+const SEQ_SUFFIX = /\s+\((\d+)\)$/;
+/** Splits off a name's trailing " (n)" sequence number: "Smith residence (2)" -> base "Smith residence", n 2; unnumbered -> n 1. */
+function splitSequence(name: string): { base: string; n: number } {
+  const m = SEQ_SUFFIX.exec(name);
+  return m ? { base: name.slice(0, m.index), n: Number(m[1]) } : { base: name, n: 1 };
+}
+
+/**
+ * When `name` exactly matches (trim + case-insensitive) one of `existing`, returns it with the next sequence number
+ * appended — past any of `existing` already numbered with the same base — and `duplicate: true`. Otherwise returns
+ * `name` unchanged and `duplicate: false`.
+ */
+export function dedupeName(name: string, existing: string[]): { name: string; duplicate: boolean } {
+  const norm = (s: string) => s.trim().toLowerCase();
+  if (!existing.some(e => norm(e) === norm(name))) return { name, duplicate: false };
+  const base = splitSequence(name).base, baseNorm = norm(base);
+  const max = existing.reduce((m, e) => norm(splitSequence(e).base) === baseNorm ? Math.max(m, splitSequence(e).n) : m, 1);
+  return { name: `${base} (${max + 1})`, duplicate: true };
+}

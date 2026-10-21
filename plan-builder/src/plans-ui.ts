@@ -1,6 +1,6 @@
 // Screens outside the editor: Sign-in, Not invited, and Plans (list + New plan form).
 import { SignInError, type AuthGate } from './auth';
-import { extractAddress, fileNameToTitle, suggestName } from './address-extract';
+import { dedupeName, extractAddress, fileNameToTitle, suggestName } from './address-extract';
 import { cleanAddress, editedAgo, type PlanMeta } from './plan-model';
 import { checkPdf, PlanInputError, type PlanStore } from './plan-store';
 import { button, card, emptyNote, error, esc, field, formStack, hint, input, listRow, row, screenPanel, screenText, splitRow } from './ui';
@@ -19,6 +19,13 @@ const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
   'device-storage': "Couldn't keep this PDF on the device. Connect to the internet and try again.",
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
+
+/** The active (non-archived) plans' names to dedupe a new or renamed name against; `excludeId` leaves out the plan being renamed. */
+export function activePlanNames(plans: PlanMeta[], excludeId?: string): string[] {
+  return plans.filter(p => !p.archived && p.id !== excludeId).map(p => p.address);
+}
+
+const duplicateNotice = (name: string) => `A plan named "${name}" already exists. Numbered this one so you can tell them apart.`;
 
 const panel = (html: string) => screenPanel('Plan Builder', html);
 
@@ -257,9 +264,11 @@ export class PlansScreen {
     const clean = cleanAddress(el.value);
     const msg = el.parentElement!.querySelector<HTMLElement>('.text-error')!;
     if (!clean) { msg.textContent = INPUT_MESSAGES.address; msg.hidden = false; return; }
+    const { name, duplicate } = dedupeName(clean, activePlanNames(this.plans, id));
+    if (duplicate) { msg.textContent = duplicateNotice(clean); msg.hidden = false; }
     this.inline = null;
     try {
-      await this.store.rename(id, clean);
+      await this.store.rename(id, name);
     } catch (err) {
       if (err instanceof PlanInputError) { this.inline = { kind: 'rename', id }; this.render(); return; }
       this.opts.onError?.(err as Error, 'save');
@@ -307,9 +316,11 @@ export class PlansScreen {
     const file = this.picked;
     if (!this.newOpen || this.creating || !file) return;
     const typed = this.root.querySelector<HTMLInputElement>('#new-address')?.value ?? '';
-    this.creating = true; this.newError = ''; this.render();
+    const suggested = suggestName({ typed, extracted: this.extracted, fileName: file.name });
+    const { name, duplicate } = dedupeName(suggested, activePlanNames(this.plans));
+    this.creating = true; this.newError = duplicate ? duplicateNotice(suggested) : ''; this.render();
     try {
-      const id = await this.store.create(suggestName({ typed, extracted: this.extracted, fileName: file.name }), file);
+      const id = await this.store.create(name, file);
       this.closeNew();
       this.opts.onOpen(id);
     } catch (err) {

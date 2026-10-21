@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { extractAddress, fileNameToTitle, suggestName, UNTITLED } from './address-extract';
+import { dedupeName, extractAddress, fileNameToTitle, suggestName, UNTITLED } from './address-extract';
 
 describe('extractAddress', () => {
   test('full one-line address', () => {
@@ -81,5 +81,27 @@ describe('suggestName', () => {
   test('untitled last resort', () => {
     expect(suggestName({ typed: '', extracted: null, fileName: '.pdf' })).toBe('Untitled plan');
     expect(UNTITLED).toBe('Untitled plan');
+  });
+});
+
+describe('dedupeName', () => {
+  test('no match: name passes through unchanged', () => {
+    expect(dedupeName('12 Oak Ln', ['34 Elm St'])).toEqual({ name: '12 Oak Ln', duplicate: false });
+    expect(dedupeName('12 Oak Ln', [])).toEqual({ name: '12 Oak Ln', duplicate: false });
+  });
+  test('exact match (trim + case-insensitive) gets " (2)"', () => {
+    expect(dedupeName('Smith residence', ['Smith residence'])).toEqual({ name: 'Smith residence (2)', duplicate: true });
+    expect(dedupeName('SMITH RESIDENCE', ['Smith residence'])).toEqual({ name: 'SMITH RESIDENCE (2)', duplicate: true });
+    expect(dedupeName('  Smith residence  ', ['Smith residence'])).toEqual({ name: '  Smith residence   (2)', duplicate: true });
+  });
+  test('skips past already-numbered duplicates', () => {
+    expect(dedupeName('Smith residence', ['Smith residence', 'Smith residence (2)'])).toEqual({ name: 'Smith residence (3)', duplicate: true });
+    expect(dedupeName('Smith residence', ['Smith residence (2)', 'Smith residence (5)', 'Smith residence'])).toEqual({ name: 'Smith residence (6)', duplicate: true });
+  });
+  test('matching an already-numbered name bumps past the highest used for that base', () => {
+    expect(dedupeName('Smith residence (2)', ['Smith residence', 'Smith residence (2)'])).toEqual({ name: 'Smith residence (3)', duplicate: true });
+  });
+  test('a different base with a similar number is not confused for the same series', () => {
+    expect(dedupeName('Jones residence', ['Jones residence', 'Smith residence (2)'])).toEqual({ name: 'Jones residence (2)', duplicate: true });
   });
 });
