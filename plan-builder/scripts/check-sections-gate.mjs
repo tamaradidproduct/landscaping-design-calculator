@@ -15,12 +15,14 @@ const shown = g => page.$eval(`[data-group=${g}]`, b => !b.closest('.group-line'
 try {
   check('Before the boundary: only Outlines shows', (await shown('outlines')) && !(await shown('surfaces')), 'Outlines visible, Surfaces hidden');
   check('Before the boundary: Lines and Plants & objects are not shown either', !(await shown('lines')) && !(await shown('symbols')), 'headers hidden');
+  check('Before the boundary: the Plant list is not shown either', !(await page.$eval('#plant-list-section', e => e.offsetParent !== null)), 'hidden');
   check('…nor their Add buttons', !(await page.$eval('[data-act=add-line]', e => e.offsetParent !== null)) && !(await page.$eval('[data-act=add-symbol]', e => e.offsetParent !== null)), 'not visible');
   await page.click('[data-start=boundary]');
   const r = await page.evaluate(() => { const b = document.getElementById('page').getBoundingClientRect(); return [b.left, b.top, b.width, b.height]; });
   const at = (fx, fy) => [r[0] + r[2] * fx, r[1] + r[3] * fy];
   await page.mouse.move(...at(0.3, 0.3)); await page.mouse.down(); await page.mouse.move(...at(0.8, 0.8), { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(300);
   check('After the boundary is outlined: Surfaces, Lines and Plants & objects appear', (await shown('surfaces')) && (await shown('lines')) && (await shown('symbols')), 'headers visible');
+  check('After the boundary is outlined: the Plant list appears', await page.$eval('#plant-list-section', e => e.offsetParent !== null), 'visible');
   check('…with their Add buttons', await page.$eval('[data-act=add-line]', e => e.offsetParent !== null) && await page.$eval('[data-act=add-symbol]', e => e.offsetParent !== null), 'visible');
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
 check('No page errors', errors.length === 0, errors.slice(0, 2).join(' | ') || 'none');
