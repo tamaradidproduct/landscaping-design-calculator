@@ -47,6 +47,7 @@
 ### 6.1 Viewing the plan ✅🔨
 - Pick the PDF from the tablet's file picker; it stays on the device. Page 1 only (multi-page: 📝 later).
 - Opens in about a second once the app has warmed up. Rendering uses **PDFium** (WebAssembly): PDF.js took ~12 s on a real plan whose text is drawn as shapes.
+- 🔨 **JPG/PNG plot plans** (#20, first slice) are also accepted, rendered as a single flat image layer at native size/DPI through a separate, PDFium-free render path — same pinch/zoom/pan, same offline-after-first-load. No pages, no address text to extract from it (falls back to the file name). 📝 **Later:** HEIC (iPhone's own photo format) and perspective correction for a plan photographed at an angle — both separate follow-up issues.
 - Pinch/scroll-pinch zooms; one finger or two-finger trackpad drag pans; **panning is free** (not limited to the page). Double-tap zooms in / back to fit.
 - Works **offline** after the first load.
 - 🔨 **Plot plan layer** at the end of the **Outlines** section (it collapses with it): **eye** shows/hides the plan (hidden = no snapping to its lines), the **file name** with a pencil opens a different plot plan, and an **opacity** slider (10–100%). Resets to shown, 100% on opening a file. ("Open another" removed.)

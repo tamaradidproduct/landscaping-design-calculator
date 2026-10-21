@@ -143,7 +143,7 @@ export function startShell(ed: Editor): Shell {
       // Open it before saving it, so a file that won't render never replaces a working plot plan
       const opened = await ed.openBytes(await file.arrayBuffer(), plan.address);
       if (opened === 'stale' || current !== plan) return;
-      if (opened === 'failed') { toast("That file couldn't be opened as a PDF. Pick the plot plan PDF."); return; }
+      if (opened === 'failed') { toast("That file couldn't be opened. Pick a PDF, JPG or PNG plot plan."); return; }
       $('replace-confirm').hidden = true;
       try {
         await store.replacePdf(plan.id, file);
