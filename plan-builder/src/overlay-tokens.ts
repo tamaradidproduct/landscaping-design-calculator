@@ -24,8 +24,8 @@ export const MARK = {
   roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
 } as const;
 
-/** The outline names on the plan: 10 page points of text, scaled with the plan within 8–30 px; the halo is this share of the text size. */
-export const LABEL = { pt: 10, min: 8, max: 30, halo: 0.28 } as const;
+/** The outline names on the plan: 8 page points of text, scaled with the plan within 7–24 px; the halo is this share of the text size. */
+export const LABEL = { pt: 8, min: 7, max: 24, halo: 0.28 } as const;
 /** Sizes of drawn things in screen px: a line is never narrower than `lineMinWidth`; a symbol never shorter than `symbolMin` (a marker `markerMin`). */
 export const DRAWN = { lineMinWidth: 2, symbolMin: 6, markerMin: 20 } as const;
 
