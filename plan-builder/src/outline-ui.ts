@@ -1,7 +1,7 @@
 // Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
+  areaPt2, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, nearestEdge,
   edgeTapOrder, moveInSection, nearestOnRing, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
@@ -86,7 +86,8 @@ export class OutlineTool {
   private hoverCorner: number | null = null;
   /** The open edge; for a surface, `fixed` is the corner that stays put when a length is typed (0 = corner i). */
   private selectedEdge: { id: string; i: number; fixed: 0 | 1 } | null = null;
-  private lastTap: { t: number; finger: Point } | null = null;
+  /** `added` marks a tap that placed this as a new point (only to signal a possible double-tap), so closing on a repeat of it must drop it. */
+  private lastTap: { t: number; finger: Point; added: boolean } | null = null;
   /** Snapping, separately for tracing outlines (on by default) and designing surfaces (off by default). */
   private snap = { outlines: true, surfaces: false };
   /** Whether snapping is on for what is being drawn or edited now (a surface, or an outline). */
@@ -793,15 +794,24 @@ export class OutlineTool {
       this.dragBefore = null; this.dragAt = null; this.snapped = null; this.update(); return;
     }
     if (d.type === 'corner') {
-      // A tap (no drag) on a corner while drawing: the first corner closes the shape.
-      // A tap (no drag) while drawing: the first corner closes the shape; a quick second tap on the
-      // corner just placed is a double-tap, which also closes it.
+      // A tap (no drag) on a corner while drawing: the first corner closes the shape outright. A quick
+      // second tap on the last corner closes it too — whether that corner was just placed by the first
+      // half of the double-tap (it only exists to signal one, so it's dropped first) or was already there.
       const o = this.current(), now = performance.now();
       const tapped = !d.moved && o && d.id === o.id;
-      if (tapped && o.pts.length >= 3 && (d.i === 0 || (d.i === o.pts.length - 1 && this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs))) {
-        this.lastTap = null; this.dragAt = null; this.close(); return;
+      if (tapped && d.i === 0 && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
+      if (tapped) {
+        const recent = d.i === o.pts.length - 1 && !!this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs;
+        const { close: shouldClose, popLast } = closesOnRepeatTap(o.pts.length, recent, this.lastTap?.added ?? false);
+        if (shouldClose) {
+          this.lastTap = null; this.dragAt = null;
+          if (popLast) o.pts.pop();
+          this.close(); return;
+        }
       }
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
+      // A plain tap on the last corner doesn't close it yet, but is stamped so a quick repeat tap can.
+      else if (tapped && d.i === o.pts.length - 1) this.lastTap = { t: now, finger: this.dragAt ?? { x: 0, y: 0 }, added: false };
       this.dragBefore = null;
       this.dragAt = null; this.snapped = null; this.update(); return;
     }
@@ -812,12 +822,17 @@ export class OutlineTool {
       this.finishRect(this.dragAt); return;
     }
     const now = performance.now();
-    const isDouble = this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < 30;
-    if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
+    const recent = !!(this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < 30);
+    const { close: shouldClose, popLast } = closesOnRepeatTap(o.pts.length, recent, this.lastTap?.added ?? false);
+    if (shouldClose) {
+      this.lastTap = null; this.dragAt = null;
+      if (popLast) o.pts.pop(); // only placed to signal the double-tap: drop it so closing doesn't leave it behind
+      this.close(); return;
+    }
     this.record();
     o.pts.push(this.host.toPage(this.dragAt));
     this.selectedCorner = { id: o.id, i: o.pts.length - 1 };
-    this.lastTap = { t: now, finger: d.finger };
+    this.lastTap = { t: now, finger: d.finger, added: true };
     this.dragAt = null; this.snapped = null;
     this.update();
   }
