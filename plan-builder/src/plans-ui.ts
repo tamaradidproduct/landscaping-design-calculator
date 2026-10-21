@@ -2,7 +2,7 @@
 import { SignInError, type AuthGate } from './auth';
 import { extractAddress, fileNameToTitle, suggestName } from './address-extract';
 import { cleanAddress, editedAgo, type PlanMeta } from './plan-model';
-import { checkPdf, PlanInputError, type PlanStore } from './plan-store';
+import { checkPdf, isPdfFile, PlanInputError, type PlanStore } from './plan-store';
 import { button, card, emptyNote, error, esc, field, formStack, hint, input, listRow, row, screenPanel, screenText, splitRow } from './ui';
 
 /** The shared `#file` picker, reused for New plan and Replace plot plan: whoever armed it last gets the file. */
@@ -14,9 +14,9 @@ export function armFilePicker(onFile: ((file: File) => void) | null): HTMLInputE
 
 const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
   address: "Enter the job's address.",
-  'not-pdf': "That file isn't a PDF. Pick the plot plan PDF.",
-  'too-big': 'This PDF is over 25 MB. Export a smaller copy and try again.',
-  'device-storage': "Couldn't keep this PDF on the device. Connect to the internet and try again.",
+  'not-pdf': "That file isn't a PDF, JPG or PNG. Pick the plot plan file.",
+  'too-big': 'This file is over 25 MB. Export a smaller copy and try again.',
+  'device-storage': "Couldn't keep this file on the device. Connect to the internet and try again.",
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
 
@@ -151,7 +151,7 @@ export class PlansScreen {
     const create = this.newOpen
       ? formStack(`<strong>New plan</strong>`
         + field('new-address', "Job's address (optional)", input('new-address', { placeholder: '123 Main St' }))
-        + row(button(this.picked ? 'Change PDF' : 'Pick plot plan PDF', { variant: this.picked ? undefined : 'primary', id: 'new-pdf', disabled: this.creating }),
+        + row(button(this.picked ? 'Change file' : 'Pick plot plan file', { variant: this.picked ? undefined : 'primary', id: 'new-pdf', disabled: this.creating }),
           this.picked ? button(this.creating ? 'Creating…' : 'Create plan', { variant: 'primary', id: 'create-plan', disabled: this.creating }) : '',
           button('Cancel', { data: { act: 'new-cancel' } }))
         + error(esc(this.newError), !this.newError), 'new-plan card stack', true)
@@ -293,6 +293,7 @@ export class PlansScreen {
   }
 
   private async extract(file: File, seq: number) {
+    if (!isPdfFile(file)) return; // a JPG/PNG plot plan has no text to extract an address from
     try {
       const text = await this.opts.readPdfText?.(await file.arrayBuffer());
       if (seq !== this.extractSeq || !text) return;
