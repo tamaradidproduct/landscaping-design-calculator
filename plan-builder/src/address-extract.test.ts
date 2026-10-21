@@ -101,6 +101,9 @@ describe('dedupeName', () => {
   test('matching an already-numbered name bumps past the highest used for that base', () => {
     expect(dedupeName('Smith residence (2)', ['Smith residence', 'Smith residence (2)'])).toEqual({ name: 'Smith residence (3)', duplicate: true });
   });
+  test('a stray trailing space after an already-numbered name is still recognized as numbered', () => {
+    expect(dedupeName('Smith residence (2) ', ['Smith residence', 'Smith residence (2) '])).toEqual({ name: 'Smith residence (3)', duplicate: true });
+  });
   test('a different base with a similar number is not confused for the same series', () => {
     expect(dedupeName('Jones residence', ['Jones residence', 'Smith residence (2)'])).toEqual({ name: 'Jones residence (2)', duplicate: true });
   });

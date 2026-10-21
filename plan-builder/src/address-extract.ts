@@ -42,8 +42,9 @@ export function suggestName(parts: { typed: string; extracted: string | null; fi
   return cleanAddress(parts.typed) ?? cleanAddress(parts.extracted ?? '') ?? (cleanAddress(fileNameToTitle(parts.fileName)) ?? UNTITLED);
 }
 
-const SEQ_SUFFIX = /\s+\((\d+)\)$/;
-/** Splits off a name's trailing " (n)" sequence number: "Smith residence (2)" -> base "Smith residence", n 2; unnumbered -> n 1. */
+const SEQ_SUFFIX = /\s+\((\d+)\)\s*$/;
+/** Splits off a name's trailing " (n)" sequence number: "Smith residence (2)" -> base "Smith residence", n 2; unnumbered -> n 1.
+ * Tolerates trailing whitespace after the ")" (e.g. a stray space left over from editing) without matching the suffix elsewhere. */
 function splitSequence(name: string): { base: string; n: number } {
   const m = SEQ_SUFFIX.exec(name);
   return m ? { base: name.slice(0, m.index), n: Number(m[1]) } : { base: name, n: 1 };
@@ -58,6 +59,9 @@ export function dedupeName(name: string, existing: string[]): { name: string; du
   const norm = (s: string) => s.trim().toLowerCase();
   if (!existing.some(e => norm(e) === norm(name))) return { name, duplicate: false };
   const base = splitSequence(name).base, baseNorm = norm(base);
-  const max = existing.reduce((m, e) => norm(splitSequence(e).base) === baseNorm ? Math.max(m, splitSequence(e).n) : m, 1);
+  const max = existing.reduce((m, e) => {
+    const seq = splitSequence(e);
+    return norm(seq.base) === baseNorm ? Math.max(m, seq.n) : m;
+  }, 1);
   return { name: `${base} (${max + 1})`, duplicate: true };
 }
