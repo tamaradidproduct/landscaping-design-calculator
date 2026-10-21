@@ -21,7 +21,7 @@ const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
 
 /** Whether a drag carries files (not text, a reordered row, …) — the only thing `dataTransfer` exposes before 'drop'. */
-const draggingFiles = (dt: DataTransfer | null) => !!dt?.types.includes('Files');
+const draggingFiles = (dt: DataTransfer | null) => !!dt?.types && Array.from(dt.types).includes('Files');
 /** The first dropped file; `dataTransfer.files` only reads once 'drop' fires (empty during dragenter/dragover). */
 export const droppedFile = (dt: DataTransfer | null): File | null => dt?.files[0] ?? null;
 
