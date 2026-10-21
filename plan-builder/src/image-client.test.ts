@@ -76,4 +76,35 @@ describe('ImageClient', () => {
     await expect(c.open(new ArrayBuffer(8))).rejects.toThrow('bad image');
     await expect(c.render(5, 5, [1, 0, 0, 1, 0, 0])).resolves.toBeDefined();
   });
+
+  it('close() releases the bitmap; render() afterward throws like nothing was ever opened', async () => {
+    const bitmap = new FakeBitmap(10, 10);
+    createImageBitmap.mockResolvedValue(bitmap);
+    const c = new ImageClient();
+    await c.open(new ArrayBuffer(8));
+    c.close();
+    expect(bitmap.closed).toBe(true);
+    await expect(c.render(5, 5, [1, 0, 0, 1, 0, 0])).rejects.toThrow('No image open');
+  });
+
+  it('render() reuses the same canvas across calls instead of allocating a new one each time', async () => {
+    createImageBitmap.mockResolvedValue(new FakeBitmap(10, 10));
+    const c = new ImageClient();
+    await c.open(new ArrayBuffer(8));
+    await c.render(100, 50, [1, 0, 0, 1, 0, 0]);
+    const first = FakeCanvas.last;
+    await c.render(20, 20, [1, 0, 0, 1, 0, 0]);
+    expect(FakeCanvas.last).toBe(first); // no new canvas constructed
+    expect(first.width).toBe(20);
+    expect(first.height).toBe(20);
+  });
+
+  it('render() clamps zero-sized dimensions to 1×1 instead of throwing (a 0×0 canvas would throw)', async () => {
+    createImageBitmap.mockResolvedValue(new FakeBitmap(10, 10));
+    const c = new ImageClient();
+    await c.open(new ArrayBuffer(8));
+    const result = await c.render(0, 0, [1, 0, 0, 1, 0, 0]);
+    expect(FakeCanvas.last.width).toBe(1); expect(FakeCanvas.last.height).toBe(1);
+    expect(result).toEqual({ sentinel: 'image-data', x: 0, y: 0, w: 1, h: 1 });
+  });
 });

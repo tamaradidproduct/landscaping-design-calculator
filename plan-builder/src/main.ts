@@ -252,10 +252,11 @@ async function openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult> 
     const mark = (label: string) => console.debug(`[open] ${label}: ${Math.round(performance.now() - t0)} ms`);
     // Pick the engine by the bytes' own header, not the plan's saved name: works for a fresh pick
     // and for bytes read back later (store/cache keep no separate file-type field).
-    const next = sniffPlanFileType(bytes) === 'application/pdf' ? pdf : img;
+    const prev = engine, next = sniffPlanFileType(bytes) === 'application/pdf' ? pdf : img;
     const opened = await next.open(bytes);
     if (v !== openVersion) return 'stale';
     engine = next; // commit only once it has actually opened, same as the PDF path's own "load first"
+    if (prev === img && next !== img) img.close(); // only now that img is no longer the open plot plan
     mark('document loaded');
     pageSize = opened.pageSize;
     page = true; swapped = true;

@@ -55,7 +55,7 @@ export function checkPdf(file: File): void {
  * `type`): used once only `getPdf()`'s raw bytes are in hand, with no File object alongside them.
  */
 export function sniffPlanFileType(bytes: ArrayBuffer): 'application/pdf' | 'image/jpeg' | 'image/png' {
-  const head = new Uint8Array(bytes.slice(0, 8));
+  const head = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 8));
   if (head[0] === 0xff && head[1] === 0xd8) return 'image/jpeg';
   if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return 'image/png';
   return 'application/pdf';
