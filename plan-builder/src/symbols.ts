@@ -4,11 +4,7 @@
 import { SYMBOL_SOURCES } from '../scripts/symbol-sources.mjs';
 import { SYMBOL_SIZES } from '../scripts/symbol-sizes.mjs';
 import aspects from './assets/symbols/symbols.json';
-
-/** Figma px per foot: the Figma library draws a 72 px stepping stone, which is 2 ft. Sizes read off Figma (stones, markers, line widths) use it. */
-export const FIGMA_PX_PER_FT = 36;
-/** A utility marker is drawn at least this long on screen, so a 1 ft marker stays visible and tappable at plan zoom. */
-const MARKER_MIN_PX = 20;
+import { DRAWN } from './overlay-tokens';
 
 export interface LibrarySymbol {
   id: string; name: string; kind: 'plant' | 'object' | 'marker'; family: string; category: string;
@@ -39,7 +35,7 @@ export const SYMBOLS: readonly LibrarySymbol[] = SYMBOL_SOURCES.map(s => {
     id: s.id, name: s.name, kind: s.kind, family: s.family, category: s.category,
     art: art[`./assets/symbols/${s.id}.webp`], thumb: thumbs[`./assets/symbols/thumbs/${s.id}.webp`],
     ...(s.kind === 'plant' ? { photo: photos[`./assets/symbols/photos/${s.id}.webp`] } : {}),
-    ...(s.kind === 'marker' ? { minPx: MARKER_MIN_PX } : {}),
+    ...(s.kind === 'marker' ? { minPx: DRAWN.markerMin } : {}),
     size, artAspect, sizeSource: { url: z.url, note: z.note, ...(z.approximate ? { approximate: true as const } : {}) },
   };
 });

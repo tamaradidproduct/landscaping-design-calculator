@@ -3,19 +3,16 @@
 // into a card with its length, Width, Delete point and Delete line.
 import { stepLineWidth, lineItemById, searchLineItems, type LineItem } from './line-items';
 import { lineLengthFt } from './line-layer';
-import { parseFeet } from './outline';
+import { formatLengthFt, parseFeet } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, esc, hint, input, layerCard, layerForm, layerRow, row, suggestRow, swatch } from './ui';
+import { button, hint, input, layerCard, layerForm, layerRow, pickerRow as pickerRowOf, row, searchPicker, suggestRow, wireSearchPicker } from './ui';
 
-const pickerRow = (i: LineItem) => button(`${swatch({ symbol: i.thumb })}<span class="layer-name">${esc(i.name)}</span>`, { mods: ['layer-row'], data: { 'line-item': i.id } });
+const pickerRow = (i: LineItem) => pickerRowOf(i.thumb, i.name, { 'line-item': i.id });
 /** The picker's list for a query: a row per item, or a note when nothing matches. */
 export function linePickerList(query: string): string {
   const found = searchLineItems(query);
   return found.length ? `<div class="layer-list symbol-list">${found.map(pickerRow).join('')}</div>` : hint('No line matches.');
 }
-
-/** A run's length for the card and the list: feet to one decimal, or "no scale" until the plan has one. */
-export const lengthText = (ft: number | null): string => ft === null ? 'no scale' : `${Math.round(ft * 10) / 10} ft`;
 
 export class LinesSection {
   private picking = false;   // the picker for a new line is open
@@ -39,7 +36,7 @@ export class LinesSection {
           button('Done', { mods: ['compact'], data: { act: 'finish-line' } }), button('Cancel', { mods: ['compact'], data: { act: 'cancel-line' } }))}` }) : ''}
       ${rows.join('')}${sel ? this.card(sel.id) : ''}
       ${drafting ? '' : this.picking
-        ? layerForm(`${input('line-search', { placeholder: 'Search lines', ariaLabel: 'Search lines', value: this.query })}<div id="line-results">${linePickerList(this.query)}</div>${button('Cancel', { mods: ['compact'], data: { act: 'cancel-line-picker' } })}`)
+        ? layerForm(`${searchPicker('line', 'Search lines', this.query, linePickerList(this.query))}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-line-picker' } })}`)
         : suggestRow('Add line…', { act: 'add-line' })}`;
     this.wire(sel?.id ?? null);
   }
@@ -49,7 +46,7 @@ export class LinesSection {
     const t = this.tool, l = t.lines.placed[id], lib = lineItemById(l.item)!;
     const canDeletePoint = t.selectedLinePoint !== null && l.points.length > 2;
     return layerCard({
-      id, swatch: { symbol: lib.thumb }, name: lib.name, sub: lengthText(lineLengthFt(l, t.cal?.ftPerPt ?? null)), done: true,
+      id, swatch: { symbol: lib.thumb }, name: lib.name, sub: formatLengthFt(lineLengthFt(l, t.cal?.ftPerPt ?? null)), done: true,
       body: `${hint('Drag a point to move it, a square to bend the run. Tap a point to select it.')}${row(
         button('−', { mods: ['icon'], ariaLabel: 'Narrower', data: { act: 'width-down' } }),
         input('line-width', { inputmode: 'decimal', value: String(l.widthFt), ariaLabel: 'Width in feet' }),
@@ -75,10 +72,7 @@ export class LinesSection {
     el.querySelector<HTMLButtonElement>('[data-act=cancel-line-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     el.querySelector<HTMLButtonElement>('[data-act=finish-line]')?.addEventListener('click', () => t.finishLine());
     el.querySelector<HTMLButtonElement>('[data-act=cancel-line]')?.addEventListener('click', () => t.cancelLine());
-    const bindPicker = () => el.querySelectorAll<HTMLButtonElement>('#line-results [data-line-item]').forEach(b => { b.onclick = () => { this.picking = false; t.startLine(b.dataset.lineItem!); }; });
-    bindPicker();
-    const search = el.querySelector<HTMLInputElement>('#line-search');
-    if (search) search.oninput = () => { this.query = search.value; el.querySelector('#line-results')!.innerHTML = linePickerList(this.query); bindPicker(); };
+    wireSearchPicker(el, { id: 'line', selector: '[data-line-item]', key: 'lineItem', list: linePickerList, onQuery: q => { this.query = q; }, onPick: item => { this.picking = false; t.startLine(item); } });
     el.querySelector('form.layer-form')?.addEventListener('submit', e => e.preventDefault());
     const card = el.querySelector<HTMLElement>('[data-card]');
     card?.querySelector<HTMLButtonElement>('[data-act=collapse]')?.addEventListener('click', () => { if (t.lineDraft) t.cancelLine(); else t.selectLine(null); });

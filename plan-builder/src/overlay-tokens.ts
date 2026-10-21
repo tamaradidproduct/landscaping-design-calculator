@@ -24,6 +24,11 @@ export const MARK = {
   roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
 } as const;
 
+/** The outline names on the plan: 14 page points of text, scaled with the plan within 10–40 px; the halo is this share of the text size. */
+export const LABEL = { pt: 14, min: 10, max: 40, halo: 0.28 } as const;
+/** Sizes of drawn things in screen px: a line is never narrower than `lineMinWidth`; a symbol never shorter than `symbolMin` (a marker `markerMin`). */
+export const DRAWN = { lineMinWidth: 2, symbolMin: 6, markerMin: 20 } as const;
+
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;
 export const POPOVER = { margin: 8, below: 24, fallbackWidth: 300, fallbackHeight: 170 } as const;
 export const TIP = { offset: 14 } as const; // edge-length tip, down-right of the pointer
@@ -38,6 +43,8 @@ export const HIT = {
   zoneSide: 10,         // the drawn straight part of a selected surface's side (push it)
   roundHandle: 18,      // the round handle on a sharp corner (finger-sized; it floats clear of the corner dot and the sides)
   roundHandleOnArc: 13, // …once the corner is rounded and the handle sits on the arc (smaller, so the sides next to it stay easy to grab)
+  line: 7,              // a drawn line: never harder to hit than this far from its centre, however thin
+  symbol: 14,           // a placed plant, object or marker: its least half-size
   roundReveal: 52,      // from the drawn line at a selected surface's corner (its arc, once rounded): shows the round handle, out to the handle itself
 } as const;
 
@@ -45,6 +52,8 @@ export const HIT = {
 export const GESTURE = {
   touchOffset: 56,      // placing on touch: the point rises this far above the finger once it drags
   doubleTapMs: 350,
+  doubleTapPx: 30,      // the second tap of a double-tap lands within this of the first
+  draftGap: 4,          // drawing a line: a tap this close to the last point is not a new point
   holdMs: 450,          // touch: press and hold this long without moving to place freely
   holdSlop: 6,          // finger jitter still counted as holding still (or as a tap)
   rectMin: 8,           // a rectangle narrower or shorter than this wasn't meant

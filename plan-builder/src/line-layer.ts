@@ -2,12 +2,11 @@
 // OutlineTool holds one, so undo, saving and pointer routing stay in the tool. Page points throughout, except where a name says Px.
 import { clampLineWidth, LINE_ITEMS } from './line-items';
 import { dist, edgeLengthPt, outlinePath } from './outline';
+import { HIT } from './overlay-tokens';
 import type { PlacedLine } from './plan-model';
 import { UNSCALED_FT_PT } from './symbol-layer';
 import type { Point } from './view';
 
-/** A line is never harder to hit than this many px from its centre line, however thin. */
-const MIN_HIT_PX = 7;
 const SAME_POINT = 1e-6;
 
 const validScale = (ftPerPt: number | null): ftPerPt is number => ftPerPt !== null && Number.isFinite(ftPerPt) && ftPerPt > 0;
@@ -71,7 +70,7 @@ export class LineLayer {
 
   /** The topmost line under a page point among those `shown`, or null: within half its width of the run (and never smaller than 7 px). */
   hitTest(p: Point, shown: (l: PlacedLine) => boolean, ftPerPt: number | null, pxPerPt: number): string | null {
-    const all = this.ordered(), minHalf = MIN_HIT_PX / pxPerPt;
+    const all = this.ordered(), minHalf = HIT.line / pxPerPt;
     for (let k = all.length - 1; k >= 0; k--) {
       const l = all[k]; if (!shown(l)) continue;
       const half = Math.max(lineWidthPt(l.widthFt, ftPerPt) / 2, minHalf), path = linePathPt(l);

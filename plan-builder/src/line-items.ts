@@ -3,7 +3,7 @@
 // scripts/build-lines.mjs. A default width is the Figma stroke weight at 36 px per ft.
 import { LINE_SOURCES } from '../scripts/line-sources.mjs';
 import tiles from './assets/lines/lines.json';
-import { FIGMA_PX_PER_FT } from './symbols';
+import { FIGMA_PX_PER_FT } from './figma-scale';
 
 export interface LineItem {
   id: string; name: string; family: string;

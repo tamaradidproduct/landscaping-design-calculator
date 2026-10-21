@@ -175,6 +175,8 @@ export function nearestEdge(pts: Point[], p: Point, tol: number, bulges?: number
 }
 
 export const formatFeet = (ft: number) => `${ft.toFixed(2)}′`;
+/** A run's length for cards and the Plant list: feet to one decimal, or "no scale" until the plan has one. */
+export const formatLengthFt = (ft: number | null): string => ft === null ? 'no scale' : `${Math.round(ft * 10) / 10} ft`;
 export const formatArea = (sqft: number) => `${Math.round(sqft).toLocaleString('en-US')} sq ft`;
 /** ftPerPt → "1 in on paper = 40.3 ft". */
 export const formatScale = (ftPerPt: number) => `1 in on paper = ${(ftPerPt * 72).toFixed(1)} ft`;

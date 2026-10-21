@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { linePickerList, lengthText } from './lines-ui';
+import { formatLengthFt } from './outline';
+import { linePickerList } from './lines-ui';
 
 describe('line picker', () => {
   test('lists every item with a data-line-item row', () => {
@@ -13,8 +14,8 @@ describe('line picker', () => {
   });
 });
 
-describe('lengthText', () => {
+describe('formatLengthFt', () => {
   test('feet to one decimal when scaled, "no scale" otherwise', () => {
-    expect(lengthText(62.04)).toBe('62 ft'); expect(lengthText(8.46)).toBe('8.5 ft'); expect(lengthText(null)).toBe('no scale');
+    expect(formatLengthFt(62.04)).toBe('62 ft'); expect(formatLengthFt(8.46)).toBe('8.5 ft'); expect(formatLengthFt(null)).toBe('no scale');
   });
 });

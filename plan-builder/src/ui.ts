@@ -174,3 +174,21 @@ export function suggestRow(name: string, data: Record<string, string>): string {
 export function token(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
+
+/** One row of a picker list: a thumbnail and a name; `data` says what choosing it picks. */
+export const pickerRow = (thumb: string, name: string, data: Record<string, string>) =>
+  button(`${swatch({ symbol: thumb })}<span class="layer-name">${esc(name)}</span>`, { mods: ['layer-row'], data });
+
+/** A searchable picker: a search field (`<id>-search`) over a results block (`<id>-results`). */
+export const searchPicker = (id: string, placeholder: string, query: string, resultsHtml: string) =>
+  `${input(`${id}-search`, { placeholder, ariaLabel: placeholder, value: query })}<div id="${id}-results">${resultsHtml}</div>`;
+
+/** Wires a searchPicker inside `root`: typing re-renders the results with `list(query)`; choosing a row (`selector`, its `key` in the dataset) calls `onPick`. */
+export function wireSearchPicker(root: HTMLElement, o: { id: string; selector: string; key: string; list: (query: string) => string; onQuery: (query: string) => void; onPick: (value: string) => void }) {
+  const results = () => root.querySelector<HTMLElement>(`#${o.id}-results`);
+  if (!results()) return; // the picker is not open
+  const bind = () => results()!.querySelectorAll<HTMLButtonElement>(o.selector).forEach(b => { b.onclick = () => o.onPick(b.dataset[o.key]!); });
+  bind();
+  const search = root.querySelector<HTMLInputElement>(`#${o.id}-search`);
+  if (search) search.oninput = () => { o.onQuery(search.value); results()!.innerHTML = o.list(search.value); bind(); };
+}

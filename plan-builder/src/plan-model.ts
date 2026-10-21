@@ -1,6 +1,7 @@
 // Pure model for a saved plan document (Firestore). No Firebase imports.
 import { TEX_SCALE, type Outline, type OutlineKind } from './outline';
 import { GROUPS, isSectionOrder, type Group } from './sections';
+import { FILL_ID } from './plot-fill';
 import { symbolById } from './symbols';
 import { LINE_WIDTH_FT, lineItemById } from './line-items';
 import type { Reference } from './scale';
@@ -50,7 +51,7 @@ function checkOutline(key: string, o: unknown) {
   if (o.bulges !== undefined) numArray(o.bulges, `outline ${key} bulges`);
   if (o.radii !== undefined) numArray(o.radii, `outline ${key} radii`);
   if (o.material !== undefined && typeof o.material !== 'string') invalid(`outline ${key} material`);
-  if (o.base !== undefined && !(o.base === true && o.kind === 'surface')) invalid(`outline ${key} base`);
+  if (o.base !== undefined && !(o.base === true && o.kind === 'surface' && key === FILL_ID)) invalid(`outline ${key} base`); // the one plot fill lives under its own key
   if (o.texScale !== undefined && !(typeof o.texScale === 'number' && o.texScale >= TEX_SCALE.min && o.texScale <= TEX_SCALE.max)) invalid(`outline ${key} texScale`);
 }
 

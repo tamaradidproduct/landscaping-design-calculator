@@ -1,15 +1,14 @@
 // The Plant list panel: what the plan contains, live: the surfaces used, each kind of line (length and runs), then each plant (symbol,
 // name, category, quantity, photo), each object (stepping stones too) and each utility marker (symbol, name, quantity).
 import { plantList, type PlantList } from './plant-list';
-import { lengthText } from './lines-ui';
-import { formatArea } from './outline';
+import { formatArea, formatLengthFt } from './outline';
 import { caption, esc, hint, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import type { LibrarySymbol } from './symbols';
 
 const lineRow = (l: PlantList['lines'][number]) =>
   `<div class="plant-surface">${swatch({ symbol: l.item.thumb })}<span class="plant-text"><span class="plant-name">${esc(l.item.name)}</span>`
-  + `<span class="plant-measure">${lengthText(l.feet)} · ${l.runs} ${l.runs === 1 ? 'run' : 'runs'}</span></span></div>`;
+  + `<span class="plant-measure">${formatLengthFt(l.feet)} · ${l.runs} ${l.runs === 1 ? 'run' : 'runs'}</span></span></div>`;
 
 const card = (s: LibrarySymbol, quantity: number) =>
   `<div class="plant-card"><img class="plant-art" src="${esc(s.art)}" alt="">`

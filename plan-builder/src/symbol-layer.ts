@@ -1,13 +1,12 @@
 // Placed plants and objects: where each is, how it is turned, and what a tap on the plan hits. Pure (no DOM); OutlineTool holds one,
 // so undo, saving and pointer routing stay in the tool. Page points throughout, except where a name says Px (screen).
+import { DRAWN, HIT } from './overlay-tokens';
 import type { PlacedSymbol } from './plan-model';
 import { SYMBOLS, symbolById, tierOf } from './symbols';
 import type { Point } from './view';
 
 /** Page points per foot while the plan has no scale yet (24 pt for 10 ft, about 1″ = 30′ on a letter sheet). */
 export const UNSCALED_FT_PT = 2.4;
-const MIN_SIZE_PX = 6;
-const MIN_HIT_PX = 14;
 
 export const normalizeDeg = (d: number): number => ((d % 360) + 360) % 360;
 
@@ -23,8 +22,8 @@ const validScale = (ftPerPt: number | null): ftPerPt is number => ftPerPt !== nu
 export const symbolSizePt = (size: { w: number; d: number }, ftPerPt: number | null): { w: number; d: number } =>
   validScale(ftPerPt) ? { w: size.w / ftPerPt, d: size.d / ftPerPt } : { w: size.w * UNSCALED_FT_PT, d: size.d * UNSCALED_FT_PT };
 
-/** A symbol's footprint on screen; a tiny one is scaled up (keeping its proportions) until its long side is `minPx` (6 px; a marker's is 20). */
-export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | null, pxPerPt: number, minPx = MIN_SIZE_PX): { w: number; d: number } {
+/** A symbol's footprint on screen; a tiny one is scaled up (keeping its proportions) until its long side is `minPx` (DRAWN.symbolMin; a marker's is DRAWN.markerMin). */
+export function symbolSizePx(size: { w: number; d: number }, ftPerPt: number | null, pxPerPt: number, minPx: number = DRAWN.symbolMin): { w: number; d: number } {
   const pt = symbolSizePt(size, ftPerPt), w = pt.w * pxPerPt, d = pt.d * pxPerPt, k = Math.max(w, d) < minPx ? minPx / Math.max(w, d) : 1;
   return { w: w * k, d: d * k };
 }
@@ -41,7 +40,7 @@ export class SymbolLayer {
     return Object.values(this.placed).map(s => ({ s, k: key(s) })).sort((a, b) => a.k.tier - b.k.tier || b.k.size - a.k.size || a.k.n - b.k.n).map(x => x.s);
   }
 
-  /** Drop a symbol on top at a page point; returns its new id (y1, y2 …: one past the highest, so it is always on top). */
+  /** Drop a symbol on top at a page point; returns its new id (y1, y2 …: one past the highest id; where it stacks is decided by its type and size, see `ordered`). */
   place(symbol: string, at: Point): string {
     const n = Math.max(0, ...Object.keys(this.placed).map(k => Number(k.slice(1)))) + 1;
     const id = `y${n}`; this.placed[id] = { id, symbol, x: at.x, y: at.y };
@@ -56,11 +55,11 @@ export class SymbolLayer {
   remove(id: string) { delete this.placed[id]; }
 
   /**
-   * The topmost (last placed) symbol under a page point among those `shown`, or null: a plant is a circle of its spread, an
-   * object its rectangle turned with it. A target is never smaller than 14 px, so a tiny symbol can still be tapped.
+   * The topmost symbol (by `ordered`) under a page point among those `shown`, or null: a plant is a circle of its spread, an
+   * object its rectangle turned with it. A target is never smaller than HIT.symbol px, so a tiny symbol can still be tapped.
    */
   hitTest(p: Point, shown: (s: PlacedSymbol) => boolean, ftPerPt: number | null, pxPerPt: number): string | null {
-    const minHalf = MIN_HIT_PX / pxPerPt, all = this.ordered();
+    const minHalf = HIT.symbol / pxPerPt, all = this.ordered();
     for (let k = all.length - 1; k >= 0; k--) {
       const s = all[k], lib = symbolById(s.symbol); if (!lib || !shown(s)) continue;
       const size = symbolSizePt(lib.size, ftPerPt), hw = Math.max(size.w / 2, minHalf), hd = Math.max(size.d / 2, minHalf);

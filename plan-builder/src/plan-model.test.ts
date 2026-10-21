@@ -43,6 +43,7 @@ describe('the plot fill', () => {
     ['base on a feature', (d: any) => { d.outlines.fill.kind = 'feature'; delete d.outlines.fill.material; }],
     ['base: false', (d: any) => { d.outlines.fill.base = false; }],
     ['base that is not a boolean', (d: any) => { d.outlines.fill.base = 'yes'; }],
+    ['a fill under another key', (d: any) => { d.outlines.s9 = { ...d.outlines.fill, id: 's9' }; delete d.outlines.fill; }],
     ['two fills', (d: any) => { d.outlines.fill2 = { ...d.outlines.fill, id: 'fill2' }; }],
   ])('%s is an invalid plan', (_, mutate) => {
     const doc = withFill(); mutate(doc); expect(reasonOf(doc)).toBe('invalid');

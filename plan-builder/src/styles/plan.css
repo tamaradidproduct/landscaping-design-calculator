@@ -57,5 +57,5 @@
 .overlay .line { pointer-events: none; }
 .overlay .line-halo, .overlay .line-draft { fill: none; stroke: var(--color-accent); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .overlay .line-halo { stroke-opacity: var(--opacity-line-halo); }
-.overlay .line-draft { stroke-opacity: var(--opacity-line-draft); }
+.overlay .line-draft { stroke-opacity: var(--opacity-line-draft); stroke-dasharray: var(--dash-guide); }
 .overlay .corner.line-point.selected { fill: var(--color-accent); }

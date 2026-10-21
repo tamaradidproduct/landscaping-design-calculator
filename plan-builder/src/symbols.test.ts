@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { SYMBOL_SIZES } from '../scripts/symbol-sizes.mjs';
-import { FIGMA_PX_PER_FT, SYMBOLS, tierOf, searchSymbols, symbolById, symbolFamilies } from './symbols';
+import { FIGMA_PX_PER_FT } from './figma-scale';
+import { SYMBOLS, tierOf, searchSymbols, symbolById, symbolFamilies } from './symbols';
 
 describe('symbol library', () => {
   test('72 symbols: 51 plants, 18 objects and 3 markers', () => {

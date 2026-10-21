@@ -1,12 +1,12 @@
 // The Layers panel's Plants & objects section: one row per kind of plant or object placed ("Blue Diamond Spruce × 3", with an eye), then
 // "Add…", which opens a picker (search, then the families as lists); picking one arms placing: each tap on the plan drops one until Done.
 // The selected symbol's row opens into a card with Rotate and Delete.
-import { button, caption, esc, hint, input, layerCard, layerForm, layerRow, row, suggestRow, swatch } from './ui';
+import { button, caption, esc, hint, input, layerCard, layerForm, layerRow, row, suggestRow, pickerRow as pickerRowOf, searchPicker, wireSearchPicker } from './ui';
 import type { OutlineTool } from './outline-ui';
 import { stepRotation } from './symbol-layer';
 import { searchSymbols, symbolById, symbolFamilies, type LibrarySymbol } from './symbols';
 
-const pickerRow = (s: LibrarySymbol) => button(`${swatch({ symbol: s.thumb })}<span class="layer-name">${esc(s.name)}</span>`, { mods: ['layer-row'], data: { symbol: s.id } });
+const pickerRow = (s: LibrarySymbol) => pickerRowOf(s.thumb, s.name, { symbol: s.id });
 /** The picker's list for a query: families as captions with a row per symbol, or a note when nothing matches. */
 export function pickerList(query: string): string {
   const found = new Set(searchSymbols(query).map(s => s.id));
@@ -37,7 +37,7 @@ export class SymbolsSection {
         body: `${hint('Placing: tap the plan to drop one. Drag to move the plan. Done or Esc stops.')}${button('Done', { mods: ['compact'], data: { act: 'stop-placing' } })}` }) : ''}
       ${rows.join('')}${card}
       ${placing ? '' : this.picking
-        ? layerForm(`${input('symbol-search', { placeholder: 'Search plants and objects', ariaLabel: 'Search plants and objects', value: this.query })}<div id="symbol-results">${pickerList(this.query)}</div>${button('Cancel', { mods: ['compact'], data: { act: 'cancel-symbol-picker' } })}`)
+        ? layerForm(`${searchPicker('symbol', 'Search plants and objects', this.query, pickerList(this.query))}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-symbol-picker' } })}`)
         : suggestRow('Add plant or object…', { act: 'add-symbol' })}`;
     this.wire(sel?.id ?? null);
   }
@@ -45,13 +45,14 @@ export class SymbolsSection {
   /** The selected symbol's card: what it is, Rotate and Delete. */
   private card(id: string): string {
     const s = this.tool.symbols.placed[id], lib = symbolById(s.symbol)!, deg = Math.round((s.rot ?? 0) * 10) / 10;
+    const turn = lib.kind === 'marker' ? 'Point' : 'Turn';
     const size = lib.kind === 'plant' ? `${fmt(lib.size.w)} ft wide` : `${fmt(lib.size.w)} × ${fmt(lib.size.d)} ft`;
     return layerCard({
       id, swatch: { symbol: lib.thumb }, name: lib.name, sub: lib.category || undefined, done: true,
       body: `${hint(`${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`)}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${row(
-        button('−', { mods: ['icon'], ariaLabel: 'Turn 15° left', data: { act: 'rot-down' } }),
-        input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: 'Rotation in degrees' }),
-        button('+', { mods: ['icon'], ariaLabel: 'Turn 15° right', data: { act: 'rot-up' } }))}${button('Delete', { variant: 'danger', mods: ['compact'], data: { act: 'delete-symbol' } })}`,
+        button('−', { mods: ['icon'], ariaLabel: `${turn} 15° left`, data: { act: 'rot-down' } }),
+        input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: `${lib.kind === 'marker' ? 'Direction' : 'Rotation'} in degrees` }),
+        button('+', { mods: ['icon'], ariaLabel: `${turn} 15° right`, data: { act: 'rot-up' } }))}${button('Delete', { variant: 'danger', mods: ['compact'], data: { act: 'delete-symbol' } })}`,
     });
   }
 
@@ -70,10 +71,7 @@ export class SymbolsSection {
     el.querySelector<HTMLButtonElement>('[data-act=add-symbol]')?.addEventListener('click', () => { this.picking = true; this.query = ''; t.deselect(); this.render(); el.querySelector<HTMLInputElement>('#symbol-search')?.focus(); });
     el.querySelector<HTMLButtonElement>('[data-act=cancel-symbol-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     el.querySelector<HTMLButtonElement>('[data-act=stop-placing]')?.addEventListener('click', () => t.stopPlacing());
-    const bindPicker = () => el.querySelectorAll<HTMLButtonElement>('#symbol-results [data-symbol]').forEach(b => { b.onclick = () => { this.picking = false; t.startPlacing(b.dataset.symbol!); }; });
-    bindPicker();
-    const search = el.querySelector<HTMLInputElement>('#symbol-search');
-    if (search) search.oninput = () => { this.query = search.value; el.querySelector('#symbol-results')!.innerHTML = pickerList(this.query); bindPicker(); };
+    wireSearchPicker(el, { id: 'symbol', selector: '[data-symbol]', key: 'symbol', list: pickerList, onQuery: q => { this.query = q; }, onPick: id => { this.picking = false; t.startPlacing(id); } });
     el.querySelector('form.layer-form')?.addEventListener('submit', e => e.preventDefault());
     const card = el.querySelector<HTMLElement>('[data-card]');
     card?.querySelector<HTMLButtonElement>('[data-act=collapse]')?.addEventListener('click', () => { if (t.placing) t.stopPlacing(); else t.selectSymbol(null); });

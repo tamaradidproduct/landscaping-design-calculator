@@ -5,11 +5,9 @@ import { lineItemById } from './line-items';
 import { linePathPt, lineWidthPt } from './line-layer';
 import { edgeMid } from './outline';
 import type { PlacedLine } from './plan-model';
-import { MARK } from './overlay-tokens';
+import { DRAWN, MARK } from './overlay-tokens';
 import type { Point } from './view';
 
-/** Narrowest a run is drawn, so a 4-inch fence is still a line at yard zoom. */
-const MIN_WIDTH_PX = 2;
 const f = (n: number) => n.toFixed(1);
 const pt = (p: Point) => `${f(p.x)},${f(p.y)}`;
 
@@ -26,7 +24,7 @@ export interface LinesSvgOptions {
   draft?: { item: string; points: Point[]; widthFt: number; hover: Point | null };
 }
 
-const widthPx = (widthFt: number, o: LinesSvgOptions) => Math.max(MIN_WIDTH_PX, lineWidthPt(widthFt, o.ftPerPt) * o.pxPerPt);
+const widthPx = (widthFt: number, o: LinesSvgOptions) => Math.max(DRAWN.lineMinWidth, lineWidthPt(widthFt, o.ftPerPt) * o.pxPerPt);
 
 function run(l: PlacedLine, o: LinesSvgOptions): string {
   const item = lineItemById(l.item); if (!item) return '';

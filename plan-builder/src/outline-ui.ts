@@ -248,8 +248,10 @@ export class OutlineTool {
   /** Whether a placed symbol is drawn and can be tapped. */
   symbolShown = (s: PlacedSymbol): boolean => !isSymbolHidden(s, this.hiddenLayers, this.hiddenSections);
   /** Show or hide every placed symbol of one library symbol (all hidden → show them, else hide them). Not an undo step. */
-  toggleSymbolGroup(symbol: string) {
-    const ids = this.symbols.groups().find(g => g.symbol === symbol)?.ids ?? []; if (!ids.length) return;
+  toggleSymbolGroup(symbol: string) { this.toggleEyes(this.symbols.groups().find(g => g.symbol === symbol)?.ids ?? []); }
+  /** The eye of a kind of placed thing (all its ids): all hidden → show them, else hide them. Not an undo step. */
+  private toggleEyes(ids: string[]) {
+    if (!ids.length) return;
     if (ids.every(id => this.hiddenLayers.has(id))) ids.forEach(id => this.hiddenLayers.delete(id)); else ids.forEach(id => this.hiddenLayers.add(id));
     this.visibilityChanged();
   }
@@ -283,24 +285,16 @@ export class OutlineTool {
     if (this.selectedSymbol === id) this.selectedSymbol = null;
     this.update();
   }
-  /** Arrow keys move the selected symbol by screen px; a run within 1.5 s is one undo step. */
-  private nudgeSymbol(dx: number, dy: number) {
-    const id = this.selectedSymbol; if (!id) return;
-    const now = performance.now(), ln = this.lastNudge, key = -3;
+  /** Arrow keys move the selected symbol or line by screen px; a run within 1.5 s on the same one is one undo step (`key` tells the kinds apart). */
+  private nudgeRun(key: number, id: string, dx: number, dy: number, move: (dx: number, dy: number) => void) {
+    const now = performance.now(), ln = this.lastNudge;
     if (!(ln && ln.id === id && ln.i === key && now - ln.t < 1500)) this.record(); else this.revision++;
     this.lastNudge = { t: now, id, i: key };
     const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
-    this.symbols.move(id, b.x - a.x, b.y - a.y); this.update();
+    move(b.x - a.x, b.y - a.y); this.update();
   }
-  /** Arrow keys move the selected line by screen px; a run within 1.5 s is one undo step. */
-  private nudgeLine(dx: number, dy: number) {
-    const id = this.selectedLine; if (!id) return;
-    const now = performance.now(), ln = this.lastNudge, key = -4;
-    if (!(ln && ln.id === id && ln.i === key && now - ln.t < 1500)) this.record(); else this.revision++;
-    this.lastNudge = { t: now, id, i: key };
-    const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
-    this.lines.move(id, b.x - a.x, b.y - a.y); this.update();
-  }
+  private nudgeSymbol(dx: number, dy: number) { const id = this.selectedSymbol; if (id) this.nudgeRun(-3, id, dx, dy, (x, y) => this.symbols.move(id, x, y)); }
+  private nudgeLine(dx: number, dy: number) { const id = this.selectedLine; if (id) this.nudgeRun(-4, id, dx, dy, (x, y) => this.lines.move(id, x, y)); }
   private symbolAt(screen: Point): string | null {
     return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
   }
@@ -308,11 +302,7 @@ export class OutlineTool {
   /** Whether a drawn line is drawn and can be tapped. */
   lineShown = (l: PlacedLine): boolean => !isLineHidden(l, this.hiddenLayers, this.hiddenSections);
   /** Show or hide every line of one item (all hidden → show them, else hide them). Not an undo step. */
-  toggleLineGroup(item: string) {
-    const ids = this.lines.groups().find(g => g.item === item)?.ids ?? []; if (!ids.length) return;
-    if (ids.every(id => this.hiddenLayers.has(id))) ids.forEach(id => this.hiddenLayers.delete(id)); else ids.forEach(id => this.hiddenLayers.add(id));
-    this.visibilityChanged();
-  }
+  toggleLineGroup(item: string) { this.toggleEyes(this.lines.groups().find(g => g.item === item)?.ids ?? []); }
   /** Drop the line selection and any line being drawn (another tool or selection takes over). */
   private clearLines() { this.selectedLine = null; this.selectedLinePoint = null; this.lineDraft = null; this.lastLineTap = null; }
   /** Start drawing a line of a library item: each tap on the plan adds a point, until finishLine (Done or Enter) or cancelLine (Esc). */
@@ -862,7 +852,7 @@ export class OutlineTool {
       this.finishRect(this.dragAt); return;
     }
     const now = performance.now();
-    const isDouble = this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < 30;
+    const isDouble = this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < GESTURE.doubleTapPx;
     if (isDouble && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
     this.record();
     o.pts.push(this.host.toPage(this.dragAt));

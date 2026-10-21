@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { DRAFT_MIN_GAP_PX, draftReady, draftTap, draftWithPoint } from './line-draft';
+import { GESTURE } from './overlay-tokens';
+import { draftReady, draftTap, draftWithPoint } from './line-draft';
 
 const P = (x: number, y: number) => ({ x, y });
 
@@ -9,7 +10,7 @@ describe('line draft', () => {
     expect(draftWithPoint([P(0, 0)], P(30, 0), 1)).toEqual([P(0, 0), P(30, 0)]);
   });
   test('a tap within 4 px of the last point is ignored (null), measured in screen px', () => {
-    expect(DRAFT_MIN_GAP_PX).toBe(4);
+    expect(GESTURE.draftGap).toBe(4);
     expect(draftWithPoint([P(0, 0)], P(3, 0), 1)).toBeNull();
     expect(draftWithPoint([P(0, 0)], P(4.1, 0), 1)).not.toBeNull();
     expect(draftWithPoint([P(0, 0)], P(1.9, 0), 2)).toBeNull();   // 3.8 px at 2 px per pt

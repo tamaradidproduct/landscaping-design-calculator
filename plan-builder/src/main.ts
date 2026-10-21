@@ -7,7 +7,9 @@ import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
 import { renderPlantList } from './plant-list-ui';
 import { LinesSection } from './lines-ui';
-import { groupAvailable, groupCounts, groupToOpen, moveAmong, moveLabel, readOpen, type Group } from './sections';
+import { GESTURE } from './overlay-tokens';
+import { layersSectionsHtml } from './layers-sections';
+import { GROUP_NAMES, groupAvailable, groupCounts, groupToOpen, moveAmong, moveLabel, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
 import type { OutlineShape } from './outline';
@@ -139,34 +141,22 @@ function setGroupOpen(g: Group, open: boolean) {
   try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ }
   updateGroups();
 }
-// Each section header gets ↑ ↓ buttons; the panel's blocks follow tool.sectionOrder (top of the panel = top of the plan's stacking).
-document.querySelectorAll<HTMLElement>('.group-line').forEach(line => {
-  const g = line.querySelector<HTMLElement>('.group-head')!.dataset.group as Group, eye = line.querySelector('[data-eye-group]');
-  for (const dir of [-1, 1] as const) {
-    const b = Object.assign(document.createElement('button'), { type: 'button', className: 'icon move', textContent: dir < 0 ? '↑' : '↓' });
-    b.dataset.moveGroup = g; b.dataset.dir = String(dir); b.onclick = () => tool.moveSection(g, dir, showingGroups());
-    line.insertBefore(b, eye);
-  }
-});
+// The Layers sections are one component (layers-sections.ts); the panel's blocks follow tool.sectionOrder (top of the panel = top of the plan's stacking).
+$('layers-sections').innerHTML = layersSectionsHtml();
+document.querySelectorAll<HTMLButtonElement>('[data-move-group]').forEach(b => { b.onclick = () => tool.moveSection(b.dataset.moveGroup as Group, Number(b.dataset.dir) as -1 | 1, showingGroups()); });
 /** The sections the panel is showing now (Lines and Plants & objects wait for a closed plot boundary). */
 const showingGroups = (): Group[] => {
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
   return tool.sectionOrder.filter(g => groupAvailable(g, tool.boundaryClosed, counts));
 };
 function applySectionOrder() {
-  const showing = showingGroups();
-  const was = document.activeElement as HTMLElement | null;
-  let ref: Element | null = document.querySelector('.layers .side-title');
-  for (const g of tool.sectionOrder) {
-    const line = document.querySelector<HTMLElement>(`.group-head[data-group=${g}]`)!.closest('.group-line')!, body = $(`group-${g}`);
-    // Move a block only when it is out of place: moving a node drops the focus from the buttons inside it.
-    if (ref && ref.nextElementSibling !== line) ref.after(line);
-    if (line.nextElementSibling !== body) line.after(body);
-    ref = body;
-    for (const dir of [-1, 1] as const) {
-      const b = line.querySelector<HTMLButtonElement>(`[data-move-group=${g}][data-dir="${dir}"]`)!;
-      b.disabled = moveAmong(tool.sectionOrder, g, dir, showing) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
-    }
+  const was = document.activeElement as HTMLElement | null, container = $('layers-sections'), showing = showingGroups();
+  const blocks = tool.sectionOrder.flatMap(g => [container.querySelector<HTMLElement>(`.group-head[data-group=${g}]`)!.closest('.group-line')!, $(`group-${g}`)]);
+  // Move a block only when it is out of place: moving a node drops the focus from the buttons inside it.
+  blocks.forEach((el, i) => { if (container.children[i] !== el) container.insertBefore(el, container.children[i] ?? null); });
+  for (const g of tool.sectionOrder) for (const dir of [-1, 1] as const) {
+    const b = container.querySelector<HTMLButtonElement>(`[data-move-group=${g}][data-dir="${dir}"]`)!;
+    b.disabled = moveAmong(tool.sectionOrder, g, dir, showing) === null; b.setAttribute('aria-label', moveLabel(g, dir)); b.title = moveLabel(g, dir);
   }
   // A button that was moved lost the focus: give it back (a move button that is now at an end passes it to its pair).
   if (was && was !== document.body && document.activeElement === document.body && was.isConnected) {
@@ -195,7 +185,7 @@ function updateGroups() {
     count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
-    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : g === 'lines' ? 'lines' : 'outlines';
+    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = GROUP_NAMES[g].toLowerCase();
     b.setAttribute('aria-pressed', String(!hidden));
     b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
   });
@@ -431,7 +421,7 @@ function endPointer(e: PointerEvent) {
   if (!moved) tool.tap(p);
   if (!moved) {
     const now = performance.now();
-    if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing && !drafting) { // placing or drawing a line: quick taps drop symbols and points (a double-tap ends the line), not a zoom
+    if (now - lastTap.t < GESTURE.doubleTapMs && dist(p, lastTap.p) < GESTURE.doubleTapPx && !tool.placing && !drafting) { // placing or drawing a line: quick taps drop symbols and points (a double-tap ends the line), not a zoom
       lastTap.t = 0;
       if (view.scale > 1.05) fitToStage(); else applyView(zoomAt(view, 3, p));
       return;

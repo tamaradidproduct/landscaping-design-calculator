@@ -14,7 +14,8 @@ export function moveSection(order: readonly Group[], group: Group, dir: -1 | 1):
   const next = [...order]; [next[at], next[to]] = [next[to], next[at]];
   return next;
 }
-const GROUP_NAMES: Record<Group, string> = { symbols: 'Plants & objects', outlines: 'Outlines', lines: 'Lines', surfaces: 'Surfaces' };
+/** The sections' names, as titles. */
+export const GROUP_NAMES: Record<Group, string> = { symbols: 'Plants & objects', outlines: 'Outlines', lines: 'Lines', surfaces: 'Surfaces' };
 /** The label of a section's move button: "Move Lines up". */
 export const moveLabel = (g: Group, dir: -1 | 1): string => `Move ${GROUP_NAMES[g]} ${dir < 0 ? 'up' : 'down'}`;
 /** Like moveSection, but over the sections that are showing: it swaps with the nearest showing one in that direction, skipping any hidden between. */

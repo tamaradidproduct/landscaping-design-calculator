@@ -122,7 +122,7 @@ export class SurfacesSection {
     });
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
-      body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
+      body: `${mat}${this.texScale(o)}${t.cal ? '' : hint('Set the scale to size this surface by typing: tap an edge of the plot boundary and type its printed length.')}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
     });
   }
 }
