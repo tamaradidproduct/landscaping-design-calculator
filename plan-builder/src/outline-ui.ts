@@ -25,7 +25,7 @@ import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFr
 import { zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
-import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, row, token } from './ui';
+import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, numericKeypad, row, token, type KeypadKey } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -1380,7 +1380,8 @@ export class OutlineTool {
       ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
       ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it.')}
       ${formStack(`
-        ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
+        ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { readonly: true, placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
+        ${numericKeypad()}
         ${ref ? button('Remove this length', { variant: 'danger', data: { act: 'unref' } })
           : this.cal ? hint('Lengths on edges running across and down also correct a stretched plan.') : ''}
         ${error(`Type a length in feet, like 116.45 or 116' 5".`)}`)}`;
@@ -1397,6 +1398,7 @@ export class OutlineTool {
       if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
       this.setEdgeLength(e.id, e.i, feet);
     };
+    this.wireLengthKeypad(form);
     this.positionPopover();
   }
   /** A surface edge: its length can be typed to resize the zone (never the scale). */
@@ -1407,7 +1409,8 @@ export class OutlineTool {
       ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
       ${curved ? button('Make straight', { data: { act: 'straighten' } }) : ''}
       ${ft === null ? hint('Set the scale on an outline edge first.') : formStack(`
-        ${field('edge-len', 'Length', row(input('edge-len', { inputmode: 'decimal', placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' })))}
+        ${field('edge-len', 'Length', row(input('edge-len', { readonly: true, placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' })))}
+        ${numericKeypad()}
         ${row(inlineHint('Stays put: the marked end'), button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
         ${error(`Type a length in feet, like 16 or 16' 6".`)}`)}`;
     this.popover.hidden = false;
@@ -1423,7 +1426,32 @@ export class OutlineTool {
       if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
       this.resizeEdge(e.id, e.i, feet);
     };
+    if (form) this.wireLengthKeypad(form);
     this.positionPopover();
+  }
+  /** Wires the numericKeypad() beside an edge-length field: each key edits #edge-len's value at the cursor
+   * (replacing any selection) instead of always appending at the end; Done submits the form. `mousedown` is
+   * prevented so tapping a key never blurs the field first (which would lose the cursor/selection). */
+  private wireLengthKeypad(form: HTMLFormElement) {
+    const el = form.querySelector<HTMLInputElement>('#edge-len')!;
+    form.querySelectorAll<HTMLButtonElement>('.keypad-key').forEach(btn => {
+      btn.onmousedown = e => e.preventDefault();
+      btn.onclick = () => {
+        const key = btn.dataset.key as KeypadKey;
+        if (key === 'done') { form.requestSubmit(); return; }
+        if (key === 'clear') { el.value = ''; el.setSelectionRange(0, 0); el.focus(); return; }
+        const start = el.selectionStart ?? el.value.length, end = el.selectionEnd ?? el.value.length, v = el.value;
+        if (key === 'back') {
+          const [from, to] = start === end ? [Math.max(0, start - 1), start] : [start, end];
+          el.value = v.slice(0, from) + v.slice(to);
+          el.setSelectionRange(from, from);
+        } else {
+          el.value = v.slice(0, start) + key + v.slice(end);
+          el.setSelectionRange(start + key.length, start + key.length);
+        }
+        el.focus();
+      };
+    });
   }
   private positionPopover() {
     const e = this.selectedEdge; if (!e || this.popover.hidden) return;
