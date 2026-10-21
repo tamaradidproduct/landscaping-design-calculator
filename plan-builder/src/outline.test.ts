@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
 import { edgeAt } from './fillet';
+import { MARK } from './overlay-tokens';
 
 describe('parseFeet', () => {
   test.each([
@@ -268,5 +269,67 @@ describe('stepTexScale', () => {
   test('does not drift over repeated presses', () => {
     let s = 1; for (let i = 0; i < 5; i++) s = stepTexScale(s, 1); for (let i = 0; i < 5; i++) s = stepTexScale(s, -1);
     expect(s).toBe(1);
+  });
+});
+
+describe('avgPoint', () => {
+  test('returns origin for empty points', () => {
+    expect(avgPoint([])).toEqual({ x: 0, y: 0 });
+  });
+
+  test('single point returns that point', () => {
+    expect(avgPoint([{ x: 12, y: 34 }])).toEqual({ x: 12, y: 34 });
+  });
+
+  test('average of multiple points computes centroid', () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+    expect(avgPoint(pts)).toEqual({ x: 5, y: 5 });
+  });
+
+  test('average of a triangle', () => {
+    const triangle = [{ x: 0, y: 0 }, { x: 6, y: 0 }, { x: 0, y: 9 }];
+    expect(avgPoint(triangle)).toEqual({ x: 2, y: 3 });
+  });
+});
+
+describe('offHandle', () => {
+  test('offsets outward away from the reference point for a horizontal edge', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, mid = { x: 5, y: 0 };
+    // Reference point below the edge (y = -10): offset pushes handle upward (+y) away from ref
+    const posAbove = offHandle(a, b, mid, { x: 5, y: -10 }, 20);
+    expect(posAbove.x).toBeCloseTo(5);
+    expect(posAbove.y).toBeCloseTo(20);
+
+    // Reference point above the edge (y = 10): offset pushes handle downward (-y) away from ref
+    const posBelow = offHandle(a, b, mid, { x: 5, y: 10 }, 20);
+    expect(posBelow.x).toBeCloseTo(5);
+    expect(posBelow.y).toBeCloseTo(-20);
+  });
+
+  test('offsets outward away from reference point for a vertical edge', () => {
+    const a = { x: 0, y: 0 }, b = { x: 0, y: 10 }, mid = { x: 0, y: 5 };
+    // Reference point to the right (x = 10): offset pushes handle leftward (-x) away from ref
+    const posLeft = offHandle(a, b, mid, { x: 10, y: 5 }, 15);
+    expect(posLeft.x).toBeCloseTo(-15);
+    expect(posLeft.y).toBeCloseTo(5);
+
+    // Reference point to the left (x = -10): offset pushes handle rightward (+x) away from ref
+    const posRight = offHandle(a, b, mid, { x: -10, y: 5 }, 15);
+    expect(posRight.x).toBeCloseTo(15);
+    expect(posRight.y).toBeCloseTo(5);
+  });
+
+  test('uses MARK.insertOffset by default', () => {
+    const a = { x: 0, y: 0 }, b = { x: 10, y: 0 }, mid = { x: 5, y: 0 };
+    const pos = offHandle(a, b, mid, { x: 5, y: -10 });
+    expect(pos.x).toBeCloseTo(5);
+    expect(pos.y).toBeCloseTo(MARK.insertOffset);
+  });
+
+  test('handles zero-length edge without NaN', () => {
+    const a = { x: 5, y: 5 }, b = { x: 5, y: 5 }, mid = { x: 5, y: 5 };
+    const pos = offHandle(a, b, mid, { x: 0, y: 0 });
+    expect(Number.isNaN(pos.x)).toBe(false);
+    expect(Number.isNaN(pos.y)).toBe(false);
   });
 });

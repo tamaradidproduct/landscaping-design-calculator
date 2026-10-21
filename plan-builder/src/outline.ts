@@ -3,6 +3,7 @@ import type { Point } from './view';
 import type { MaterialId } from './materials';
 import { cornerRound } from './shape-edit';
 import { edgeAt, edgeBetween } from './fillet';
+import { MARK } from './overlay-tokens';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -141,6 +142,23 @@ export function insertCorner(pts: Point[], bulges: number[] | undefined, i: numb
   if (!bulges) return { pts: newPts, bulges: undefined };
   const newBulges = [...bulges]; newBulges.splice(i, 1, h1, h2);
   return { pts: newPts, bulges: newBulges };
+}
+
+/** A rough "inside" reference point for offHandle: the average of a shape's (or run's) own points. */
+export function avgPoint(pts: Point[]): Point {
+  if (!pts.length) return { x: 0, y: 0 };
+  return pts.reduce((s, p) => ({ x: s.x + p.x / pts.length, y: s.y + p.y / pts.length }), { x: 0, y: 0 });
+}
+
+/**
+ * An insert-point "+" handle position off edge a→b at its midpoint `mid`: away from reference point
+ * `ref` (the shape's or run's own average point), so it never sits on the edge itself (where the bend handle is).
+ */
+export function offHandle(a: Point, b: Point, mid: Point, ref: Point, offset: number = MARK.insertOffset): Point {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const sign = (mid.x - ref.x) * nx + (mid.y - ref.y) * ny >= 0 ? 1 : -1;
+  return { x: mid.x + nx * offset * sign, y: mid.y + ny * offset * sign };
 }
 
 /**
