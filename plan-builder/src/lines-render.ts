@@ -3,7 +3,7 @@
 // draft being drawn. Pure string building, used by OutlineTool.render.
 import { lineItemById } from './line-items';
 import { linePathPt, lineWidthPt } from './line-layer';
-import { edgeMid } from './outline';
+import { avgPoint, edgeMid, offHandle } from './outline';
 import type { PlacedLine } from './plan-model';
 import { MARK } from './overlay-tokens';
 import type { Point } from './view';
@@ -51,17 +51,6 @@ function run(l: PlacedLine, o: LinesSvgOptions): string {
 }
 
 const polyline = (pts: Point[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${f(p.x)} ${f(p.y)}`).join(' ');
-
-/** A rough "inside" reference point for offHandle: the average of the run's own points. */
-const avgPoint = (pts: Point[]): Point => pts.reduce((s, p) => ({ x: s.x + p.x / pts.length, y: s.y + p.y / pts.length }), { x: 0, y: 0 });
-/** An insert-point "+" off segment a→b at its midpoint `mid`, away from reference point `ref`, so it never
- * sits on top of the bend handle (which sits on the segment itself — see outline-ui.ts's own copy of this). */
-function offHandle(a: Point, b: Point, mid: Point, ref: Point): Point {
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-  const sign = (mid.x - ref.x) * nx + (mid.y - ref.y) * ny >= 0 ? 1 : -1;
-  return { x: mid.x + nx * MARK.insertOffset * sign, y: mid.y + ny * MARK.insertOffset * sign };
-}
 
 function handles(l: PlacedLine, o: LinesSvgOptions): string {
   let svg = `<path d="${polyline(linePathPt(l).map(o.toScreen))}" class="line-halo" style="stroke-width:${f(widthPx(l.widthFt, o) + 8)}px"/>`;

@@ -1,8 +1,8 @@
 // Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  areaPt2, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
-  edgeTapOrder, moveInSection, nearestOnRing, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
+  areaPt2, avgPoint, bulgeToward, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
+  edgeTapOrder, moveInSection, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -1548,18 +1548,6 @@ function crosshair(x: number, y: number): string {
   return `<path d="M${x - o} ${y}H${x - g}M${x + g} ${y}H${x + o}M${x} ${y - o}V${y - g}M${x} ${y + g}V${y + o}" class="crosshair"/>`;
 }
 function unit(a: Point, b: Point): Point { const l = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / l, y: (b.y - a.y) / l }; }
-/** A rough "inside" reference point for offHandle: the average of a shape's (or run's) own points. */
-function avgPoint(pts: Point[]): Point {
-  return pts.reduce((s, p) => ({ x: s.x + p.x / pts.length, y: s.y + p.y / pts.length }), { x: 0, y: 0 });
-}
-/** An insert-point "+" handle's screen position off edge a→b at its midpoint `mid`: away from reference point
- * `ref` (the shape's own average point), so it never sits on the edge itself (where the bend handle already is). */
-function offHandle(a: Point, b: Point, mid: Point, ref: Point): Point {
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-  const nx = -dy / len, ny = dx / len;
-  const sign = (mid.x - ref.x) * nx + (mid.y - ref.y) * ny >= 0 ? 1 : -1;
-  return { x: mid.x + nx * MARK.insertOffset * sign, y: mid.y + ny * MARK.insertOffset * sign };
-}
 
 interface Snapshot {
   outlines: Record<string, Outline>;
