@@ -25,7 +25,7 @@ import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFr
 import { zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
-import { applyKeypadKey, button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, numericKeypad, row, token, type KeypadKey } from './ui';
+import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, numericKeypad, row, token, type KeypadKey } from './ui';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -1414,14 +1414,26 @@ export class OutlineTool {
     if (form) this.wireLengthKeypad(form);
     this.positionPopover();
   }
-  /** Wires the numericKeypad() beside an edge-length field: each key edits #edge-len's value; Done submits the form. */
+  /** Wires the numericKeypad() beside an edge-length field: each key edits #edge-len's value at the cursor
+   * (replacing any selection) instead of always appending at the end; Done submits the form. `mousedown` is
+   * prevented so tapping a key never blurs the field first (which would lose the cursor/selection). */
   private wireLengthKeypad(form: HTMLFormElement) {
     const el = form.querySelector<HTMLInputElement>('#edge-len')!;
     form.querySelectorAll<HTMLButtonElement>('.keypad-key').forEach(btn => {
+      btn.onmousedown = e => e.preventDefault();
       btn.onclick = () => {
         const key = btn.dataset.key as KeypadKey;
         if (key === 'done') { form.requestSubmit(); return; }
-        el.value = applyKeypadKey(el.value, key);
+        if (key === 'clear') { el.value = ''; el.setSelectionRange(0, 0); el.focus(); return; }
+        const start = el.selectionStart ?? el.value.length, end = el.selectionEnd ?? el.value.length, v = el.value;
+        if (key === 'back') {
+          const [from, to] = start === end ? [Math.max(0, start - 1), start] : [start, end];
+          el.value = v.slice(0, from) + v.slice(to);
+          el.setSelectionRange(from, from);
+        } else {
+          el.value = v.slice(0, start) + key + v.slice(end);
+          el.setSelectionRange(start + key.length, start + key.length);
+        }
         el.focus();
       };
     });
