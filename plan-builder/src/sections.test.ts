@@ -78,16 +78,15 @@ describe('lines section', () => {
 });
 
 describe('which sections show', () => {
-  const none = { outlines: 0, surfaces: 0, symbols: 0, lines: 0 }, some = { ...none, symbols: 2, lines: 1 };
-  test('Lines and Plants & objects wait for a closed plot boundary', () => {
-    expect(groupAvailable('lines', false, none)).toBe(false); expect(groupAvailable('symbols', false, none)).toBe(false);
-    expect(groupAvailable('lines', true, none)).toBe(true); expect(groupAvailable('symbols', true, none)).toBe(true);
+  const none = { outlines: 0, surfaces: 0, symbols: 0, lines: 0 }, some = { ...none, symbols: 2, lines: 1, surfaces: 1 };
+  test('Surfaces, Lines and Plants & objects wait for a closed plot boundary', () => {
+    for (const g of ['surfaces', 'lines', 'symbols'] as const) { expect(groupAvailable(g, false, none), g).toBe(false); expect(groupAvailable(g, true, none), g).toBe(true); }
   });
-  test('a plan that already has lines or symbols always shows them', () => {
-    expect(groupAvailable('lines', false, some)).toBe(true); expect(groupAvailable('symbols', false, some)).toBe(true);
+  test('a plan that already has surfaces, lines or symbols always shows them', () => {
+    for (const g of ['surfaces', 'lines', 'symbols'] as const) expect(groupAvailable(g, false, some), g).toBe(true);
   });
-  test('Surfaces (which explains itself) and Outlines always show', () => {
-    expect(groupAvailable('surfaces', false, none)).toBe(true); expect(groupAvailable('outlines', false, none)).toBe(true);
+  test('Outlines always shows: it is where the plot boundary is added', () => {
+    expect(groupAvailable('outlines', false, none)).toBe(true);
   });
 });
 
