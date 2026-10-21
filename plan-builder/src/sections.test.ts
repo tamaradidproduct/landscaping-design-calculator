@@ -78,22 +78,22 @@ describe('lines section', () => {
 });
 
 describe('section order', () => {
-  test('default, top to bottom: Plants & objects, Outlines, Lines, Surfaces', () => {
-    expect(DEFAULT_SECTION_ORDER).toEqual(['symbols', 'outlines', 'lines', 'surfaces']);
+  test('default, top to bottom: Plants & objects, Lines, Surfaces, Outlines (Outlines stays last in the panel)', () => {
+    expect(DEFAULT_SECTION_ORDER).toEqual(['symbols', 'lines', 'surfaces', 'outlines']);
   });
   test('moveSection swaps with the neighbour above or below', () => {
-    expect(moveSection(DEFAULT_SECTION_ORDER, 'lines', -1)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
-    expect(moveSection(DEFAULT_SECTION_ORDER, 'outlines', 1)).toEqual(['symbols', 'lines', 'outlines', 'surfaces']);
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'surfaces', -1)).toEqual(['symbols', 'surfaces', 'lines', 'outlines']);
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'lines', 1)).toEqual(['symbols', 'surfaces', 'lines', 'outlines']);
   });
   test('at the ends, or for an unknown group, there is nothing to move (null)', () => {
-    expect(moveSection(DEFAULT_SECTION_ORDER, 'symbols', -1)).toBeNull(); expect(moveSection(DEFAULT_SECTION_ORDER, 'surfaces', 1)).toBeNull();
+    expect(moveSection(DEFAULT_SECTION_ORDER, 'symbols', -1)).toBeNull(); expect(moveSection(DEFAULT_SECTION_ORDER, 'outlines', 1)).toBeNull();
     expect(moveSection(DEFAULT_SECTION_ORDER, 'nope' as Group, 1)).toBeNull();
   });
   test('moveSection does not change its input', () => {
-    const o = [...DEFAULT_SECTION_ORDER]; moveSection(o, 'lines', -1); expect(o).toEqual(DEFAULT_SECTION_ORDER);
+    const o = [...DEFAULT_SECTION_ORDER]; moveSection(o, 'surfaces', -1); expect(o).toEqual(DEFAULT_SECTION_ORDER);
   });
   test('paintOrder is bottom to top: the reverse', () => {
-    expect(paintOrder(DEFAULT_SECTION_ORDER)).toEqual(['surfaces', 'lines', 'outlines', 'symbols']);
+    expect(paintOrder(DEFAULT_SECTION_ORDER)).toEqual(['outlines', 'surfaces', 'lines', 'symbols']);
   });
   test('isSectionOrder accepts every permutation of the four groups and nothing else', () => {
     expect(isSectionOrder(['surfaces', 'lines', 'symbols', 'outlines'])).toBe(true); expect(isSectionOrder([...DEFAULT_SECTION_ORDER])).toBe(true);
