@@ -4,18 +4,18 @@ Date: 2026-10-19 · Status: draft for review · Builds on the Layers panel secti
 
 ## Goal
 
-Make stacking on the plan predictable and controllable: **Plants & objects is the top group by default**, the four Layers sections (Plants & objects, Outlines, Lines, Surfaces) can be **moved up and down** and the plan stacks in that order, and **plants stack automatically by type and size** (trees on top, then shrubs, then perennials) instead of by placing order.
+Make stacking on the plan predictable and controllable: **Plants & objects is the top group by default**, the four Layers sections (Plants & objects, Lines, Surfaces, Outlines) can be **moved up and down** and the plan stacks in that order, and **plants stack automatically by type and size** (trees on top, then shrubs, then perennials) instead of by placing order.
 
 ## Decisions (from the brainstorm)
 
 - **Automatic stacking by type, then size**, with no manual override (no Bring to front / Send to back).
 - **Reorder the four sections**, not rows inside them; the panel's top-to-bottom order is the plan's top-to-bottom stacking.
-- Default order, top to bottom: **Plants & objects, Outlines, Lines, Surfaces** (today the plan stacks Outlines over Plants and the panel lists Surfaces first).
+- Default order, top to bottom: **Plants & objects, Lines, Surfaces, Outlines** (changed after review: Outlines stays last in the panel) (today the plan stacks Outlines over Plants and the panel lists Surfaces first).
 - Out of scope: reordering rows inside a section (zones keep today's up/down), per-plant manual stacking, plant sizes and calibers (the next feature), changing what cuts what (houses and features still cut surfaces; areas are unchanged).
 
 ## Section order
 
-- Plan state gains `sectionOrder?: Group[]` (top to bottom), a permutation of `['symbols', 'outlines', 'lines', 'surfaces']`; anything else (duplicates, a missing or unknown group) is an invalid plan; absent means the default. `v: 1` kept; plans without it load unchanged.
+- Plan state gains `sectionOrder?: Group[]` (top to bottom), a permutation of `['symbols', 'lines', 'surfaces', 'outlines']`; anything else (duplicates, a missing or unknown group) is an invalid plan; absent means the default. `v: 1` kept; plans without it load unchanged.
 - Saved with the plan like the visibility state (`hiddenSections`): not an undo step.
 - `DEFAULT_SECTION_ORDER` and `moveSection(order, group, dir)` (pure, in `src/sections.ts`): swaps with the neighbour, null at the ends.
 - **UI:** each section header gets ↑ and ↓ icon buttons beside its eye (disabled at the ends, labelled "Move Lines up"). The panel's section blocks reorder to match.

@@ -35,10 +35,10 @@ try {
   check('A tap where they overlap picks the tree', /Blue Diamond Spruce/.test(picked), picked || 'no card');
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   // Default order
-  check('The default panel order is Plants & objects, Outlines, Lines, Surfaces', (await panelOrder()).join() === 'symbols,outlines,lines,surfaces', (await panelOrder()).join());
+  check('The default panel order is Plants & objects, Lines, Surfaces, Outlines (Outlines last)', (await panelOrder()).join() === 'symbols,lines,surfaces,outlines', (await panelOrder()).join());
   const all1 = await paintIds();
   check('By default the plants paint above the House shape', all1.indexOf('HOUSE') >= 0 && all1.indexOf('HOUSE') < all1.indexOf('creeping-phlox'), all1.join(' < '));
-  check('The top section cannot move up; the bottom one cannot move down', await page.$eval('[data-move-group=symbols][data-dir="-1"]', b => b.disabled) && await page.$eval('[data-move-group=surfaces][data-dir="1"]', b => b.disabled), 'both disabled');
+  check('The top section cannot move up; the bottom one cannot move down', await page.$eval('[data-move-group=symbols][data-dir="-1"]', b => b.disabled) && await page.$eval('[data-move-group=outlines][data-dir="1"]', b => b.disabled), 'both disabled');
   // Drawing an outline over the tree: its in-progress path is visible above the plants
   await page.click('#outlines [data-act=name]'); await page.fill('#outline-name', 'Shed'); await page.press('#outline-name', 'Enter'); await page.waitForTimeout(250);
   await page.mouse.click(...await at(0.45, 0.45)); await page.waitForTimeout(250); await page.mouse.move(...await at(0.55, 0.55)); await page.waitForTimeout(250);
@@ -46,18 +46,18 @@ try {
   check('An outline being drawn paints above the plants (rubber band visible over the tree)', drawOrder.includes('DRAWING') && drawOrder.lastIndexOf('IMG') < drawOrder.indexOf('DRAWING'), drawOrder.join(' < '));
   await page.keyboard.press('Escape'); await page.waitForTimeout(200);
   // Keyboard: a move button keeps focus after it is pressed
-  await page.focus('[data-move-group=lines][data-dir="-1"]'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+  await page.focus('[data-move-group=surfaces][data-dir="-1"]'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
   const focused = await page.evaluate(() => document.activeElement?.dataset?.moveGroup ?? document.activeElement?.tagName);
-  check('A move button keeps focus after it moves a section', focused === 'lines', `focus on ${focused}`);
+  check('A move button keeps focus after it moves a section', focused === 'surfaces', `focus on ${focused}`);
   await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-  check('…so pressing it again moves it again', (await panelOrder()).join() === 'lines,symbols,outlines,surfaces', (await panelOrder()).join());
+  check('…so pressing it again moves it again', (await panelOrder()).join() === 'surfaces,symbols,lines,outlines', (await panelOrder()).join());
   await page.focus('[data-eye-group=surfaces]'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
   check('An eye button keeps focus after it is pressed', await page.evaluate(() => document.activeElement?.dataset?.eyeGroup === 'surfaces'), 'focus kept');
   await page.keyboard.press('Enter'); await page.waitForTimeout(200);
-  await page.click('[data-move-group=lines][data-dir="1"]'); await page.click('[data-move-group=lines][data-dir="1"]'); await page.waitForTimeout(300); // back to the default order
+  await page.click('[data-move-group=surfaces][data-dir="1"]'); await page.click('[data-move-group=surfaces][data-dir="1"]'); await page.waitForTimeout(300); // back to the default order
   // Move Outlines up
-  await page.click('[data-move-group=outlines][data-dir="-1"]'); await page.waitForTimeout(300);
-  check('Move Outlines up swaps the panel blocks', (await panelOrder()).join() === 'outlines,symbols,lines,surfaces', (await panelOrder()).join());
+  for (let i = 0; i < 3; i++) { await page.click('[data-move-group=outlines][data-dir="-1"]'); await page.waitForTimeout(200); }
+  check('Moving Outlines up three times puts it first in the panel', (await panelOrder()).join() === 'outlines,symbols,lines,surfaces', (await panelOrder()).join());
   const all2 = await paintIds();
   check('…and the plan: the House now paints over the plants', all2.indexOf('HOUSE') > all2.indexOf('blue-diamond-spruce'), all2.join(' < '));
   check('The Plot plan block stays below all the sections', await page.evaluate(() => { const kids = [...document.querySelector('.layers').children]; return kids.indexOf(document.querySelector('.plan-layer')) === kids.length - 1; }), 'last in Layers');

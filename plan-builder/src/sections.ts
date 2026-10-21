@@ -6,7 +6,7 @@ export type OpenState = Record<Group, boolean>;
 
 export const GROUPS: readonly Group[] = ['surfaces', 'lines', 'symbols', 'outlines'];
 /** The sections' order from the top of the Layers panel (and of the plan's stacking) to the bottom. */
-export const DEFAULT_SECTION_ORDER: readonly Group[] = ['symbols', 'outlines', 'lines', 'surfaces'];
+export const DEFAULT_SECTION_ORDER: readonly Group[] = ['symbols', 'lines', 'surfaces', 'outlines'];
 /** The order with `group` swapped with its neighbour above (-1) or below (+1); null at the ends or for an unknown group. */
 export function moveSection(order: readonly Group[], group: Group, dir: -1 | 1): Group[] | null {
   const at = order.indexOf(group), to = at + dir;
