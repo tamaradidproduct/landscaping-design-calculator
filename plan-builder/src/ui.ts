@@ -53,11 +53,37 @@ export interface InputOptions {
   cls?: string;
   ariaLabel?: string;
   required?: boolean;
+  /** Blocks the native keyboard (and typing): a numericKeypad() beside the field drives its value instead. */
+  readonly?: boolean;
 }
 export function input(id: string, o: InputOptions = {}): string {
   return `<input id="${id}"${o.cls ? ` class="${o.cls}"` : ''} autocomplete="off"${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.required ? ' required' : ''}`
-    + `${o.inputmode ? ` inputmode="${o.inputmode}"` : ''}${o.placeholder ? ` placeholder="${esc(o.placeholder)}"` : ''}`
+    + `${o.inputmode ? ` inputmode="${o.inputmode}"` : ''}${o.placeholder ? ` placeholder="${esc(o.placeholder)}"` : ''}${o.readonly ? ' readonly' : ''}`
     + `${o.value !== undefined ? ` value="${esc(o.value)}"` : ''} />`;
+}
+
+/** Keys on the numericKeypad(): digits, the feet/inches marks and decimal point build up the field's value;
+ * 'back' drops the last character, 'clear' empties it, and 'done' is a no-op — the caller submits the form. */
+export type KeypadKey = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | "'" | '"' | '.' | 'back' | 'clear' | 'done';
+export function applyKeypadKey(value: string, key: KeypadKey): string {
+  if (key === 'done') return value;
+  if (key === 'clear') return '';
+  if (key === 'back') return value.slice(0, -1);
+  return value + key;
+}
+/**
+ * On-screen keypad that stands in for the native keyboard on a length field (digits + the feet/inches/decimal
+ * marks), so contractors get numeric-only entry on iPad. Every key is a grid cell at least --control-md (48px)
+ * tall, per PRD §6.6. Pair it with a `readonly` input() — the caller wires each key's click to applyKeypadKey().
+ */
+export function numericKeypad(): string {
+  const key = (glyph: string, k: KeypadKey, extra: ButtonOptions = {}) => button(glyph, { mods: ['keypad-key'], data: { key: k }, ...extra });
+  return `<div class="keypad">`
+    + key('1', '1') + key('2', '2') + key('3', '3') + key('′', "'", { ariaLabel: 'Feet mark' })
+    + key('4', '4') + key('5', '5') + key('6', '6') + key('″', '"', { ariaLabel: 'Inches mark' })
+    + key('7', '7') + key('8', '8') + key('9', '9') + key('.', '.', { ariaLabel: 'Decimal point' })
+    + key('C', 'clear', { ariaLabel: 'Clear' }) + key('0', '0') + key('⌫', 'back', { ariaLabel: 'Backspace' }) + key('Done', 'done')
+    + `</div>`;
 }
 
 /** Field: a label stacked over its control(s) — pass `row(...)` for a field with an action beside it. */

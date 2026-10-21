@@ -81,6 +81,7 @@
 ### 6.3 Scale & checks ✅🔨
 - Tap an edge, type its printed length (`116.45`, `116' 5"`) → scale (shown as "1 in on paper = 30.0 ft"). Every typed length is kept as a **reference**; the scale is fitted to all of them. The scale isn't shown on screen (only in the toast after typing); an edge with a typed length shows it in its popover with **Update** and **Remove this length** (undoable).
 - 🔨 **Stretched plans:** with references on edges running different ways (across vs down), the app fits **separate across and down scales** and stretches the plan picture and outlines back to their **true shape** ("Across 1 in = 30.0 ft · Down 1 in = 33.0 ft"). References all running the same way keep one best-fit scale and ask for one the other way. The correction is a general 2×2 transform (only stretch for now); 📝 skew later fits more of it from 3+ references. Redrawing an outline drops the lengths typed for its old edges.
+- 🔨 **Numeric keypad, not the native keyboard:** the edge-length popover and the zone-resize length field are `readonly`, with a custom on-screen keypad (digits, `'` `"` `.`, backspace, clear, Done) driving the value instead — numeric-only entry on iPad, still accepting either format (#28).
 - Edge lengths appear only on **hover or tap**; curved edges measure along the curve.
 - Plot area is shown quietly under **Plot boundary** in the Layers panel. (Typing the printed lot size to compare was removed: not needed.)
 - Accuracy target: **within 1%** of printed dimensions.
