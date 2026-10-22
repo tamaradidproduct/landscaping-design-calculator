@@ -4,7 +4,7 @@ import { sectionOf, type Outline } from './outline';
 export type Group = 'surfaces' | 'lines' | 'symbols' | 'outlines';
 export type OpenState = Record<Group, boolean>;
 
-export const GROUPS: readonly Group[] = ['surfaces', 'lines', 'symbols', 'outlines'];
+export const GROUPS: readonly Group[] = ['symbols', 'lines', 'surfaces', 'outlines'];
 export const groupOf = (o: Outline): Group => sectionOf(o.kind) === 'surfaces' ? 'surfaces' : 'outlines';
 
 /** Whether a layer is hidden: its own eye is off, or its whole section's is. A section's eye leaves each layer's own state alone. */

@@ -1,0 +1,75 @@
+// The Layers panel's structure: only Outlines until the boundary is closed and the scale set; then + Add with its three pickers,
+// sections appearing on their first item in the fixed order, the Edit | Sheet toggle, and Undo/Redo and zoom/Fit in the canvas corners.
+// Usage: node scripts/check-panel.mjs <plot-plan.pdf> [url] [outDir]
+import { chromium } from 'playwright-core';
+import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
+
+const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
+const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const results = [], check = (name, ok, got) => results.push([name, `${ok ? 'ok' : 'FAIL'} · ${got}`]);
+const errors = []; 
+for (const width of [1180, 820]) {
+  const page = await browser.newPage({ viewport: { width, height: 900 } });
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(url); await page.waitForTimeout(3500);
+  await page.evaluate(() => localStorage.setItem('plan-builder.shape.outline', 'rect')); await page.reload(); await page.waitForTimeout(3500);
+  await openPlan(page, pdf);
+  const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 792]; }, [x, y]);
+  const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(450); };
+  const shown = () => page.$$eval('.layer-group:not([hidden])', g => g.map(x => x.id.replace('section-', '')).join(','));
+  const addShown = () => page.evaluate(() => !document.getElementById('add').hidden);
+  const tag = `${width}px: `;
+  check(tag + 'empty plan shows Outlines only, no Add', (await shown()) === 'outlines' && !(await addShown()), `${await shown()} · add ${await addShown()}`);
+  check(tag + 'hint is "Outline the plot boundary."', (await page.textContent('#outlines')).includes('Outline the plot boundary.'), '');
+  check(tag + 'undo/redo/zoom/fit live on the canvas, none in the sidebar', await page.evaluate(() => ['undo', 'redo', 'zoom-in', 'zoom-out', 'fit'].every(id => document.getElementById(id)?.closest('.canvas-controls') && !document.getElementById(id).closest('#sidebar'))), '');
+  await page.click('[data-start=boundary]');
+  const a = await toScreen([250, 150]), b = await toScreen([550, 650]);
+  await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(250); await page.keyboard.press('Escape');
+  check(tag + 'closed boundary, no scale: Outlines only, scale hint, no Add', (await shown()) === 'outlines' && !(await addShown()) && (await page.textContent('#outlines')).includes('printed length'), await shown());
+  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape');
+  check(tag + 'scale set: Add appears, empty sections stay hidden', (await addShown()) && (await shown()) === 'outlines', `${await shown()} · add ${await addShown()}`);
+  await page.click('#add-button');
+  check(tag + 'menu lists the three types', (await page.$$eval('#add [data-add]', b => b.map(x => x.dataset.add).join())) === 'symbols,surfaces,lines', '');
+  await page.click('[data-act=cancel-add]');
+  await addVia(page, 'symbols'); check(tag + 'Plant or object opens its picker (section visible while open)', !!(await page.$('#symbol-search')) && (await shown()).startsWith('symbols'), await shown());
+  await page.click('[data-act=cancel-symbol-picker]');
+  check(tag + 'cancelling hides the empty section again', (await shown()) === 'outlines', await shown());
+  await addVia(page, 'lines'); check(tag + 'Edges & walls opens its picker', !!(await page.$('#line-search')), '');
+  await page.click('[data-act=cancel-line-picker]');
+  await addVia(page, 'surfaces'); check(tag + 'Surface opens the material list', !!(await page.$('#surfaces [data-material]')), '');
+  await page.click('[data-act=cancel-picker]');
+  await addVia(page, 'symbols'); await page.click('#symbol-results [data-symbol]'); await tap([350, 300]); await tap([380, 330]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
+  check(tag + 'first plant: Plants & objects appears above Outlines', (await shown()) === 'symbols,outlines', await shown());
+  await page.click('.group-head[data-group=symbols]');
+  check(tag + 'collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'false', '');
+  await addVia(page, 'symbols');
+  check(tag + 'Add opens a collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'true' && await page.isVisible('#symbol-search'), '');
+  await page.click('[data-act=cancel-symbol-picker]');
+  await addVia(page, 'lines'); await page.click('#line-results [data-line-item]'); await tap([300, 200]); await tap([450, 200]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(200);
+  check(tag + 'first edge: sections in fixed order', (await shown()) === 'symbols,lines,outlines', await shown());
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
+  check(tag + '⌘Z undoes (edge gone)', (await shown()) === 'symbols,outlines', await shown());
+  await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(150);
+  check(tag + '⇧⌘Z redoes', (await shown()) === 'symbols,lines,outlines', await shown());
+  await page.click('#undo'); await page.waitForTimeout(150); check(tag + 'Undo button works', (await shown()) === 'symbols,outlines', await shown());
+  await page.click('#redo'); await page.waitForTimeout(150);
+  await page.click('[data-view=sheet]');
+  const sheet = await page.$eval('#layers-sheet', e => e.innerText.replace(/\n+/g, ' | '));
+  check(tag + 'Sheet shows plants and edges, Edit view hidden', /Plants/.test(sheet) && /Edges & walls/i.test(sheet) && await page.$eval('#layers-edit', e => e.hidden), sheet.slice(0, 120));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  const halos = () => page.$$eval('.overlay .symbol-halo', h => h.length);
+  const before = await halos();
+  await page.click('#layers-sheet [data-sheet-symbol]'); await page.waitForTimeout(150);
+  check(tag + 'tapping a sheet card selects and highlights it on the plan', before === 0 && (await halos()) === 1 && !!(await page.$('#layers-sheet .plant-card.selected')), `halos ${before} → ${await halos()}`);
+  const head = await page.$eval('.side-head', e => ({ w: e.clientWidth, sw: e.scrollWidth }));
+  check(tag + 'Edit | Sheet toggle fits the header', head.sw <= head.w, JSON.stringify(head));
+  await page.screenshot({ path: `${outDir}/panel-${width}-sheet.png` });
+  await page.click('[data-view=edit]');
+  await page.screenshot({ path: `${outDir}/panel-${width}-edit.png` });
+  await page.close();
+}
+console.table(results.map(([step, result]) => ({ step, result })));
+if (errors.length) console.log('page errors:', errors);
+await browser.close();
+process.exit(results.some(r => r[1].startsWith('FAIL')) || errors.length ? 1 : 0);

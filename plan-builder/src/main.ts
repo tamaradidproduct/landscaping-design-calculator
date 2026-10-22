@@ -5,9 +5,11 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
-import { renderPlantList } from './plant-list-ui';
+import { renderSheet } from './sheet-ui';
+import { AddMenu, type AddType } from './add-menu';
+import { panelState, visibleGroups } from './panel-state';
 import { LinesSection } from './lines-ui';
-import { groupCounts, groupToOpen, readOpen, type Group } from './sections';
+import { GROUPS, groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
 import type { OutlineShape } from './outline';
@@ -93,8 +95,8 @@ const tool = new OutlineTool({
     surfaces?.render();
     linesSection?.render();
     symbolsSection?.render();
-    renderPlantList($('plant-list'), tool);
     outlines?.render();
+    if (sheetOpen) renderSheet($('layers-sheet'), tool);
     updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
     showSnap();
@@ -148,6 +150,13 @@ function updateGroups() {
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
+  // Guided unlock: only Outlines until the boundary is closed and the scale set; empty sections stay hidden until their first item.
+  const state = panelState({ boundaryClosed: tool.boundaryClosed, scaleSet: !!tool.cal, placed: counts.symbols + counts.lines + counts.surfaces });
+  const shown = new Set(visibleGroups(state, counts));
+  const busy: Record<Group, boolean> = { symbols: !!tool.placing || !!symbolsSection?.pickerOpen, lines: !!tool.lineDraft || !!linesSection?.pickerOpen, surfaces: !!surfaces?.pickerOpen || (!!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface'), outlines: true };
+  for (const g of GROUPS) $(`section-${g}`).hidden = !shown.has(g) && !busy[g];
+  document.querySelectorAll<HTMLElement>('[data-eye-group]').forEach(b => { b.hidden = counts[b.dataset.eyeGroup as Group] === 0; });
+  addMenu.render(state === 'ready');
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
     b.setAttribute('aria-expanded', String(isOpen));
@@ -155,7 +164,7 @@ function updateGroups() {
     count.hidden = isOpen; count.textContent = `· ${counts[g]}`;
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
-    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : g === 'lines' ? 'lines' : 'outlines';
+    const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : g === 'lines' ? 'edges and walls' : 'outlines';
     b.setAttribute('aria-pressed', String(!hidden));
     b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
   });
@@ -170,10 +179,22 @@ linesSection = new LinesSection($('lines'), tool);
 linesSection.render();
 symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
-renderPlantList($('plant-list'), tool);
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
+// Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
+const addMenu = new AddMenu($('add'), (type: AddType) => { groupsOpen[type] = true; try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ } ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
+// Edit | Sheet: the sheet is a read-only view of the same data.
+let sheetOpen = false;
+document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(b => {
+  b.onclick = () => {
+    sheetOpen = b.dataset.view === 'sheet';
+    document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('layers-edit').hidden = sheetOpen; $('layers-sheet').hidden = !sheetOpen;
+    if (sheetOpen) renderSheet($('layers-sheet'), tool);
+  };
+});
 updateGroups();
+$('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
 // Dev only: size of the plan document as it would be saved (outlines + refs + small fixed metadata); scripts assert it stays small.
 if (import.meta.env.DEV) (window as unknown as { __planBytes: unknown }).__planBytes = () =>

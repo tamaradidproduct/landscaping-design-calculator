@@ -61,6 +61,21 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .dock > * { pointer-events: auto; }
 .dock > .toggle, .dock > .segmented { box-shadow: var(--shadow-sm); }
 
+/* ---------- Canvas controls: Undo/Redo top right, zoom and Fit bottom right; muted until pressed ---------- */
+.canvas-controls { position: absolute; z-index: var(--z-chip); display: flex; gap: var(--space-3); right: calc(var(--space-6) + env(safe-area-inset-right, 0px)); }
+.canvas-controls.top-right { top: calc(var(--space-6) + env(safe-area-inset-top, 0px)); }
+.canvas-controls.bottom-right { bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px)); }
+.canvas-controls > button.icon { background: var(--color-surface); color: var(--color-muted); box-shadow: var(--shadow-sm); }
+.canvas-controls > button.icon:hover:not(:disabled) { color: var(--color-ink); }
+.canvas-controls > button.icon:disabled { opacity: var(--opacity-layer-off); box-shadow: none; }
+
+/* Layers header: the title and the Edit | Sheet toggle */
+.side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.side-head .segmented > button { min-height: var(--control-sm); padding: 0 var(--space-6); font-size: var(--text-base); }
+#layers-edit, #layers-sheet { display: flex; flex-direction: column; gap: var(--space-4); }
+#layers-edit[hidden], #layers-sheet[hidden], .layer-group[hidden] { display: none; }
+.layer-group { display: flex; flex-direction: column; gap: var(--space-4); }
+
 /* ---------- Segmented control: one choice of a few, joined (Corners | Rectangle) ---------- */
 .segmented { display: inline-flex; background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); overflow: hidden; }
 .segmented > button { border: 0; border-radius: 0; background: transparent; }
@@ -184,7 +199,8 @@ button.group-head[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .choice-line { display: flex; align-items: center; gap: var(--space-5); font-size: var(--text-base); }
 
 /* ---------- Plant list: surfaces used, then a card per plant (symbol, name, category, quantity, photo) and per object ---------- */
-.plant-list > summary { cursor: pointer; }
+button.plant-card, button.plant-surface { width: 100%; text-align: left; background: transparent; border-color: transparent; }
+button.plant-card.selected, button.plant-surface.selected { background: var(--color-bg); border-color: var(--color-accent); }
 .plant-card { display: grid; grid-template-columns: var(--width-plant-art) minmax(0, 1fr) auto var(--width-plant-art); align-items: center; gap: var(--space-5); padding: var(--space-3) 0; border-bottom: var(--border-width) dotted var(--color-line); }
 .plant-art { width: var(--width-plant-art); height: var(--width-plant-art); object-fit: contain; }
 .plant-photo { width: var(--width-plant-art); height: var(--width-plant-art); object-fit: cover; border-radius: var(--radius-sm); }

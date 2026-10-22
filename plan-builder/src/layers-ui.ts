@@ -3,6 +3,7 @@
 // the outline being drawn or edited expands into a card with its step, nudge arrows and actions (there is no
 // panel over the plan).
 import { formatArea, outlineSuggestions, type Outline } from './outline';
+import { outlinesHints, panelState } from './panel-state';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
 import { button, caption, chips, esc, hint, input, label, layerCard, layerForm, layerRow, nudgePad, splitRow, suggestRow, type Swatch } from './ui';
@@ -22,15 +23,15 @@ export class OutlinesSection {
       swatch: swatchOf(o), data: { layer: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
-    const scaleHint = !t.cal && all.some(o => o.closed) && !t.drawing
-      ? hint('Tap an edge and type its printed length to set the scale.') : '';
+    const placed = Object.values(t.symbols.placed).length + Object.values(t.lines.placed).length + all.filter(o => o.kind === 'surface').length;
+    const guide = outlinesHints(panelState({ boundaryClosed: t.boundaryClosed, scaleSet: !!t.cal, placed }), !!t.drawing).map(hint).join('');
     const suggestions = [
       ...(s.boundary ? [suggestRow('Plot boundary', { start: 'boundary' })] : []),
       ...s.features.map(n => suggestRow(n, { feature: n })),
     ];
     this.el.innerHTML = `
-      ${all.length ? '' : hint('Trace what is already on the lot. Start with the plot boundary to set the scale.')}
-      ${rows.join('')}${scaleHint}${suggestions.join('')}
+      ${guide}
+      ${rows.join('')}${suggestions.join('')}
       ${this.naming ? layerForm(`
           ${caption('Common features')}
           ${chips(s.picks.map(n => button(esc(n), { mods: ['chip'], data: { feature: n } })))}

@@ -4,6 +4,7 @@
 // Usage: node scripts/check-collapse.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -25,8 +26,9 @@ const planShown = () => page.$eval('#plan-opacity', e => e.checkVisibility());
 try {
   results.push(['Start', `surfaces ${await head('surfaces')} · outlines ${await head('outlines')} · plot plan shown ${await planShown()}`]);
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
+  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // the scale unlocks + Add
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await drag([280, 420], [520, 600]); await page.keyboard.press('Escape');
+  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await drag([280, 420], [520, 600]); await page.keyboard.press('Escape');
 
   await page.click('.group-head[data-group=outlines]');
   results.push(['Collapse Outlines', `${await head('outlines')} (expect "· 2") · plot plan shown ${await planShown()}`]);
