@@ -38,18 +38,15 @@ await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]);
 await page.keyboard.press('Escape');
 results.push(['After the plot boundary', `${(await page.textContent('#surfaces')).trim()}`]);
 
-// Sod before any scale: tapping its edge offers no length field.
-await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]');
-await drag([280, 180], [520, 400]);
-results.push(['Zone closed before a scale: toast', await toast()]);
-await tap([400, 400]);
-results.push(['Zone edge before a scale', `field shown: ${!!await page.$('#edge-len')} · ${(await page.textContent('.popover')).replace(/\s+/g, ' ').trim().slice(0, 80)}`]);
-await page.keyboard.press('Escape');
-
 // Scale from the boundary's left edge: 500 pt = 100 ft (0.2 ft/pt).
 await tap([250, 560]);
 await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
 results.push(['Scale set on the boundary', await toast()]);
+await page.keyboard.press('Escape');
+
+// Sod, drawn once the scale is set (Add stays hidden until then).
+await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]');
+await drag([280, 180], [520, 400]);
 await page.keyboard.press('Escape');
 
 // House drawn after the sod still cuts it.
