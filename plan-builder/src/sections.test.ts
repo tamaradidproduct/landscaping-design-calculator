@@ -6,6 +6,7 @@ const o = (id: string, kind: Outline['kind'], closed = true): Outline => ({ id, 
 const all = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('s1', 'surface'), o('s2', 'surface'), o('f2', 'feature', false)].map(x => [x.id, x]));
 
 describe('collapsible Layers sections', () => {
+  test('order: Plants & objects, Edges & walls, Surfaces, Outlines', () => expect(GROUPS).toEqual(['symbols', 'lines', 'surfaces', 'outlines']));
   test('counts: Outlines = the boundary + features (the plot plan is not counted), Surfaces = zones', () => {
     expect(groupCounts(Object.values(all))).toEqual({ outlines: 3, surfaces: 2, symbols: 0, lines: 0 });
     expect(groupCounts(Object.values(all), 4)).toEqual({ outlines: 3, surfaces: 2, symbols: 4, lines: 0 });
