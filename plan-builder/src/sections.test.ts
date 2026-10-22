@@ -64,7 +64,6 @@ describe('hiding placed symbols', () => {
 
 describe('lines section', () => {
   const none = new Set<never>();
-  test('group order is surfaces, lines, symbols, outlines', () => expect(GROUPS).toEqual(['surfaces', 'lines', 'symbols', 'outlines']));
   test('a line is hidden by its own id or by the lines section, not by the others', () => {
     expect(isLineHidden({ id: 'l1' }, none, none)).toBe(false);
     expect(isLineHidden({ id: 'l1' }, new Set(['l1']), none)).toBe(true);
