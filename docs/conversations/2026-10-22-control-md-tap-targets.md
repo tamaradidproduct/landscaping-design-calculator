@@ -8,12 +8,13 @@ Issue: #43 ("Decide whether --control-sm (40px) should stay below the PRD's 44px
 3. Leave as-is — reject on the grounds that 40px rows are an intentional secondary-chrome convention.
 
 ## Decisions
-- `.layer-head` (the expanded layer-card header; PRD §6.1 — tapping it also closes the card) and `.material-list > button.layer-row` (the material-picker rows) now use `--control-md` (48px) instead of `--control-sm` (40px).
+- `.layer-head` (the expanded layer-card header; PRD §6.1 — tapping it also closes the card) now uses `--control-md` (48px) instead of `--control-sm` (40px).
+- `.material-list > button.layer-row` was removed outright rather than switched to `--control-md`: the base `button.layer-row` rule already sets `min-height: var(--control-md)`, so once the override target matched the base value it was dead weight (caught in review).
 - No other call site changed. `button.group-head` (the collapsible Layers section header) was listed in the issue's inventory but not named in the approved suggested approach, so it was left on `--control-sm` — out of scope for this decision; worth a follow-up issue if it also needs to move.
 - `--control-sm`/`--control-md` are both existing design-system tokens (`src/styles/tokens.css`) — no token values changed, so `tokens.json`/the design-system artifact and `npm run tokens` are untouched; this is purely a per-selector choice of which existing token to use.
 
 ## Build notes
-- `plan-builder/src/styles/components.css`: two one-line edits (`.layer-head`, `.material-list > button.layer-row`), `--control-sm` → `--control-md`.
+- `plan-builder/src/styles/components.css`: `.layer-head` moved from `--control-sm` to `--control-md`; `.material-list > button.layer-row` override removed as redundant with the base rule.
 - `npm run lint`, `npm run typecheck`, `npm test` (484 passed, 1 skipped) and `npm run build` all pass.
 
 ## Later
