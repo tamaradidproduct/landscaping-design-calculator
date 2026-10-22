@@ -181,8 +181,8 @@ symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
-// Global + Add: opens the chosen section's picker (the section shows itself while its picker is open).
-const addMenu = new AddMenu($('add'), (type: AddType) => { ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
+// Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
+const addMenu = new AddMenu($('add'), (type: AddType) => { groupsOpen[type] = true; try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ } ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
 // Edit | Sheet: the sheet is a read-only view of the same data.
 let sheetOpen = false;
 document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(b => {

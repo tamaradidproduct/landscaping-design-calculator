@@ -41,6 +41,11 @@ for (const width of [1180, 820]) {
   await page.click('[data-act=cancel-picker]');
   await addVia(page, 'symbols'); await page.click('#symbol-results [data-symbol]'); await tap([350, 300]); await tap([380, 330]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
   check(tag + 'first plant: Plants & objects appears above Outlines', (await shown()) === 'symbols,outlines', await shown());
+  await page.click('.group-head[data-group=symbols]');
+  check(tag + 'collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'false', '');
+  await addVia(page, 'symbols');
+  check(tag + 'Add opens a collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'true' && await page.isVisible('#symbol-search'), '');
+  await page.click('[data-act=cancel-symbol-picker]');
   await addVia(page, 'lines'); await page.click('#line-results [data-line-item]'); await tap([300, 200]); await tap([450, 200]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(200);
   check(tag + 'first edge: sections in fixed order', (await shown()) === 'symbols,lines,outlines', await shown());
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
