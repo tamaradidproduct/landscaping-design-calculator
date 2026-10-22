@@ -33,7 +33,7 @@ const cursor = () => page.$eval('#stage', e => e.style.cursor || 'default');
 try {
   await page.click('[data-start=boundary]');
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   await drag([300, 250], [360, 350]); // 12′ × 20′ (60 × 100 pt), stays selected

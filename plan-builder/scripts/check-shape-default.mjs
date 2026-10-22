@@ -36,7 +36,7 @@ try {
   await page.keyboard.press('x');
   results.push(['X on the boundary', await pressed()]);
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]');
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['First surface starts as', await pressed()]);

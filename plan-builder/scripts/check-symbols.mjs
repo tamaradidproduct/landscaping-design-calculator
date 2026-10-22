@@ -23,7 +23,7 @@ const counts = () => onSheet(page, p => p.$$eval('#layers-sheet .plant-count', c
 const arm = async (id, query = '') => { await addVia(page, 'symbols'); if (query) { await page.fill('#symbol-search', query); await page.waitForTimeout(150); } await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   // Picker
   await addVia(page, 'symbols'); await page.fill('#symbol-search', 'spruce'); await page.waitForTimeout(150);
   const found = await page.$$eval('#symbol-results [data-symbol]', b => b.map(x => x.textContent.trim()));

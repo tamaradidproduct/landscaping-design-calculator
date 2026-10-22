@@ -27,7 +27,7 @@ const listText = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerT
 try {
   await page.click('[data-start=boundary]'); await page.mouse.move(...await toScreen([250, 150]));
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]); await drag(a, b); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   const k = await pxPerPt();
   // Picker
   await addVia(page, 'lines'); await page.fill('#line-search', 'fence'); await page.waitForTimeout(150);
@@ -111,7 +111,7 @@ try {
   check('Turning a marker 90° points it along the run', /rotate\(90 /.test((await symImgs()).find(i => /gas-line/.test(i.src)).t ?? ''), '90°');
   await page.keyboard.press('Escape');
   const list = await listText();
-  check('The Sheet shows lines with feet and runs', /Lines \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| White stone edging \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 2 runs/.test(list), list.slice(0, 160));
+  check('The Sheet shows lines with feet and runs', /Edges & walls \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| White stone edging \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 2 runs/.test(list), list.slice(0, 160));
   check('…stepping stones under Objects and the gas marker under Utility markers', /Objects \| .*Porcelain stepping stones.*1/.test(list) && /Utility markers \| .*Gas line.*1/.test(list), list.slice(-160));
   // Hide
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);

@@ -23,7 +23,7 @@ const pressed = sel => page.$eval(sel, b => b.getAttribute('aria-pressed'));
 const tile = id => page.$eval(`#zone-defs pattern#zone-${id}`, p => Number(p.getAttribute('width')));
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // the scale unlocks + Add
+  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // the scale unlocks + Add
   await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
   // Before any scale is set, the texture scale still works (and follows zoom).
   if (await page.$('#surfaces [data-zone=s1]')) await page.click('#surfaces [data-zone=s1]'); // else its card is already open

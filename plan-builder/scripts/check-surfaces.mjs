@@ -48,7 +48,7 @@ await page.keyboard.press('Escape');
 
 // Scale from the boundary's left edge: 500 pt = 100 ft (0.2 ft/pt).
 await tap([250, 560]);
-await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]');
+await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
 results.push(['Scale set on the boundary', await toast()]);
 await page.keyboard.press('Escape');
 
@@ -79,7 +79,7 @@ await page.keyboard.down('Control'); for (let i = 0; i < 10; i++) { await page.m
 await page.waitForTimeout(600);
 await tap([320, 250]); // top edge, near the left corner → the left corner stays
 results.push(['Pavers top edge', `${(await page.textContent('.popover .text-figure')).trim()} · label "${(await page.textContent('.popover .text-label'))}" · fixed mark in accent ${await page.$eval('.overlay .fixed-end', e => getComputedStyle(e).stroke === getComputedStyle(document.querySelector('button.primary') ?? document.body).backgroundColor).catch(() => 'missing')}`]);
-await page.fill('#edge-len', '16'); await page.click('.popover button[type=submit]');
+await page.$eval('#edge-len', (e, v) => { e.value = v; }, '16'); await page.click('.popover button[type=submit]');
 const p16 = await shape('s2');
 results.push(['Typed 16′', `${await toast()} · x ${p16.x0}..${p16.x1} (expect 300..380) · y ${p16.y0}..${p16.y1} (expect 250..350)`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
