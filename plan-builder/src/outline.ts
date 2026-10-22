@@ -2,7 +2,8 @@
 import type { Point } from './view';
 import type { MaterialId } from './materials';
 import { cornerRound } from './shape-edit';
-import { edgeBetween } from './fillet';
+import { edgeAt, edgeBetween } from './fillet';
+import { MARK } from './overlay-tokens';
 
 /** The plot boundary is special (one per plan, sets the lot area); everything else is an existing feature. */
 export type OutlineKind = 'boundary' | 'feature' | 'surface';
@@ -116,6 +117,51 @@ export function edgePoints(a: Point, b: Point, h: number, samples = 32): Point[]
 }
 
 /**
+ * Splitting edge a→b (bulge h) at fraction t (0 < t < 1) into two: the new corner, and the two edges' bulges,
+ * chosen so each sub-edge's own arc is part of the original circle — the split shows no kink. A straight edge
+ * (h ≈ 0) splits into two straight edges at the lerp point.
+ */
+export function splitEdge(a: Point, b: Point, h: number, t: number): { point: Point; h1: number; h2: number } {
+  if (Math.abs(h) < 1e-9) return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, h1: 0, h2: 0 };
+  const point = edgeAt(a, b, h, t);
+  // Each sub-edge's own arc midpoint (at half its own fraction of the original arc) sits exactly on the original
+  // circle, so the bulge that reconstructs it from the sub-chord is exact: no visible kink at `point`.
+  const mid1 = edgeAt(a, b, h, t / 2), mid2 = edgeAt(a, b, h, t + (1 - t) / 2);
+  return { point, h1: bulgeToward(a, point, mid1), h2: bulgeToward(point, b, mid2) };
+}
+
+/**
+ * Insert a corner splitting edge i (pts[i] → pts[(i+1) % n], bulge bulges[i]) at fraction t (0 < t < 1): works on
+ * an open run (a line) or a closed ring (an outline/zone) alike, since edge i never wraps for an open run's last
+ * point. A bent edge splits into two edges whose combined shape still matches the original curve.
+ */
+export function insertCorner(pts: Point[], bulges: number[] | undefined, i: number, t: number): { pts: Point[]; bulges: number[] | undefined } {
+  const n = pts.length, a = pts[i], b = pts[(i + 1) % n], h = bulges?.[i] ?? 0;
+  const { point, h1, h2 } = splitEdge(a, b, h, t);
+  const newPts = [...pts.slice(0, i + 1), point, ...pts.slice(i + 1)];
+  if (!bulges) return { pts: newPts, bulges: undefined };
+  const newBulges = [...bulges]; newBulges.splice(i, 1, h1, h2);
+  return { pts: newPts, bulges: newBulges };
+}
+
+/** A rough "inside" reference point for offHandle: the average of a shape's (or run's) own points. */
+export function avgPoint(pts: Point[]): Point {
+  if (!pts.length) return { x: 0, y: 0 };
+  return pts.reduce((s, p) => ({ x: s.x + p.x / pts.length, y: s.y + p.y / pts.length }), { x: 0, y: 0 });
+}
+
+/**
+ * An insert-point "+" handle position off edge a→b at its midpoint `mid`: away from reference point
+ * `ref` (the shape's or run's own average point), so it never sits on the edge itself (where the bend handle is).
+ */
+export function offHandle(a: Point, b: Point, mid: Point, ref: Point, offset: number = MARK.insertOffset): Point {
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len, ny = dx / len;
+  const sign = (mid.x - ref.x) * nx + (mid.y - ref.y) * ny >= 0 ? 1 : -1;
+  return { x: mid.x + nx * offset * sign, y: mid.y + ny * offset * sign };
+}
+
+/**
  * The outline as a dense polyline (arcs sampled). `radii` rounds corners of a closed outline (page points), also next to
  * a bent edge: the rounding then trims the arc.
  */
@@ -168,6 +214,18 @@ export function nearestEdge(pts: Point[], p: Point, tol: number, bulges?: number
     for (let k = 0; k + 1 < line.length; k++) { const d = distToSegment(p, line[k], line[k + 1]); if (d <= bd) { bd = d; best = i; } }
   }
   return best;
+}
+
+/**
+ * Whether a quick repeat tap on the outline's last point should close it, instead of adding (or leaving
+ * behind) a spurious extra corner there — and whether that point must be dropped first. `recent` is whether
+ * the previous tap counts as the first half of this double-tap (close enough in time, and — for a tap that
+ * missed every existing corner — in screen position too). `addedLast` is whether that previous tap placed
+ * the point now at the end of `pts` only to signal the possible double-tap, rather than it already existing.
+ */
+export function closesOnRepeatTap(ptsLen: number, recent: boolean, addedLast: boolean): { close: boolean; popLast: boolean } {
+  if (!recent || ptsLen - (addedLast ? 1 : 0) < 3) return { close: false, popLast: false };
+  return { close: true, popLast: addedLast };
 }
 
 export const formatFeet = (ft: number) => `${ft.toFixed(2)}′`;

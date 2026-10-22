@@ -53,7 +53,7 @@ export class LinesSection {
     const canDeletePoint = t.selectedLinePoint !== null && l.points.length > 2;
     return layerCard({
       id, swatch: { symbol: lib.thumb }, name: lib.name, sub: lengthText(lineLengthFt(l, t.cal?.ftPerPt ?? null)), done: true,
-      body: `${hint('Drag a point to move it, a square to bend the run. Tap a point to select it.')}${row(
+      body: `${hint('Drag a point to move it, a square to bend the run, or tap the + to add one. Tap a point to select it.')}${row(
         button('−', { mods: ['icon'], ariaLabel: 'Narrower', data: { act: 'width-down' } }),
         input('line-width', { inputmode: 'decimal', value: String(l.widthFt), ariaLabel: 'Width in feet' }),
         button('+', { mods: ['icon'], ariaLabel: 'Wider', data: { act: 'width-up' } }))}${hint('Width in feet (6 in works too).')}${row(

@@ -91,6 +91,10 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .nudge { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
+/* ---------- Numeric keypad: stands in for the native keyboard on a readonly edge-length / zone-resize field ---------- */
+.keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
+.keypad-key { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+
 /* ---------- Side panel: history, view and layers, docked on the right ---------- */
 .sidebar {
   flex: none; width: var(--width-sidebar); display: flex; flex-direction: column; overflow-y: auto;

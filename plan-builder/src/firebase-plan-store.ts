@@ -7,10 +7,8 @@ import {
 import { deleteObject, getBytes, ref as storageRef, uploadBytesResumable, type FirebaseStorage, type UploadTask } from 'firebase/storage';
 import { getFirebase } from './firebase';
 import { cleanAddress, docBytes, downloadTimeoutMs, editorFields, fromDoc, planStateOf, sortPlans, toDoc, SIZE_WARN_BYTES, type PlanDoc, type PlanMeta, type PlanState } from './plan-model';
-import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
+import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, sniffPlanFileType, type PlanStore } from './plan-store';
 import { pdfCache } from './pdf-cache';
-
-const CONTENT_TYPE = 'application/pdf'; // iPad files can have an empty type; rules require this
 
 const code = (e: unknown) => (e as { code?: unknown } | null)?.code;
 const isDenied = (e: unknown) => code(e) === 'permission-denied' || code(e) === 'storage/unauthorized';
@@ -240,7 +238,10 @@ export class FirebasePlanStore implements PlanStore {
     const local = mine?.rev === cur.pdf.rev ? mine : await pdfCache.get(id);
     if (local?.rev !== cur.pdf.rev) return; // not this device's PDF, or an older one
     const rev = local.rev;
-    const task = uploadBytesResumable(this.pdfRef(id), local.bytes, { contentType: CONTENT_TYPE, customMetadata: { rev: String(rev) } });
+    // Sniffed from the bytes, not trusted from the File that was picked: storage rules require an exact
+    // match, and iPad Files can hand that File an empty/wrong MIME type.
+    const contentType = sniffPlanFileType(local.bytes);
+    const task = uploadBytesResumable(this.pdfRef(id), local.bytes, { contentType, customMetadata: { rev: String(rev) } });
     this.inFlight.set(id, { rev, task });
     try {
       await task;

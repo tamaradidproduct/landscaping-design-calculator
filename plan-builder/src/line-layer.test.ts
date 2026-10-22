@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { edgeAt } from './fillet';
 import { LineLayer, lineLengthFt, lineLengthPt, linePathPt, lineWidthPt } from './line-layer';
 import { UNSCALED_FT_PT } from './symbol-layer';
 
@@ -41,6 +42,35 @@ describe('LineLayer', () => {
     expect(L.placed[id].points).toHaveLength(3); expect(L.placed[id].bulges).toEqual([0, -3]);
     expect(L.removePoint(id, 0)).toBe(true); expect(L.placed[id].bulges).toEqual([-3]);
     expect(L.removePoint(id, 0)).toBe(false); expect(L.placed[id].points).toHaveLength(2);
+  });
+  test('insertPoint splits a straight segment at the given fraction, keeping it straight', () => {
+    const L = new LineLayer(); const id = L.add('wood-privacy-fence', [P(0, 0), P(10, 0)], 1)!;
+    const i = L.insertPoint(id, 0, 0.25)!;
+    expect(i).toBe(1);
+    expect(L.placed[id].points).toEqual([P(0, 0), P(2.5, 0), P(10, 0)]);
+    expect(L.placed[id].bulges).toBeUndefined();
+  });
+  test('insertPoint splits a bent segment with no kink: each half still traces the original arc', () => {
+    const L = new LineLayer(); const id = L.add('dry-river', [P(0, 0), P(10, 0)], 4)!;
+    L.setBulge(id, 0, 3);
+    const before = L.placed[id], a = before.points[0], b = before.points[1], h = before.bulges![0], t = 0.4;
+    const i = L.insertPoint(id, 0, t)!;
+    const after = L.placed[id], p = after.points[i], h1 = after.bulges![0], h2 = after.bulges![1];
+    expect(after.points).toHaveLength(3);
+    for (const s of [0, 0.5, 1]) {
+      const onOriginal = edgeAt(a, b, h, t * s), onSub = edgeAt(a, p, h1, s);
+      expect(onSub.x).toBeCloseTo(onOriginal.x, 9); expect(onSub.y).toBeCloseTo(onOriginal.y, 9);
+    }
+    for (const s of [0, 0.5, 1]) {
+      const onOriginal = edgeAt(a, b, h, t + (1 - t) * s), onSub = edgeAt(p, b, h2, s);
+      expect(onSub.x).toBeCloseTo(onOriginal.x, 9); expect(onSub.y).toBeCloseTo(onOriginal.y, 9);
+    }
+  });
+  test('insertPoint refuses an out-of-range segment', () => {
+    const L = new LineLayer(); const id = L.add('wood-privacy-fence', [P(0, 0), P(10, 0)], 1)!;
+    expect(L.insertPoint(id, 1, 0.5)).toBeNull();
+    expect(L.insertPoint(id, -1, 0.5)).toBeNull();
+    expect(L.insertPoint('nope', 0, 0.5)).toBeNull();
   });
   test('setBulge clears bulges when every one is 0', () => {
     const L = new LineLayer(); const id = L.add('dry-river', [P(0, 0), P(10, 0)], 4)!;

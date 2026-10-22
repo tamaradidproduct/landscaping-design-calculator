@@ -1,8 +1,8 @@
 // Screens outside the editor: Sign-in, Not invited, and Plans (list + New plan form).
 import { SignInError, type AuthGate } from './auth';
-import { extractAddress, fileNameToTitle, suggestName } from './address-extract';
+import { dedupeName, extractAddress, fileNameToTitle, suggestName } from './address-extract';
 import { cleanAddress, editedAgo, type PlanMeta } from './plan-model';
-import { checkPdf, PlanInputError, type PlanStore } from './plan-store';
+import { checkPdf, isPdfFile, PlanInputError, type PlanStore } from './plan-store';
 import { button, card, emptyNote, error, esc, field, formStack, hint, input, listRow, row, screenPanel, screenText, splitRow } from './ui';
 
 /** The shared `#file` picker, reused for New plan and Replace plot plan: whoever armed it last gets the file. */
@@ -14,11 +14,23 @@ export function armFilePicker(onFile: ((file: File) => void) | null): HTMLInputE
 
 const INPUT_MESSAGES: Record<PlanInputError['reason'], string> = {
   address: "Enter the job's address.",
-  'not-pdf': "That file isn't a PDF. Pick the plot plan PDF.",
-  'too-big': 'This PDF is over 25 MB. Export a smaller copy and try again.',
-  'device-storage': "Couldn't keep this PDF on the device. Connect to the internet and try again.",
+  'not-pdf': "That file isn't a PDF, JPG or PNG. Pick the plot plan file.",
+  'too-big': 'This file is over 25 MB. Export a smaller copy and try again.',
+  'device-storage': "Couldn't keep this file on the device. Connect to the internet and try again.",
 };
 export const planInputMessage = (e: PlanInputError) => INPUT_MESSAGES[e.reason];
+
+/** The active (non-archived) plans' names to dedupe a new or renamed name against; `excludeId` leaves out the plan being renamed. */
+export function activePlanNames(plans: PlanMeta[], excludeId?: string): string[] {
+  return plans.filter(p => !p.archived && p.id !== excludeId).map(p => p.address);
+}
+
+const duplicateNotice = (name: string) => `A plan named "${name}" already exists. Numbered this one so you can tell them apart.`;
+
+/** Whether a drag carries files (not text, a reordered row, …) — the only thing `dataTransfer` exposes before 'drop'. */
+const draggingFiles = (dt: DataTransfer | null) => !!dt?.types && Array.from(dt.types).includes('Files');
+/** The first dropped file; `dataTransfer.files` only reads once 'drop' fires (empty during dragenter/dragover). */
+export const droppedFile = (dt: DataTransfer | null): File | null => dt?.files[0] ?? null;
 
 const panel = (html: string) => screenPanel('Plan Builder', html);
 
@@ -88,6 +100,11 @@ export class PlansScreen {
     root.addEventListener('keydown', e => this.onKey(e));
     root.addEventListener('input', e => { if ((e.target as HTMLElement).id === 'new-address') this.userEdited = true; });
     root.addEventListener('submit', e => e.preventDefault());
+    // Drag-and-drop (desktop convenience): dropping anywhere on the page feeds the New-plan form, opening it first if needed.
+    root.addEventListener('dragenter', e => this.onDragOver(e));
+    root.addEventListener('dragover', e => this.onDragOver(e));
+    root.addEventListener('dragleave', e => this.onDragLeave(e));
+    root.addEventListener('drop', e => this.onDrop(e));
   }
 
   show(): void {
@@ -102,6 +119,7 @@ export class PlansScreen {
 
   hide(): void {
     this.root.hidden = true;
+    this.root.classList.remove('drag-over');
     this.unwatch?.(); this.unwatch = null;
     clearInterval(this.tick);
     this.closeNew();
@@ -151,7 +169,7 @@ export class PlansScreen {
     const create = this.newOpen
       ? formStack(`<strong>New plan</strong>`
         + field('new-address', "Job's address (optional)", input('new-address', { placeholder: '123 Main St' }))
-        + row(button(this.picked ? 'Change PDF' : 'Pick plot plan PDF', { variant: this.picked ? undefined : 'primary', id: 'new-pdf', disabled: this.creating }),
+        + row(button(this.picked ? 'Change file' : 'Pick plot plan file', { variant: this.picked ? undefined : 'primary', id: 'new-pdf', disabled: this.creating }),
           this.picked ? button(this.creating ? 'Creating…' : 'Create plan', { variant: 'primary', id: 'create-plan', disabled: this.creating }) : '',
           button('Cancel', { data: { act: 'new-cancel' } }))
         + error(esc(this.newError), !this.newError), 'new-plan card stack', true)
@@ -257,9 +275,11 @@ export class PlansScreen {
     const clean = cleanAddress(el.value);
     const msg = el.parentElement!.querySelector<HTMLElement>('.text-error')!;
     if (!clean) { msg.textContent = INPUT_MESSAGES.address; msg.hidden = false; return; }
+    const { name, duplicate } = dedupeName(clean, activePlanNames(this.plans, id));
+    if (duplicate) { msg.textContent = duplicateNotice(clean); msg.hidden = false; }
     this.inline = null;
     try {
-      await this.store.rename(id, clean);
+      await this.store.rename(id, name);
     } catch (err) {
       if (err instanceof PlanInputError) { this.inline = { kind: 'rename', id }; this.render(); return; }
       this.opts.onError?.(err as Error, 'save');
@@ -270,6 +290,29 @@ export class PlansScreen {
   /** While the New plan form is open, a picked file is held until Create plan. */
   private armNew(): HTMLInputElement {
     return armFilePicker(file => this.pick(file));
+  }
+
+  private onDragOver(e: DragEvent) {
+    if (!draggingFiles(e.dataTransfer)) return;
+    e.preventDefault(); // lets 'drop' fire
+    e.dataTransfer!.dropEffect = 'copy';
+    this.root.classList.add('drag-over');
+  }
+
+  private onDragLeave(e: DragEvent) {
+    if (e.relatedTarget instanceof Node && this.root.contains(e.relatedTarget)) return; // still over a child
+    this.root.classList.remove('drag-over');
+  }
+
+  /** Dropped onto the open New-plan card: same as picking it there. Dropped elsewhere: open the card with it attached. */
+  private onDrop(e: DragEvent) {
+    if (!draggingFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    this.root.classList.remove('drag-over');
+    const file = droppedFile(e.dataTransfer);
+    if (!file) return;
+    if (!this.newOpen) { this.newOpen = true; this.armNew(); }
+    this.pick(file);
   }
 
   private setAddress(text: string) {
@@ -293,6 +336,7 @@ export class PlansScreen {
   }
 
   private async extract(file: File, seq: number) {
+    if (!isPdfFile(file)) return; // a JPG/PNG plot plan has no text to extract an address from
     try {
       const text = await this.opts.readPdfText?.(await file.arrayBuffer());
       if (seq !== this.extractSeq || !text) return;
@@ -307,9 +351,11 @@ export class PlansScreen {
     const file = this.picked;
     if (!this.newOpen || this.creating || !file) return;
     const typed = this.root.querySelector<HTMLInputElement>('#new-address')?.value ?? '';
-    this.creating = true; this.newError = ''; this.render();
+    const suggested = suggestName({ typed, extracted: this.extracted, fileName: file.name });
+    const { name, duplicate } = dedupeName(suggested, activePlanNames(this.plans));
+    this.creating = true; this.newError = duplicate ? duplicateNotice(suggested) : ''; this.render();
     try {
-      const id = await this.store.create(suggestName({ typed, extracted: this.extracted, fileName: file.name }), file);
+      const id = await this.store.create(name, file);
       this.closeNew();
       this.opts.onOpen(id);
     } catch (err) {

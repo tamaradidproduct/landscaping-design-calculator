@@ -25,6 +25,9 @@ button.account-toggle { max-width: 100%; overflow: hidden; text-overflow: ellips
 /* New plan form: a card in place of the New plan button */
 .new-plan .row > .primary { flex: 1; }
 
+/* Drag-and-drop (desktop convenience): dropping a file anywhere on the page feeds the New-plan form */
+#screen-plans.drag-over { outline: var(--stroke-bold) dashed var(--color-accent); outline-offset: calc(-1 * var(--space-8)); }
+
 /* Plan row: open (address over "Edited …"), Rename, Delete; or an inline rename field / delete confirm */
 .plan-list { display: flex; flex-direction: column; gap: var(--space-3); }
 .plan-row {
