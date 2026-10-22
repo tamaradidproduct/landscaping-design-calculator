@@ -38,13 +38,22 @@ export function renderSheet(el: HTMLElement, tool: OutlineTool) {
     material: tool.selected ? tool.outlines[tool.selected]?.material : undefined,
   };
   el.innerHTML = sheetHtml(plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null), sel);
-  el.querySelectorAll<HTMLElement>('[data-sheet-symbol]').forEach(b => { b.onclick = () => {
-    const id = tool.symbols.groups().find(g => g.symbol === b.dataset.sheetSymbol)?.ids[0]; if (id) tool.selectSymbol(id);
-  }; });
-  el.querySelectorAll<HTMLElement>('[data-sheet-line]').forEach(b => { b.onclick = () => {
-    const id = tool.lines.groups().find(g => g.item === b.dataset.sheetLine)?.ids[0]; if (id) tool.selectLine(id);
-  }; });
-  el.querySelectorAll<HTMLElement>('[data-sheet-material]').forEach(b => { b.onclick = () => {
-    const z = Object.values(tool.outlines).find(o => o.kind === 'surface' && o.material === b.dataset.sheetMaterial); if (z) tool.selectOutline(z.id);
-  }; });
+  el.querySelectorAll<HTMLElement>('[data-sheet-symbol]').forEach(b => {
+    b.onclick = () => {
+      const id = tool.symbols.groups().find(g => g.symbol === b.dataset.sheetSymbol)?.ids[0];
+      if (id) tool.selectSymbol(id);
+    };
+  });
+  el.querySelectorAll<HTMLElement>('[data-sheet-line]').forEach(b => {
+    b.onclick = () => {
+      const id = tool.lines.groups().find(g => g.item === b.dataset.sheetLine)?.ids[0];
+      if (id) tool.selectLine(id);
+    };
+  });
+  el.querySelectorAll<HTMLElement>('[data-sheet-material]').forEach(b => {
+    b.onclick = () => {
+      const z = Object.values(tool.outlines).find(o => o.kind === 'surface' && o.material === b.dataset.sheetMaterial);
+      if (z) tool.selectOutline(z.id);
+    };
+  });
 }
