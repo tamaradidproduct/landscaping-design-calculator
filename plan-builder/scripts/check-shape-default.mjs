@@ -2,6 +2,7 @@
 // Usage: node scripts/check-shape-default.mjs <riesberg.pdf> [url]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -37,12 +38,12 @@ try {
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]');
   await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['First surface starts as', await pressed()]);
   await page.keyboard.press('x');
   results.push(['X on the surface', await pressed()]);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=premium-sod]');
+  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]');
   results.push(['Next surface remembers', await pressed()]);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await page.click('#outlines [data-layer=boundary]'); await page.click('#outlines [data-card=boundary] [data-act=redraw]');
