@@ -1,9 +1,10 @@
 // Plants and objects on Riesberg (memory store): the picker finds and arms a symbol, each tap drops one at its researched size, a
-// placed symbol moves, turns and deletes (each undoable), the Plant list counts them, an eye hides a kind or the whole section,
+// placed symbol moves, turns and deletes (each undoable), the Sheet counts them, an eye hides a kind or the whole section,
 // and placements and hidden state survive closing and reopening the plan.
 // Usage: node scripts/check-symbols.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia, onSheet } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -18,13 +19,13 @@ const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getE
 const drag = async (p, q) => { const a = await toScreen(p), b = await toScreen(q); await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(200); };
 const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(250); };
 const images = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, x: +x.getAttribute('x'), y: +x.getAttribute('y'), w: +x.getAttribute('width'), t: x.getAttribute('transform') })));
-const counts = () => page.$$eval('#plant-list .plant-count', c => c.map(x => x.textContent.trim()));
-const arm = async (id, query = '') => { await page.click('[data-act=add-symbol]'); if (query) { await page.fill('#symbol-search', query); await page.waitForTimeout(150); } await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
+const counts = () => onSheet(page, p => p.$$eval('#layers-sheet .plant-count', c => c.map(x => x.textContent.trim())));
+const arm = async (id, query = '') => { await addVia(page, 'symbols'); if (query) { await page.fill('#symbol-search', query); await page.waitForTimeout(150); } await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   // Picker
-  await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', 'spruce'); await page.waitForTimeout(150);
+  await addVia(page, 'symbols'); await page.fill('#symbol-search', 'spruce'); await page.waitForTimeout(150);
   const found = await page.$$eval('#symbol-results [data-symbol]', b => b.map(x => x.textContent.trim()));
   check('Search "spruce" finds the two spruces', found.length === 2 && found.every(n => /Spruce/.test(n)), found.join(', '));
   await page.click('#symbol-results [data-symbol=blue-diamond-spruce]'); await page.waitForTimeout(150);
@@ -36,11 +37,11 @@ try {
   const expected = 10 / 0.2 * pxPerPt * 1.08; // 10 ft spread ÷ 0.2 ft/pt, plus the art's shadow allowance
   check('A plant is drawn at its researched spread', Math.abs(two[0].w / expected - 1) < 0.03, `${two[0].w.toFixed(1)} px vs ${expected.toFixed(1)}`);
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
-  check('The Plant list counts them', (await counts()).join() === '2', (await page.$eval('#plant-list', e => e.innerText.replace(/\n+/g, ' | '))));
+  check('The Sheet counts them', (await counts()).join() === '2', (await counts()).join());
   // Disarming: the card's ×; and starting a surface while armed
   await arm('hot-tub'); await page.click('#symbols [data-act=collapse]'); await page.waitForTimeout(150);
   check('The × on the placing card stops placing', !(await page.$('[data-act=stop-placing]')), 'Done button gone');
-  await arm('hot-tub'); await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await page.waitForTimeout(150);
+  await arm('hot-tub'); await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await page.waitForTimeout(150);
   await drag([300, 200], [340, 240]);
   check('Starting a surface while armed draws it, and placing stops', !(await page.$('[data-act=stop-placing]')) && (await page.$$('.overlay .shape.surface')).length > 0 && (await images()).length === 2, `${(await images()).length} symbols`);
   await page.keyboard.press('Escape');
@@ -75,7 +76,7 @@ try {
   await page.click('#symbols [data-eye-symbol=blue-diamond-spruce]'); await page.waitForTimeout(200);
   const imgsHidden = await images();
   check('Hiding a kind hides its symbols but not the others', imgsHidden.length === 1 && imgsHidden[0].id === 'y3', imgsHidden.map(i => i.id).join());
-  check('Hidden symbols still count in the Plant list', (await counts()).join() === '2,1', (await counts()).join());
+  check('Hidden symbols still count in the Sheet', (await counts()).join() === '2,1', (await counts()).join());
   await page.click('[data-eye-group=symbols]'); await page.waitForTimeout(200);
   check('Hiding the section hides every symbol', (await images()).length === 0, 'none drawn');
   // Persistence

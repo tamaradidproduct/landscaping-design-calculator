@@ -1,7 +1,7 @@
 // The Layers panel's Plants & objects section: one row per kind of plant or object placed ("Blue Diamond Spruce × 3", with an eye), then
 // "Add…", which opens a picker (search, then the families as lists); picking one arms placing: each tap on the plan drops one until Done.
 // The selected symbol's row opens into a card with Rotate and Delete.
-import { button, caption, esc, hint, input, layerCard, layerForm, layerRow, row, suggestRow, swatch } from './ui';
+import { button, caption, esc, hint, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import { stepRotation } from './symbol-layer';
 import { searchSymbols, symbolById, symbolFamilies, type LibrarySymbol } from './symbols';
@@ -20,6 +20,10 @@ export class SymbolsSection {
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
+  get pickerOpen() { return this.picking; }
+  /** The global Add menu's "Plant or object": open the picker. */
+  openPicker() { this.picking = true; this.query = ''; this.tool.deselect(); this.render(); this.el.querySelector<HTMLInputElement>('#symbol-search')?.focus(); }
+
   render() {
     const t = this.tool, sel = t.selectedSymbol ? t.symbols.placed[t.selectedSymbol] : null;
     if (t.placing || sel) this.picking = false;
@@ -32,13 +36,12 @@ export class SymbolsSection {
     const card = sel ? this.card(sel.id) : '';
     const placing = t.placing ? symbolById(t.placing)! : null;
     this.el.innerHTML = `
-      ${groups.length || placing || this.picking ? '' : hint('Add plants and objects: tap the plan to place each one at its true size.')}
       ${placing ? layerCard({ id: placing.id, swatch: { symbol: placing.thumb }, name: placing.name, done: true,
         body: `${hint('Placing: tap the plan to drop one. Drag to move the plan. Done or Esc stops.')}${button('Done', { mods: ['compact'], data: { act: 'stop-placing' } })}` }) : ''}
       ${rows.join('')}${card}
       ${placing ? '' : this.picking
         ? layerForm(`${input('symbol-search', { placeholder: 'Search plants and objects', ariaLabel: 'Search plants and objects', value: this.query })}<div id="symbol-results">${pickerList(this.query)}</div>${button('Cancel', { mods: ['compact'], data: { act: 'cancel-symbol-picker' } })}`)
-        : suggestRow('Add plant or object…', { act: 'add-symbol' })}`;
+        : ''}`;
     this.wire(sel?.id ?? null);
   }
 
@@ -67,7 +70,6 @@ export class SymbolsSection {
         t.selectSymbol(cur < 0 ? ids[0] : cur + 1 < ids.length ? ids[cur + 1] : null);
       };
     });
-    el.querySelector<HTMLButtonElement>('[data-act=add-symbol]')?.addEventListener('click', () => { this.picking = true; this.query = ''; t.deselect(); this.render(); el.querySelector<HTMLInputElement>('#symbol-search')?.focus(); });
     el.querySelector<HTMLButtonElement>('[data-act=cancel-symbol-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     el.querySelector<HTMLButtonElement>('[data-act=stop-placing]')?.addEventListener('click', () => t.stopPlacing());
     const bindPicker = () => el.querySelectorAll<HTMLButtonElement>('#symbol-results [data-symbol]').forEach(b => { b.onclick = () => { this.picking = false; t.startPlacing(b.dataset.symbol!); }; });

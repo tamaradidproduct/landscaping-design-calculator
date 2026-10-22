@@ -41,6 +41,7 @@
 | 4b | Surfaces stage 2 (Width × Depth in the zone card, optional aspect lock), stage 3 (move one corner) | 🔨 stage 2 done; stage 3 📝 next | `feat/surfaces-width-depth` |
 | 5 | Plants & objects (symbols at true mature size) and the Plant list | ✅ done (merged) | `feat/symbols` |
 | 5b | Lines (fence, walls, edging, dry river), stepping stones, utility markers (the rest of the library's surfaces) | 🔨 done, in review | `feat/linear-point-surfaces` |
+| 5c | Panel structure: guided unlock (boundary, then scale), global + Add, new section order, Sheet view, quiet canvas controls | 🔨 done, in review | `feat/handoff-panel` |
 | 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
@@ -51,7 +52,7 @@
 - Pinch/scroll-pinch zooms; one finger or two-finger trackpad drag pans; **panning is free** (not limited to the page). Double-tap zooms in / back to fit.
 - Works **offline** after the first load.
 - 🔨 **Plot plan layer** at the end of the **Outlines** section (it collapses with it): **eye** shows/hides the plan (hidden = no snapping to its lines), the **file name** with a pencil opens a different plot plan, and an **opacity** slider (10–100%). Resets to shown, 100% on opening a file. ("Open another" removed.)
-- 🔨 **Side panel** on the right (always docked, 280 px), top to bottom: **Undo / Redo** · **zoom − / + / Fit page** · **Layers**. Layers has an **Outlines** section: one row per outline (tap a feature's row to select it), then suggestions while missing — **Plot boundary**, **House**, **Custom outline…** (quick picks: Driveway, Patio, Porch, Walk, Deck, Garage, Shed, Pool, or type a name). Sections by trade come later.
+- 🔨 **Side panel** on the right (always docked, 280 px) is **Layers** only; **Undo / Redo** (⌘Z / ⇧⌘Z still work) sit in a quiet icon bar at the canvas's top-right and **zoom − / + / Fit page** at its bottom-right. Until the plot boundary is outlined the panel shows only **Outlines** with a hint; once the scale is set, a global **+ Add** at the top (Plant or object, Surface, Edges & walls) and the sections that have items appear, in the order **Plants & objects → Edges & walls → Surfaces → Outlines**. Empty sections stay hidden; a plan that already has items but no scale shows them as unlocked. An **Edit | Sheet** toggle switches to a read-only Sheet view (see §6.10).
 - 🔨 **Collapsible Layers sections:** **Surfaces** (above) and **Outlines** each have a header with a chevron; collapsed, it shows the count (Outlines = the plot boundary + features, not the plot plan; Surfaces = zones). Open/closed is remembered on the device. Selecting a layer on the plan or starting to draw one opens its section; it can be collapsed again while still selected.
 - 🔨 **Snap toggle** sits in the floating bar at the bottom of the plan (beside Freehand | Rectangle), shown only while drawing an outline or with a finished outline's corner, edge or feature selected.
 - 🔨 **Rectangle tool.** While an outline is being drawn, a floating bar at the bottom of the plan offers **Freehand | Rectangle** (with the Snap toggle beside it); **X** switches; the choice is remembered on the device. The pointer shows which tool is on: Freehand = a dot; Rectangle = a ⌐ corner mark and dashed guide lines across the plan through the pointer (also while dragging, so they show where the edges will run); the cursor is a crosshair while drawing. **Rectangle:** drag from one corner to the opposite one (or tap one corner, then the other); the result is square to the plan and closes itself as a normal 4-corner outline (editable, bendable, Square works). Each end snaps like any corner; Shift makes it a square. Switching tools after starting starts the outline over (⌘Z brings the corners back). Angled shapes: use Freehand.
@@ -136,7 +137,7 @@
 - A placed symbol: tap to select, drag to move, arrow keys nudge, **Rotate** (− / typed angle / +, 15° steps), **Delete**; every change undoes (a drag or a run of nudges is one step). Where symbols overlap, the last placed is on top.
 - **Rows** group by kind ("Blue Diamond Spruce × 3") with an eye per kind and one on the section header (saved with the plan, like the other eyes; hidden symbols still count in the list).
 - Saved with the plan as `symbols` (library id, position, rotation). With no plan scale yet, a symbol is 2.4 page points per foot and still follows zoom.
-- **Plant list** panel under Layers, live: surfaces used (swatch, name), plants (symbol, name, category, quantity, photo), objects (symbol, name, quantity). The water-consumption table is 📝 later.
+- **Sheet view** (Edit | Sheet toggle in the panel) replaces the old Plant list under Layers: read-only, live, fed by the same plant list, grouped as Plants, Objects, Utility markers, Edges & walls (feet and runs) and Surfaces (swatch, name). The water-consumption table is 📝 later.
 - 📝 Later: plant growth over time, quantities with prices, per-symbol size overrides, the water table.
 
 ### 6.11 Lines, stepping stones and utility markers ✅🔨
@@ -149,7 +150,7 @@
 - **Stepping stones** are objects (2 × 2 ft; the Colorado buff stone 3.56 × 2 ft), placed one per tap like any symbol, with rotate.
 - **Utility markers** place one per tap; **rotation is the direction** (the art points along the run, 0° = up). True size (0.4 × 1 ft for gas and electric, 3.8 × 3 ft for drainage) but never shorter than **20 px** on screen.
 - Saved with the plan as `lines` (item, points, bends, width in feet); stones and markers are `symbols`. With no plan scale a width or length uses 2.4 page points per foot and the list says "no scale".
-- **Plant list** gains **Lines** (item, total feet, runs), stepping stones under **Objects**, and **Utility markers** (quantity).
+- The Sheet view gains **Edges & walls** (item, total feet, runs; "Lines" was renamed), stepping stones under **Objects**, and **Utility markers** (quantity).
 - 📝 Later: stones repeating along a path, fence posts and gates, widths per segment, utility depth and length, snapping lines to outlines.
 
 ### 6.9 Plans & sign-in ✅🔨

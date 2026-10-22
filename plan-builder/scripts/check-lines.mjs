@@ -4,6 +4,7 @@
 // Usage: node scripts/check-lines.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia, onSheet } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -22,14 +23,14 @@ const runs = () => page.$$eval('.overlay g.line', g => g.map(x => ({ id: x.datas
 /** The run's width in px: its texture tile is as wide as the stroke (a strip item). */
 const thickness = () => page.$eval('.overlay g.line pattern', p => +p.getAttribute('width'));
 const pxPerPt = () => page.evaluate(() => document.getElementById('page').getBoundingClientRect().width / 612);
-const listText = () => page.$eval('#plant-list', e => e.innerText.replace(/\n+/g, ' | '));
+const listText = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerText.replace(/\n+/g, ' | ')));
 try {
   await page.click('[data-start=boundary]'); await page.mouse.move(...await toScreen([250, 150]));
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]); await drag(a, b); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   const k = await pxPerPt();
   // Picker
-  await page.click('[data-act=add-line]'); await page.fill('#line-search', 'fence'); await page.waitForTimeout(150);
+  await addVia(page, 'lines'); await page.fill('#line-search', 'fence'); await page.waitForTimeout(150);
   const found = await page.$$eval('#line-results [data-line-item]', x => x.map(i => i.textContent.trim()));
   check('Search "fence" finds the privacy fence only', found.length === 1 && /fence/i.test(found[0]), found.join(', '));
   await page.click('#line-results [data-line-item=wood-privacy-fence]'); await page.waitForTimeout(150);
@@ -66,10 +67,10 @@ try {
   check('⌘Z brings the point back', (await page.$$('.overlay .line-point')).length === 3, `${(await page.$$('.overlay .line-point')).length} points`);
   // Esc mid-draft: nothing saved
   await page.keyboard.press('Escape');
-  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  await addVia(page, 'lines'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
   check('Esc cancels a draft without saving', (await runs()).length === 1 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} run`);
   // ⌘Z mid-draft takes back one point and leaves the saved line alone
-  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await tap([250, 480]);
+  await addVia(page, 'lines'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 450]); await tap([250, 480]);
   const dots = () => page.$$eval('.overlay .corner', d => d.length);
   check('Two taps make two draft points', (await dots()) === 2, `${await dots()} dots`);
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
@@ -80,22 +81,22 @@ try {
   check('A double-tap on a point placed earlier ends the run', (await runs()).length === 2 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} runs, draft ${!!(await page.$('[data-act=finish-line]'))}`);
   // Second line l3: double-tap on a new spot adds the point and finishes
   await page.keyboard.press('Escape');
-  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 520]);
+  await addVia(page, 'lines'); await page.click('#line-results [data-line-item=dry-river]'); await tap([150, 520]);
   const [dx, dy] = await toScreen([350, 560]); await page.mouse.dblclick(dx, dy); await page.waitForTimeout(500);
   check('A double-tap on a new spot adds the point and ends the run', (await runs()).length === 3 && !(await page.$('[data-act=finish-line]')), `${(await runs()).length} runs`);
   await page.keyboard.press('Escape');
   // Edging along the plot boundary's left edge: tapping it selects the line, not the outline's edge
-  await page.click('[data-act=add-line]'); await page.click('#line-results [data-line-item=white-stone-edging]'); await tap([250, 200]); await tap([250, 400]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(250);
+  await addVia(page, 'lines'); await page.click('#line-results [data-line-item=white-stone-edging]'); await tap([250, 200]); await tap([250, 400]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(250);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await tap([250, 300]);
   check('Tapping edging that lies on the boundary selects the line, not the edge', (await page.$$('.overlay .line-point')).length === 2 && (await page.$$('.popover:not([hidden])')).length === 0, `${(await page.$$('.overlay .line-point')).length} points, ${(await page.$$('.popover:not([hidden])')).length} popovers`);
   await page.keyboard.press('Escape');
   // Starting a symbol while a line is selected leaves no stuck state
-  await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', 'hot'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
+  await addVia(page, 'symbols'); await page.fill('#symbol-search', 'hot'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
   check('Arming a symbol drops the line selection', (await page.$$('.overlay .line-point')).length === 0 && !!(await page.$('[data-act=stop-placing]')), 'no handles, Done shown');
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   // Stepping stone and utility marker: one per tap, direction on the marker, both counted
-  const pickSymbol = async (query, id) => { await page.click('[data-act=add-symbol]'); await page.fill('#symbol-search', query); await page.waitForTimeout(150); await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
+  const pickSymbol = async (query, id) => { await addVia(page, 'symbols'); await page.fill('#symbol-search', query); await page.waitForTimeout(150); await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
   const symImgs = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, src: x.getAttribute('href'), w: +x.getAttribute('width'), h: +x.getAttribute('height'), t: x.getAttribute('transform') })));
   await pickSymbol('porcelain', 'porcelain-pavers'); await tap([300, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   await pickSymbol('gas', 'gas-line'); await tap([450, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
@@ -110,14 +111,14 @@ try {
   check('Turning a marker 90° points it along the run', /rotate\(90 /.test((await symImgs()).find(i => /gas-line/.test(i.src)).t ?? ''), '90°');
   await page.keyboard.press('Escape');
   const list = await listText();
-  check('The Plant list shows lines with feet and runs', /Lines \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| White stone edging \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 2 runs/.test(list), list.slice(0, 160));
+  check('The Sheet shows lines with feet and runs', /Edges & walls \| Wood privacy fence \| \d+(\.\d)? ft · 1 run \| White stone edging \| \d+(\.\d)? ft · 1 run \| Dry river \| \d+(\.\d)? ft · 2 runs/.test(list), list.slice(0, 160));
   check('…stepping stones under Objects and the gas marker under Utility markers', /Objects \| .*Porcelain stepping stones.*1/.test(list) && /Utility markers \| .*Gas line.*1/.test(list), list.slice(-160));
   // Hide
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
   check('Hiding a kind hides its runs only', (await runs()).length === 3 && !(await runs()).some(r => r.id === 'l1'), (await runs()).map(r => r.id).join());
   await page.click('[data-eye-group=lines]'); await page.waitForTimeout(200);
   check('Hiding the section hides every run', (await runs()).length === 0, 'none drawn');
-  check('Hidden runs still count in the Plant list', /Wood privacy fence \| \d/.test(await listText()), 'still listed');
+  check('Hidden runs still count in the Sheet', /Wood privacy fence \| \d/.test(await listText()), 'still listed');
   // Persistence
   await page.waitForTimeout(1800);
   await page.click('#back-to-plans'); await page.locator('.plan-row').first().waitFor();
@@ -131,7 +132,7 @@ try {
   await page.click('#lines [data-eye-line=wood-privacy-fence]'); await page.waitForTimeout(200);
   check('Showing that kind restores all four runs', (await runs()).length === 4, (await runs()).map(r => r.id).join());
   check('Stone and marker survived reopening', (await symImgs()).length === 2, `${(await symImgs()).length} symbols`);
-  check('The list still shows lines and markers', /Lines \|/.test(await listText()) && /Utility markers/.test(await listText()), (await listText()).slice(0, 80));
+  check('The list still shows lines and markers', /Edges & walls \|/.test(await listText()) && /Utility markers/.test(await listText()), (await listText()).slice(0, 80));
   await page.screenshot({ path: `${outDir}/lines-end.png` });
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }
 check('No page errors', errors.length === 0, errors.slice(0, 2).join(' | ') || 'none');

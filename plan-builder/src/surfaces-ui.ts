@@ -7,7 +7,7 @@ import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from '
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
+import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, swatch } from './ui';
 
 /** Every material as a list, grouped by family under a caption; `current` is marked. */
 const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
@@ -19,26 +19,27 @@ export class SurfacesSection {
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
+  get pickerOpen() { return this.picking; }
+  /** The global Add menu's "Surface": open the material picker (adding a zone closes the selected one's card). */
+  openPicker() { this.picking = true; if (this.tool.selected) this.tool.selectOutline(null); else this.render(); }
+
   render() {
     const t = this.tool;
     const zones = Object.values(t.outlines).filter(o => o.kind === 'surface');
-    if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = hint('Outline the plot boundary first.'); return; }
+    if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = ''; return; }
     if (t.drawing || !t.boundaryClosed) this.picking = false;
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
       : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
-      ${zones.length ? '' : hint('Add the new surfaces: lawn, beds, patio…')}
       ${rows.join('')}
       ${t.drawing || !t.boundaryClosed ? '' : this.picking
         ? layerForm(`${picker()}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-picker' } })}`)
-        : suggestRow('Add surface…', { act: 'add-surface' })}`;
+        : ''}`;
 
     this.el.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach(b => {
       b.onclick = () => { const id = b.dataset.zone!; t.selectOutline(id !== t.selected ? id : null); };
     });
-    // Adding a zone closes the selected one's card, so only one material picker shows at a time.
-    this.el.querySelector<HTMLButtonElement>('[data-act=add-surface]')?.addEventListener('click', () => { this.picking = true; if (t.selected) t.selectOutline(null); else this.render(); });
     this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');

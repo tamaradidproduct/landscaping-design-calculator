@@ -4,6 +4,7 @@
 // Usage: node scripts/check-visibility.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -22,7 +23,8 @@ const pressed = sel => page.$eval(sel, b => b.getAttribute('aria-pressed'));
 const tile = id => page.$eval(`#zone-defs pattern#zone-${id}`, p => Number(p.getAttribute('width')));
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
+  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // the scale unlocks + Add
+  await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
   // Before any scale is set, the texture scale still works (and follows zoom).
   if (await page.$('#surfaces [data-zone=s1]')) await page.click('#surfaces [data-zone=s1]'); // else its card is already open
   const u0 = await tile('s1');
@@ -31,10 +33,9 @@ try {
   await page.click('#zoom-in'); await page.waitForTimeout(250);
   const u2 = await tile('s1');
   check('No scale yet: + still enlarges the texture', Math.abs(u1 / u0 - 1.25) < 0.001, `${u0.toFixed(1)} → ${u1.toFixed(1)}`);
-  check('No scale yet: the texture follows zoom', u2 > u1 * 1.1, `${u1.toFixed(1)} → ${u2.toFixed(1)}`);
+  check('The texture follows zoom', u2 > u1 * 1.1, `${u1.toFixed(1)} → ${u2.toFixed(1)}`);
   await page.click('#surfaces [data-act=tex-reset]'); await page.click('#fit'); await page.keyboard.press('Escape'); await page.waitForTimeout(250);
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=deck-wood]'); await drag([300, 420], [480, 620]); await page.keyboard.press('Escape');
+  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=deck-wood]'); await drag([300, 420], [480, 620]); await page.keyboard.press('Escape');
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');
 
   // Texture scale (zone s2 = the deck): select it and step.

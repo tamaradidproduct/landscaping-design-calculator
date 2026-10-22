@@ -18,6 +18,15 @@
           <div class="loading" id="loading" hidden>Opening plot plan…</div>
         </div>
         <header class="plan-head" id="plan-head"></header>
+        <div class="canvas-controls top-right">
+          <button type="button" class="icon" id="undo" disabled aria-label="Undo" title="Undo (⌘Z)"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3L2.5 6.5 6 10M3 6.5h6a4 4 0 010 8H6" /></svg></button>
+          <button type="button" class="icon" id="redo" disabled aria-label="Redo" title="Redo (⇧⌘Z)"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l3.5 3.5L10 10M13 6.5H7a4 4 0 000 8h3" /></svg></button>
+        </div>
+        <div class="canvas-controls bottom-right">
+          <button type="button" class="icon" id="zoom-out" aria-label="Zoom out" title="Zoom out"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10" /></svg></button>
+          <button type="button" class="icon" id="zoom-in" aria-label="Zoom in" title="Zoom in"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10" /></svg></button>
+          <button type="button" class="icon" id="fit" aria-label="Fit page" title="Fit page"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /></svg></button>
+        </div>
         <div class="dock">
           <div class="segmented" id="shape" role="group" aria-label="Draw the outline" hidden>
             <button type="button" data-shape="freehand" aria-pressed="true" title="Freehand (X switches)">Freehand</button>
@@ -29,68 +38,70 @@
       <section class="screen" id="screen-auth" hidden></section>
       <section class="screen" id="screen-plans" hidden></section>
       <aside class="sidebar" id="sidebar" hidden>
-        <section class="side-section">
-          <div class="row split">
-            <button type="button" id="undo" disabled title="Undo (⌘Z)">↶ Undo</button>
-            <button type="button" id="redo" disabled title="Redo (⇧⌘Z)">↷ Redo</button>
-          </div>
-        </section>
-        <section class="side-section">
-          <div class="row">
-            <button type="button" class="icon" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
-            <button type="button" class="icon" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
-            <button type="button" class="grow" id="fit">Fit page</button>
-          </div>
-        </section>
         <section class="side-section layers">
-          <h2 class="side-title">Layers</h2>
-          <div class="group-line">
-            <button type="button" class="group-head" data-group="surfaces" aria-expanded="true" aria-controls="group-surfaces">
-              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-              <span class="group-title">Surfaces</span><span class="group-count" hidden></span>
-            </button>
-            <button type="button" class="icon" data-eye-group="surfaces" aria-pressed="true" aria-label="Hide all surfaces" title="Hide all surfaces">
-              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
-            </button>
+          <div class="side-head">
+            <h2 class="side-title">Layers</h2>
+            <div class="segmented" id="layers-view" role="group" aria-label="Panel view">
+              <button type="button" data-view="edit" aria-pressed="true">Edit</button>
+              <button type="button" data-view="sheet" aria-pressed="false">Sheet</button>
+            </div>
           </div>
-          <div class="group-body" id="group-surfaces">
-            <div class="layer-list" id="surfaces"></div>
-          </div>
-          <div class="group-line">
-            <button type="button" class="group-head" data-group="lines" aria-expanded="true" aria-controls="group-lines">
-              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-              <span class="group-title">Lines</span><span class="group-count" hidden></span>
-            </button>
-            <button type="button" class="icon" data-eye-group="lines" aria-pressed="true" aria-label="Hide all lines" title="Hide all lines">
-              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
-            </button>
-          </div>
-          <div class="group-body" id="group-lines">
-            <div class="layer-list" id="lines"></div>
-          </div>
-          <div class="group-line">
-            <button type="button" class="group-head" data-group="symbols" aria-expanded="true" aria-controls="group-symbols">
-              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-              <span class="group-title">Plants &amp; objects</span><span class="group-count" hidden></span>
-            </button>
-            <button type="button" class="icon" data-eye-group="symbols" aria-pressed="true" aria-label="Hide all plants and objects" title="Hide all plants and objects">
-              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
-            </button>
-          </div>
-          <div class="group-body" id="group-symbols">
-            <div class="layer-list" id="symbols"></div>
-          </div>
-          <div class="group-line">
-            <button type="button" class="group-head" data-group="outlines" aria-expanded="true" aria-controls="group-outlines">
-              <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
-              <span class="group-title">Outlines</span><span class="group-count" hidden></span>
-            </button>
-            <button type="button" class="icon" data-eye-group="outlines" aria-pressed="true" aria-label="Hide all outlines" title="Hide all outlines">
-              <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
-            </button>
-          </div>
-          <div class="group-body" id="group-outlines">
-            <div class="layer-list" id="outlines"></div>
+          <div id="layers-edit">
+            <div id="add" class="add-menu" hidden></div>
+            <div class="layer-group" id="section-symbols">
+              <div class="group-line">
+                <button type="button" class="group-head" data-group="symbols" aria-expanded="true" aria-controls="group-symbols">
+                  <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+                  <span class="group-title">Plants &amp; objects</span><span class="group-count" hidden></span>
+                </button>
+                <button type="button" class="icon" data-eye-group="symbols" aria-pressed="true" aria-label="Hide all plants and objects" title="Hide all plants and objects">
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+                </button>
+              </div>
+              <div class="group-body" id="group-symbols">
+                <div class="layer-list" id="symbols"></div>
+              </div>
+            </div>
+            <div class="layer-group" id="section-lines">
+              <div class="group-line">
+                <button type="button" class="group-head" data-group="lines" aria-expanded="true" aria-controls="group-lines">
+                  <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+                  <span class="group-title">Edges &amp; walls</span><span class="group-count" hidden></span>
+                </button>
+                <button type="button" class="icon" data-eye-group="lines" aria-pressed="true" aria-label="Hide all edges and walls" title="Hide all edges and walls">
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+                </button>
+              </div>
+              <div class="group-body" id="group-lines">
+                <div class="layer-list" id="lines"></div>
+              </div>
+            </div>
+            <div class="layer-group" id="section-surfaces">
+              <div class="group-line">
+                <button type="button" class="group-head" data-group="surfaces" aria-expanded="true" aria-controls="group-surfaces">
+                  <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+                  <span class="group-title">Surfaces</span><span class="group-count" hidden></span>
+                </button>
+                <button type="button" class="icon" data-eye-group="surfaces" aria-pressed="true" aria-label="Hide all surfaces" title="Hide all surfaces">
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+                </button>
+              </div>
+              <div class="group-body" id="group-surfaces">
+                <div class="layer-list" id="surfaces"></div>
+              </div>
+            </div>
+            <div class="layer-group" id="section-outlines">
+              <div class="group-line">
+                <button type="button" class="group-head" data-group="outlines" aria-expanded="true" aria-controls="group-outlines">
+                  <svg class="line-icon chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg>
+                  <span class="group-title">Outlines</span><span class="group-count" hidden></span>
+                </button>
+                <button type="button" class="icon" data-eye-group="outlines" aria-pressed="true" aria-label="Hide all outlines" title="Hide all outlines">
+                  <svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path class="eye" d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z" /><circle class="eye" cx="8" cy="8" r="2" /><path class="eye-off" d="M2.5 2.5l11 11" /></svg>
+                </button>
+              </div>
+              <div class="group-body" id="group-outlines">
+                <div class="layer-list" id="outlines"></div>
             <div class="plan-layer">
               <h3 class="side-subtitle">Plot plan</h3>
               <div class="layer-item">
@@ -115,12 +126,11 @@
                 <span class="text-figure" id="plan-opacity-value">100%</span>
               </div>
             </div>
+              </div>
+            </div>
           </div>
+          <div id="layers-sheet" class="sheet" hidden></div>
         </section>
-        <details class="side-section plant-list" id="plant-list-section" open>
-          <summary class="side-title">Plant list</summary>
-          <div id="plant-list"></div>
-        </details>
       </aside>
       <div class="bubble toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" hidden />

@@ -4,6 +4,7 @@
 // Usage: node scripts/check-zone-edit.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -34,9 +35,9 @@ try {
   await page.click('[data-start=boundary]');
   results.push(['Snap while tracing the boundary', await snapLabel()]);
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
+  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
-  await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['Snap while drawing a surface', await snapLabel()]);
   await drag([300, 250], [360, 350]); // 12′ × 20′, stays selected
   results.push(['Rename field', `wrap ${!!await page.$('#surfaces .layer-rename-wrap')} · pencil ${!!await page.$('#surfaces .layer-rename-wrap svg')} · ${await page.$eval('#surfaces .layer-rename-wrap', e => getComputedStyle(e).borderBottomStyle)} underline`]);

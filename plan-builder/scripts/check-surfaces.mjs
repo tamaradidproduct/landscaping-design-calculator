@@ -4,6 +4,7 @@
 // Usage: node scripts/check-surfaces.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -37,18 +38,15 @@ await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]);
 await page.keyboard.press('Escape');
 results.push(['After the plot boundary', `${(await page.textContent('#surfaces')).trim()}`]);
 
-// Sod before any scale: tapping its edge offers no length field.
-await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=premium-sod]');
-await drag([280, 180], [520, 400]);
-results.push(['Zone closed before a scale: toast', await toast()]);
-await tap([400, 400]);
-results.push(['Zone edge before a scale', `field shown: ${!!await page.$('#edge-len')} · ${(await page.textContent('.popover')).replace(/\s+/g, ' ').trim().slice(0, 80)}`]);
-await page.keyboard.press('Escape');
-
 // Scale from the boundary's left edge: 500 pt = 100 ft (0.2 ft/pt).
 await tap([250, 560]);
-await page.fill('#edge-len', '100'); await page.click('.popover button[type=submit]');
+await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
 results.push(['Scale set on the boundary', await toast()]);
+await page.keyboard.press('Escape');
+
+// Sod, drawn once the scale is set (Add stays hidden until then).
+await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]');
+await drag([280, 180], [520, 400]);
 await page.keyboard.press('Escape');
 
 // House drawn after the sod still cuts it.
@@ -58,7 +56,7 @@ const sod = await shape('s1');
 results.push(['House (drawn later) cuts the sod', `sod rings ${sod?.rings} (2 = with a hole)`]);
 
 // Pavers 12′ × 20′ (60 × 100 pt), inside the sod → placed above it.
-await page.click('[data-act=add-surface]'); await page.click('#surfaces [data-material=pavers-classic]');
+await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=pavers-classic]');
 await drag([300, 250], [360, 350]);
 results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod rings now ${(await shape('s1'))?.rings}`]);
 results.push(['Plan look', `boundary fill ${await page.$eval('.overlay .shape.boundary.closed', e => getComputedStyle(e).fill)} (expect none) · surface labels ${await page.$$eval('.overlay .label.surface', e => e.length)} (expect 0)`]);
@@ -66,7 +64,7 @@ results.push(['Selected zone stays solid (expect 1 · 1)', `pavers ${await fillO
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 
 // With the pavers still selected, Add surface… starts a new zone (it must not re-material the pavers).
-await page.click('[data-act=add-surface]'); await page.click('#surfaces .layer-form [data-material=wood-mulch]');
+await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=wood-mulch]');
 results.push(['Add surface… while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
 await drag([250, 150], [330, 190]); // its top edge lies on the lot line
 await tap([290, 150]);
@@ -78,7 +76,7 @@ await page.keyboard.down('Control'); for (let i = 0; i < 10; i++) { await page.m
 await page.waitForTimeout(600);
 await tap([320, 250]); // top edge, near the left corner → the left corner stays
 results.push(['Pavers top edge', `${(await page.textContent('.popover .text-figure')).trim()} · label "${(await page.textContent('.popover .text-label'))}" · fixed mark in accent ${await page.$eval('.overlay .fixed-end', e => getComputedStyle(e).stroke === getComputedStyle(document.querySelector('button.primary') ?? document.body).backgroundColor).catch(() => 'missing')}`]);
-await page.fill('#edge-len', '16'); await page.click('.popover button[type=submit]');
+await page.$eval('#edge-len', (e, v) => { e.value = v; }, '16'); await page.click('.popover button[type=submit]');
 const p16 = await shape('s2');
 results.push(['Typed 16′', `${await toast()} · x ${p16.x0}..${p16.x1} (expect 300..380) · y ${p16.y0}..${p16.y1} (expect 250..350)`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
