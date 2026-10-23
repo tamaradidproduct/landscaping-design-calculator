@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: deploy-staging
   cancel-in-progress: true
@@ -17,6 +20,8 @@ jobs:
         working-directory: plan-builder
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -42,16 +47,24 @@ jobs:
         continue-on-error: true
         env:
           WEBHOOK: ${{ secrets.AIRTABLE_DEPLOY_WEBHOOK }}
-          COMMITS: ${{ toJson(github.event.commits.*.message) }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DEPLOY_URL: https://tamaradidproduct.github.io/landscaping-design-calculator-staging/
         run: |
           # secrets can't be read in `if:`; skip here when the webhook isn't configured.
           [ -n "$WEBHOOK" ] || { echo "No AIRTABLE_DEPLOY_WEBHOOK; skipping"; exit 0; }
+          # Include commits since the last successful notification, including commits from canceled runs.
+          git fetch origin refs/heads/staging-notified:refs/remotes/origin/staging-notified 2>/dev/null || true
+          PREVIOUS_SHA=$(git rev-parse --verify refs/remotes/origin/staging-notified 2>/dev/null || true)
+          if [ -n "$PREVIOUS_SHA" ]; then
+            COMMIT_RANGE="$PREVIOUS_SHA..$GITHUB_SHA"
+          else
+            COMMIT_RANGE="$GITHUB_SHA"
+          fi
+          COMMITS=$(git log --reverse --format='%B%x00' "$COMMIT_RANGE" | jq -Rs 'split("\u0000") | map(select(test("\\S")))')
           # issue_numbers: #N refs from behavior commits only (docs/test/ci/chore/build/deps/Dependabot skipped).
           # Airtable moves the matching open Findings to Ready to retest.
           jq -n \
-            --argjson messages "${COMMITS:-null}" \
+            --argjson messages "$COMMITS" \
             --arg sha "$GITHUB_SHA" --arg branch "$GITHUB_REF_NAME" \
             --arg run_url "$RUN_URL" --arg run_id "$GITHUB_RUN_ID" --arg url "$DEPLOY_URL" \
             --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
@@ -69,3 +82,4 @@ jobs:
               issue_numbers: ([$m[] | select(skip | not) | [scan("#([0-9]+)\\b")[0]][]] | unique)
             }' \
           | curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK"
+          git push origin "$GITHUB_SHA:refs/heads/staging-notified"
