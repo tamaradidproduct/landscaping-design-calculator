@@ -1,7 +1,9 @@
 // The slimmer cards on Riesberg: outline card (header + action row only, icon Redraw, trash on features), the three ways a card closes,
 // the collapsed surface card and its Corner radius field, the edge chip (Set length -> keypad -> Done, ⋯ menu, "No scale"),
 // drag-to-reorder of Outlines and Surfaces (grip drag, Escape, Alt+arrows, one ⌘Z), the touch-only canvas nudge pad with the floating
-// Square corners button, and the plant card (no rotation) against the object card (Rotate row).
+// Square corners button, and the plant card (no rotation) against the object card (Rotate row). PART=followup: typed edge lengths on
+// a desktop keyboard (keypad on touch), the edge chip's ⓘ tip, the surface card's header and Material swatch, Width and Depth in
+// the card, typed numeric fields, and the resizable side panel (drag, touch, keys, double-tap, limits, persistence, no overlaps).
 // Usage: node scripts/check-slim-cards.mjs <plot-plan.pdf> [base-url] [outDir]
 //   base-url defaults to $BASE_URL or http://localhost:5180 (`/?store=memory` is added unless the URL already has a query); outDir to $OUT_DIR or ./
 import { chromium } from 'playwright-core';
@@ -13,7 +15,8 @@ const [pdf, baseArg, outArg] = process.argv.slice(2);
 const base = baseArg ?? process.env.BASE_URL ?? 'http://localhost:5180';
 const url = base.includes('?') ? base : `${base.replace(/\/$/, '')}/?store=memory`;
 const outDir = outArg ?? process.env.OUT_DIR ?? '.';
-const onlyPart = process.env.PART; // 'main' | 'nudge' to run one part
+const onlyPart = process.env.PART; // 'main' | 'nudge' | 'followup' to run one part
+const runs = part => !onlyPart || onlyPart === part;
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const results = [];
@@ -41,7 +44,7 @@ async function start({ width = 1180, coarse = false, touch = false } = {}) {
   return { context, page, toScreen, tap, drag, dragRect };
 }
 
-if (onlyPart !== 'nudge') {
+if (runs('main')) {
   const { context, page, toScreen, tap, drag, dragRect } = await start({ touch: true });
   const chipText = () => page.evaluate(() => { const m = document.querySelector('.edge-chip-mount'); return m.hidden ? '(hidden)' : m.innerText.replace(/\s+/g, ' ').trim(); });
   const insideStage = () => page.evaluate(() => {
@@ -175,17 +178,17 @@ if (onlyPart !== 'nudge') {
   // ---- Surface card ----
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   await drag([400, 200], [500, 300]);
-  check('surface card: collapsed by default (no #zone-width)', !!(await page.$('#surfaces [data-card]')) && !(await page.$('#zone-width')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'false', '');
+  check('surface card: Width and Depth in the card; Corners and texture collapsed (no #round-all)', !!(await page.$('#surfaces [data-card]')) && !!(await page.$('#zone-width')) && !(await page.$('#round-all')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'false', '');
   check('surface card: no up/down, no Square corners button, no nudge in the card', !(await page.$('#surfaces [data-card] [data-act=up], #surfaces [data-card] [data-act=down], #surfaces [data-card] [data-act=square-all], #surfaces [data-card] .nudge, #surfaces [data-card] .layer-order')), '');
   const sRedraw = await page.$('#surfaces [data-card] [data-act=redraw]'), sTrash = await page.$('#surfaces [data-card] [data-act=delete]');
   check('surface card: icon Redraw and Delete trash', !!sRedraw && (await sRedraw.getAttribute('aria-label')) === 'Redraw' && !!sTrash && (await sTrash.getAttribute('aria-label')) === 'Delete', '');
   const trunc = await page.evaluate(() => ['#surfaces [data-act=change-material]', '#surfaces [data-disclosure=adjust] .layer-name'].map(q => { const e = document.querySelector(q), r = e.getBoundingClientRect(); return { q, text: e.textContent.trim(), clipped: e.scrollWidth > e.clientWidth + 1, w: Math.round(r.width) }; }));
-  check('surface card: Material and Shape and texture labels are not truncated', trunc.every(t => !t.clipped), JSON.stringify(trunc));
+  check('surface card: Material and Corners and texture labels are not truncated', trunc.every(t => !t.clipped), JSON.stringify(trunc));
   check('surface card: the Material button keeps aria-label Change material', (await page.getAttribute('#surfaces [data-act=change-material]', 'aria-label')) === 'Change material', '');
   check('reorder grips carry a title and aria-keyshortcuts', await page.$$eval('#outlines [data-grip]', g => g.length > 0 && g.every(x => x.title && /Alt\+ArrowUp/.test(x.getAttribute('aria-keyshortcuts') ?? ''))), '');
   await page.screenshot({ path: `${outDir}/slim-surface-closed.png` });
   await page.click('[data-disclosure=adjust]'); await page.waitForTimeout(200);
-  check('surface card: Shape and texture opens the size fields', !!(await page.$('#zone-width')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'true', '');
+  check('surface card: Corners and texture opens Corner radius and Texture', !!(await page.$('#round-all')) && !!(await page.$('#surfaces [data-act=tex-up]')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'true', '');
   await page.screenshot({ path: `${outDir}/slim-surface-open.png` });
   await page.fill('#round-all', '2'); await page.click('.round-all button[type=submit]'); await page.waitForTimeout(250);
   check('surface card: Corner radius shows 2 after Round all 2′', (await page.inputValue('#round-all')) === '2', await page.inputValue('#round-all'));
@@ -282,7 +285,7 @@ if (onlyPart !== 'nudge') {
 }
 
 // ---- Nudge pad and floating Square corners: fine and coarse pointer ----
-if (onlyPart !== 'main') for (const coarse of [false, true]) for (const width of [1180, 820]) {
+if (runs('nudge')) for (const coarse of [false, true]) for (const width of [1180, 820]) {
   const { context, page, toScreen, tap, dragRect } = await start({ width, coarse });
   const tag = `${coarse ? 'coarse' : 'fine'} ${width}px: `;
   const hidden = sel => page.$eval(sel, e => e.hidden || getComputedStyle(e).display === 'none');
@@ -329,6 +332,184 @@ if (onlyPart !== 'main') for (const coarse of [false, true]) for (const width of
   await page.click('#square-corners'); await page.waitForTimeout(250);
   check(tag + 'Square corners click runs without error', errors.length === 0, errors.join('|'));
   await context.close();
+}
+
+// ---- Follow-ups (iPad review): typed lengths on desktop, the edge tip, the surface card header and Material button, Width and Depth
+// back in the card, and the resizable side panel ----
+if (runs('followup')) {
+  const rect = (pg, sel) => pg.$eval(sel, e => { const r = e.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height, hidden: e.hidden || r.width === 0 }; });
+  const inside = (a, b) => a.l >= b.l - 0.5 && a.r <= b.r + 0.5 && a.t >= b.t - 0.5 && a.b <= b.b + 0.5;
+  const overlap = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  const chipOf = pg => pg.evaluate(() => { const m = document.querySelector('.edge-chip-mount'); return m.hidden ? '(hidden)' : m.innerText.replace(/\s+/g, ' ').trim(); });
+  const sideW = pg => pg.$eval('#sidebar', e => Math.round(parseFloat(getComputedStyle(e).width))); // the panel's width (its border sits outside)
+  const stored = pg => pg.evaluate(() => localStorage.getItem('plan-builder.sidebar-width'));
+
+  // ---- Desktop (fine pointer): typing lengths, the tip, the surface card, typed numeric fields ----
+  {
+    const { context, page, tap, drag, dragRect } = await start({ width: 1180 });
+    const tag = 'desktop: ';
+    await page.click('[data-start=boundary]'); await dragRect([250, 150], [550, 650]);
+    await tap([250, 560]);
+    await page.click('.edge-chip [data-act=edit-length]'); await page.waitForTimeout(150);
+    check(tag + 'edge field is focused and typeable (not readonly)', await page.evaluate(() => document.activeElement?.id === 'edge-len' && !document.activeElement.readOnly), '');
+    check(tag + 'no on-screen keypad; a Done submit button instead', !(await page.$('.edge-chip .keypad')) && !!(await page.$('.edge-chip button[type=submit]')), '');
+    const doneBox = await (await page.$('.edge-chip button[type=submit]')).boundingBox();
+    check(tag + 'Done is at least 44px tall', doneBox.height >= 44, `${doneBox.height}`);
+    await page.screenshot({ path: `${outDir}/followup-chip-typing.png` });
+    await page.keyboard.type('100'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    check(tag + 'typed 100 + Enter sets the scale', /Scale set/.test(await page.textContent('#toast')), await page.textContent('#toast'));
+    await tap([250, 560]);
+    check(tag + 'edge then reads 100.00′', (await chipOf(page)).startsWith('100.00′'), await chipOf(page));
+    await page.click('.edge-chip [data-act=edit-length]'); await page.keyboard.type('5'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    check(tag + 'Escape cancels typing: back to the length, edge still selected, nothing changed', !(await page.$('.edge-chip.editing')) && (await chipOf(page)).startsWith('100.00′'), await chipOf(page));
+    // The info tip
+    const tipBtn = '.edge-chip [data-act=tip]';
+    check(tag + 'info button keeps its title and aria-label, starts collapsed', await page.$eval(tipBtn, b => !!b.title && b.title === b.getAttribute('aria-label') && b.getAttribute('aria-expanded') === 'false'), '');
+    await page.click(tipBtn); await page.waitForTimeout(150);
+    const tipText = await page.$eval('.edge-chip .edge-tip', e => e.textContent).catch(() => '');
+    check(tag + 'tapping ⓘ shows the tip in the chip (aria-expanded true)', /Drag the square/.test(tipText) && (await page.getAttribute(tipBtn, 'aria-expanded')) === 'true', tipText);
+    check(tag + 'the open tip keeps the chip inside the stage', inside(await rect(page, '.edge-chip-mount'), await rect(page, '#stage')), '');
+    await page.screenshot({ path: `${outDir}/followup-chip-tip.png` });
+    await page.click(tipBtn); await page.waitForTimeout(150);
+    check(tag + 'tapping ⓘ again closes the tip', !(await page.$('.edge-chip .edge-tip')) && (await page.getAttribute(tipBtn, 'aria-expanded')) === 'false', '');
+    await page.click(tipBtn); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    check(tag + 'Escape closes the tip first (the chip stays)', !(await page.$('.edge-chip .edge-tip')) && (await chipOf(page)) !== '(hidden)', await chipOf(page));
+    await page.click(tipBtn); await tap([100, 700]); await tap([250, 560]);
+    check(tag + 'deselecting the edge closes the tip', !(await page.$('.edge-chip .edge-tip')) && (await page.getAttribute(tipBtn, 'aria-expanded')) === 'false', '');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+
+    // Surface card: area under the name, swatch in the Material button, Width and Depth in the card
+    await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+    await drag([400, 200], [500, 300]);
+    const card = '#surfaces [data-card]';
+    check(tag + 'surface header has no swatch', !!(await page.$(card)) && !(await page.$(`${card} .layer-head .swatch`)), '');
+    const sub = await page.$eval(`${card} .layer-head .layer-sub`, e => e.textContent).catch(() => '(none)');
+    check(tag + 'surface area is the line under the name (no meta beside it)', /sq ft/.test(sub) && !(await page.$(`${card} .layer-head .layer-meta`)), sub);
+    const mat = await page.$eval(`${card} [data-act=change-material]`, e => { const r = e.getBoundingClientRect(); return { sw: !!e.querySelector('.swatch.material'), text: e.textContent.trim(), h: r.height, clipped: [...e.querySelectorAll('span')].some(s => s.scrollWidth > s.clientWidth + 1) || e.scrollWidth > e.clientWidth + 1, label: e.getAttribute('aria-label') }; });
+    check(tag + 'Material button shows the swatch and "Material" (aria-label Change material, >=44px, not clipped)', mat.sw && mat.text === 'Material' && mat.label === 'Change material' && mat.h >= 44 && !mat.clipped, JSON.stringify(mat));
+    check(tag + 'Width and Depth show without opening the disclosure', !!(await page.$('#zone-width')) && !!(await page.$('#zone-depth')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'false', '');
+    const discLabel = await page.$eval('[data-disclosure=adjust] .layer-name', e => ({ t: e.textContent, clipped: e.scrollWidth > e.clientWidth + 1 }));
+    check(tag + 'disclosure reads "Corners and texture", not truncated', discLabel.t === 'Corners and texture' && !discLabel.clipped, JSON.stringify(discLabel));
+    await page.screenshot({ path: `${outDir}/followup-surface-card.png` });
+    const zid = await page.$eval(card, e => e.dataset.card);
+    const zw = () => page.$eval(`.overlay .shape.closed[data-id="${zid}"]`, e => Math.round(e.getBoundingClientRect().width));
+    const w0 = await zw();
+    await page.click('#zone-width'); await page.keyboard.press('Meta+a'); await page.keyboard.type('12'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    check(tag + 'typing a Width resizes the zone', (await page.inputValue('#zone-width')).startsWith('12') && (await zw()) !== w0, `${await page.inputValue('#zone-width')} · ${w0} -> ${await zw()}`);
+    await page.click('[data-disclosure=adjust]'); await page.waitForTimeout(150);
+    await page.click('#round-all'); await page.keyboard.press('Meta+a'); await page.keyboard.type('2'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    check(tag + 'typing a Corner radius applies it', (await page.inputValue('#round-all')) === '2', await page.inputValue('#round-all'));
+    // A typed length with a feet mark on the zone's right edge
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    await page.click(`#surfaces [data-zone="${zid}"]`); await page.waitForTimeout(250);
+    const zb = await page.$eval(`.overlay .shape.closed[data-id="${zid}"]`, e => { const r = e.getBoundingClientRect(); return [r.right, r.top + r.height / 2]; });
+    await page.mouse.click(zb[0] - 1, zb[1]); await page.waitForTimeout(400);
+    if ((await chipOf(page)) !== '(hidden)') {
+      await page.click('.edge-chip [data-act=edit-length]'); await page.keyboard.type("15'"); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+      await page.mouse.click(...await page.$eval(`.overlay .shape.closed[data-id="${zid}"]`, e => { const r = e.getBoundingClientRect(); return [r.right - 1, r.top + r.height / 2]; })); await page.waitForTimeout(400);
+      check(tag + "typing 15' on a zone edge resizes it", (await chipOf(page)).startsWith('15.00′'), await chipOf(page));
+    } else check(tag + "typing 15' on a zone edge resizes it", false, 'no chip on the zone side');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    // A second zone: the first one's collapsed row keeps its swatch
+    await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+    await dragRect([400, 380], [500, 460]);
+    check(tag + 'collapsed surface rows keep their swatch', await page.$$eval('#surfaces [data-zone]', rs => rs.length > 0 && rs.every(r => r.querySelector('.swatch.material'))), '');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    // Object rotation takes typing
+    await addVia(page, 'symbols'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
+    await tap([450, 560]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200); await tap([450, 560]);
+    await page.click('#symbol-rotation'); await page.keyboard.press('Meta+a'); await page.keyboard.type('30'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const tf = await page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => x.getAttribute('transform') ?? '').join('|'));
+    check(tag + 'typing a rotation turns the object', /rotate\(30/.test(tf) && (await page.inputValue('#symbol-rotation')) === '30', tf);
+    await page.keyboard.press('Escape');
+
+    // ---- Side panel resize ----
+    const h = '#sidebar-resize';
+    check(tag + 'panel handle is a focusable vertical separator', await page.$eval(h, e => e.getAttribute('role') === 'separator' && e.getAttribute('aria-orientation') === 'vertical' && e.tabIndex === 0 && !!e.getAttribute('aria-label')), '');
+    check(tag + 'panel starts at the default 280px', (await sideW(page)) === 280, `${await sideW(page)}`);
+    const cw0 = (await rect(page, '#canvas')).w, hb = await rect(page, h);
+    await page.mouse.move(hb.l + hb.w / 2, 400); await page.mouse.down(); await page.mouse.move(hb.l + hb.w / 2 - 100, 400, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(500);
+    check(tag + 'dragging the handle 100px left widens the panel to 380px', (await sideW(page)) === 380, `${await sideW(page)}`);
+    check(tag + 'the canvas narrows by the same amount', Math.abs((await rect(page, '#canvas')).w - (cw0 - 100)) <= 1, `${cw0} -> ${(await rect(page, '#canvas')).w}`);
+    check(tag + 'the width is kept for this viewer (localStorage)', (await stored(page)) === '380', `${await stored(page)}`);
+    check(tag + 'the handle follows the panel edge', Math.abs(((await rect(page, h)).l + (await rect(page, h)).w / 2) - (await rect(page, '#sidebar')).l) <= 1, '');
+    await tap([250, 400]); await page.waitForTimeout(300);
+    const sb = await rect(page, '#sidebar'), st = await rect(page, '#stage');
+    for (const id of ['#square-corners', '#zoom-in', '#fit', '#undo', '#redo']) {
+      const r = await rect(page, id); if (r.hidden) continue;
+      check(tag + `after widening, ${id} sits inside the stage, clear of the panel`, inside(r, st) && !overlap(r, sb), JSON.stringify(r));
+    }
+    await tap([250, 560]);
+    check(tag + 'after widening, the edge chip stays inside the stage', (await chipOf(page)) !== '(hidden)' && inside(await rect(page, '.edge-chip-mount'), st), await chipOf(page));
+    check(tag + 'after widening, the plan still fits the stage', inside(await rect(page, '#page'), { l: st.l - 1, r: st.r + 1, t: st.t - 1, b: st.b + 1 }), JSON.stringify(await rect(page, '#page')));
+    await page.screenshot({ path: `${outDir}/followup-panel-wide.png` });
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    await page.focus(h); await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(200);
+    check(tag + 'ArrowLeft on the handle widens by 16px', (await sideW(page)) === 396, `${await sideW(page)}`);
+    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(200);
+    check(tag + 'ArrowRight narrows by 16px', (await sideW(page)) === 380, `${await sideW(page)}`);
+    check(tag + 'aria-valuenow follows the width', (await page.getAttribute(h, 'aria-valuenow')) === '380', await page.getAttribute(h, 'aria-valuenow'));
+    const hb2 = await rect(page, h);
+    await page.mouse.move(hb2.l + hb2.w / 2, 400); await page.mouse.down(); await page.mouse.move(100, 400, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(400);
+    check(tag + 'the panel stops at 472px (40% of 1180)', (await sideW(page)) === 472, `${await sideW(page)}`);
+    const hb3 = await rect(page, h);
+    await page.mouse.move(hb3.l + hb3.w / 2, 400); await page.mouse.down(); await page.mouse.move(1150, 400, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(400);
+    check(tag + 'the panel never goes below 280px', (await sideW(page)) === 280, `${await sideW(page)}`);
+    await page.focus(h); for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(200);
+    const hb4 = await rect(page, h);
+    await page.mouse.dblclick(hb4.l + hb4.w / 2, 400); await page.waitForTimeout(400);
+    check(tag + 'double-clicking the handle resets to 280px', (await sideW(page)) === 280 && (await stored(page)) === null, `${await sideW(page)} · ${await stored(page)}`);
+    await page.focus(h); for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(200);
+    await page.reload(); await page.waitForTimeout(3500); await openPlan(page, pdf);
+    check(tag + 'the width survives a reload', (await sideW(page)) === 360, `${await sideW(page)}`);
+    await context.close();
+  }
+
+  // ---- Narrow window (820px): the panel's widest, and nothing overlaps ----
+  {
+    const { context, page, tap, dragRect } = await start({ width: 820 });
+    const tag = 'desktop 820px: ';
+    const hb = await rect(page, '#sidebar-resize');
+    await page.mouse.move(hb.l + hb.w / 2, 400); await page.mouse.down(); await page.mouse.move(50, 400, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(500);
+    check(tag + 'the panel stops at 328px (40% of 820)', (await sideW(page)) === 328, `${await sideW(page)}`);
+    await page.click('[data-start=boundary]'); await dragRect([250, 150], [550, 650]);
+    await tap([250, 400]); await page.waitForTimeout(300);
+    const sb = await rect(page, '#sidebar'), st = await rect(page, '#stage');
+    for (const id of ['#square-corners', '#zoom-in', '#zoom-out', '#fit', '#undo', '#redo', '#plan-head']) {
+      const r = await rect(page, id); if (r.hidden) continue;
+      check(tag + `${id} inside the stage, clear of the panel`, inside(r, st) && !overlap(r, sb), JSON.stringify(r));
+    }
+    await tap([550, 400]);
+    check(tag + 'edge chip on the right edge stays inside the stage', (await chipOf(page)) !== '(hidden)' && inside(await rect(page, '.edge-chip-mount'), st), await chipOf(page));
+    await page.screenshot({ path: `${outDir}/followup-panel-820.png` });
+    await context.close();
+  }
+
+  // ---- Touch (coarse pointer): keypad stays, ⓘ taps, the handle drags by touch ----
+  {
+    const { context, page, tap, dragRect } = await start({ width: 1180, coarse: true });
+    const tag = 'touch: ';
+    await page.click('[data-start=boundary]'); await dragRect([250, 150], [550, 650]);
+    await tap([250, 560]);
+    await page.click('.edge-chip [data-act=edit-length]'); await page.waitForTimeout(150);
+    check(tag + 'edge field stays readonly with the on-screen keypad', await page.$eval('#edge-len', e => e.readOnly) && !!(await page.$('.edge-chip .keypad')), '');
+    const tb = await (await page.$('.edge-chip [data-act=tip]')).boundingBox();
+    await page.touchscreen.tap(tb.x + tb.width / 2, tb.y + tb.height / 2); await page.waitForTimeout(200);
+    check(tag + 'tapping ⓘ opens the tip', !!(await page.$('.edge-chip .edge-tip')), '');
+    await page.touchscreen.tap(tb.x + tb.width / 2, tb.y + tb.height / 2); await page.waitForTimeout(200);
+    check(tag + 'tapping ⓘ again closes it', !(await page.$('.edge-chip .edge-tip')), '');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    const cdp = await context.newCDPSession(page), hb = await rect(page, '#sidebar-resize');
+    const x0 = hb.l + hb.w / 2, y = 400;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });
+    for (let i = 1; i <= 8; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 - 80 * i / 8, y }] }); await page.waitForTimeout(20); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(400);
+    check(tag + 'a touch drag of the handle widens the panel', (await sideW(page)) === 360, `${await sideW(page)}`);
+    const hb2 = await rect(page, '#sidebar-resize');
+    await page.touchscreen.tap(hb2.l + hb2.w / 2, y); await page.waitForTimeout(120); await page.touchscreen.tap(hb2.l + hb2.w / 2, y); await page.waitForTimeout(400);
+    check(tag + 'a double-tap on the handle resets it', (await sideW(page)) === 280, `${await sideW(page)}`);
+    await context.close();
+  }
 }
 
 check('no page errors', errors.length === 0, errors.join(' | '));
