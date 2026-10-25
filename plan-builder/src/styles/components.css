@@ -61,17 +61,15 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .dock > * { pointer-events: auto; }
 .dock > .toggle, .dock > .segmented { box-shadow: var(--shadow-sm); }
 
-/* ---------- Canvas controls: Undo/Redo top right, zoom and Fit bottom right; muted until pressed ---------- */
+/* ---------- Canvas controls: zoom and Fit bottom right; muted until pressed ---------- */
 .canvas-controls { position: absolute; z-index: var(--z-chip); display: flex; gap: var(--space-3); right: calc(var(--space-6) + env(safe-area-inset-right, 0px)); }
-.canvas-controls.top-right { top: calc(var(--space-6) + env(safe-area-inset-top, 0px)); }
 .canvas-controls.bottom-right { bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px)); }
 .canvas-controls > button.icon { background: var(--color-surface); color: var(--color-muted); box-shadow: var(--shadow-sm); }
 .canvas-controls > button.icon:hover:not(:disabled) { color: var(--color-ink); }
 .canvas-controls > button.icon:disabled { opacity: var(--opacity-layer-off); box-shadow: none; }
 
-/* Layers header: the title and the Edit | Sheet toggle */
+/* Layers header: the title */
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.side-head .segmented > button { min-height: var(--control-sm); padding: 0 var(--space-6); font-size: var(--text-base); }
 #layers-edit, #layers-sheet { display: flex; flex-direction: column; gap: var(--space-4); }
 #layers-edit[hidden], #layers-sheet[hidden], .layer-group[hidden] { display: none; }
 .layer-group { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -99,7 +97,7 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .sidebar {
   flex: none; width: var(--width-sidebar); display: flex; flex-direction: column; overflow-y: auto;
   background: var(--color-surface); border-left: var(--border-width) solid var(--color-line);
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
 }
 .side-section { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6) var(--space-7); border-bottom: var(--border-width) solid var(--color-line); }
 .side-section.layers { border-bottom: 0; }
@@ -215,3 +213,6 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
 .plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
+
+/* Narrow screens: the name truncates first, then Export shows its icon only */
+@media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar #export { min-width: var(--control-md); padding: 0; } }

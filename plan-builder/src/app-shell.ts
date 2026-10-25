@@ -51,7 +51,7 @@ export function startShell(ed: Editor): Shell {
   function showScreen(which: 'auth' | 'plans' | 'editor') {
     authRoot.hidden = which !== 'auth';
     if (which !== 'plans') session?.plans.hide();
-    $('canvas').hidden = which !== 'editor'; $('sidebar').hidden = which !== 'editor';
+    $('top-bar').hidden = which !== 'editor'; $('canvas').hidden = which !== 'editor'; $('sidebar').hidden = which !== 'editor';
     if (which === 'plans') session?.plans.show();
   }
 
@@ -95,7 +95,7 @@ export function startShell(ed: Editor): Shell {
   }
 
   function backToPlans() { closeEditor(); showScreen('plans'); }
-  const head = new PlanHead($('plan-head'), {
+  const head = new PlanHead($('top-bar-left'), {
     back: backToPlans,
     async rename(address) {
       const plan = current, store = session?.store;

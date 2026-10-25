@@ -20,6 +20,7 @@ import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 import { docBytes, toDoc } from './plan-model';
+import { topBarHtml, EXPORT_NOTE, type EditorView } from './top-bar';
 import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
@@ -41,6 +42,16 @@ let stageSize: Size = { w: 0, h: 0 };
 let sharpTimer = 0;
 let viewVersion = 0;
 let baseVersion = 0;
+
+// ---------- Top bar: rendered once (PlanHead owns its left cluster); undo/redo and the view switch are patched in place ----------
+const bar = { canUndo: false, canRedo: false, view: 'edit' as EditorView };
+$('top-bar').innerHTML = topBarHtml({ name: '', ...bar });
+function updateBar() {
+  ($('undo') as HTMLButtonElement).disabled = !bar.canUndo;
+  ($('redo') as HTMLButtonElement).disabled = !bar.canRedo;
+  document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === bar.view)));
+  $('top-bar').classList.toggle('previewing', bar.view === 'preview');
+}
 
 let correction: Correction = IDENTITY;   // page points → true-shape points (a stretched plan, once corrected)
 /** The page in true-shape points (only stretches for now, so the sheet's corner stays at the origin). */
@@ -91,8 +102,7 @@ const tool = new OutlineTool({
     applyView(view, false); void renderBase().then(() => renderSharpSoon(0));
   },
   historyChanged(canUndo, canRedo) {
-    ($('undo') as HTMLButtonElement).disabled = !canUndo;
-    ($('redo') as HTMLButtonElement).disabled = !canRedo;
+    bar.canUndo = canUndo; bar.canRedo = canRedo; updateBar();
   },
   changed() {
     rescalePatterns(); // a typed edge length can change the plan's scale
@@ -188,16 +198,14 @@ outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 // Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
 const addMenu = new AddMenu($('add'), (type: AddType) => { groupsOpen[type] = true; try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ } ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
-// Edit | Sheet: the sheet is a read-only view of the same data.
+// Edit | Preview (top bar): Preview is the read-only sheet view of the same data.
 let sheetOpen = false;
-document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(b => {
-  b.onclick = () => {
-    sheetOpen = b.dataset.view === 'sheet';
-    document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    $('layers-edit').hidden = sheetOpen; $('layers-sheet').hidden = !sheetOpen;
-    if (sheetOpen) renderSheet($('layers-sheet'), tool);
-  };
-});
+function setView(v: EditorView) {
+  sheetOpen = v === 'preview'; bar.view = v; updateBar();
+  $('layers-edit').hidden = sheetOpen; $('layers-sheet').hidden = !sheetOpen;
+  if (sheetOpen) renderSheet($('layers-sheet'), tool);
+}
+document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => { b.onclick = () => setView(b.dataset.view === 'preview' ? 'preview' : 'edit'); });
 updateGroups();
 $('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
@@ -215,6 +223,7 @@ window.addEventListener('blur', () => tool.setModifiers(false, false));
 
 $('undo').onclick = () => tool.undo();
 $('redo').onclick = () => tool.redo();
+$('export').onclick = () => toast(EXPORT_NOTE);
 
 // Freehand | Rectangle, remembered per kind on this device (a convenience: losing it just means the defaults,
 // Freehand for outlines and Rectangle for surfaces). X switches.
