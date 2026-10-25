@@ -27,6 +27,17 @@ button.large { min-height: var(--control-xl); padding: 0 var(--space-11); }
 button.icon { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-2xl); line-height: var(--leading-tight); }
 button.icon.small { min-width: var(--control-sm); min-height: var(--control-sm); font-size: var(--text-3xl); }
 button.toggle[aria-pressed="false"] { color: var(--color-muted); }
+button.icon.danger { color: var(--color-warn); }
+/* Reorder grip: a 48 px hit area beside a layer row */
+.grip { flex: none; display: grid; place-content: center; min-width: var(--control-md); min-height: var(--control-md); color: var(--color-muted); cursor: grab; touch-action: none; border-radius: var(--radius-md); }
+.grip:hover, .grip:focus-visible { color: var(--color-ink); }
+/* Disclosure: a row that opens a body beneath it */
+.disclosure { display: flex; flex-direction: column; gap: var(--space-4); }
+.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: var(--control-md); text-align: left; }
+.disclosure-body { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Canvas nudge pad: four arrows at the canvas's bottom-left */
+.nudge-pad { position: absolute; left: var(--space-8); bottom: var(--space-8); display: flex; gap: var(--space-3); }
+.nudge-pad > button.icon { background: var(--color-surface); box-shadow: var(--shadow-sm); }
 button.toggle[aria-pressed="true"] { border-color: var(--color-accent); }
 button.chip { text-align: center; }
 button.compact { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-base); white-space: nowrap; }

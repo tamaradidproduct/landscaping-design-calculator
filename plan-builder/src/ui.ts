@@ -126,6 +126,33 @@ export function nudgePad(): string {
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
+export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right';
+const ICON_PATHS: Record<IconName, string> = {
+  trash: '<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.5 7v4M9.5 7v4" />',
+  info: '<circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.1" />',
+  more: '<circle cx="3.5" cy="8" r=".6" /><circle cx="8" cy="8" r=".6" /><circle cx="12.5" cy="8" r=".6" />',
+  'chevron-left': '<path d="M10 3L5 8l5 5" />',
+  'chevron-right': '<path d="M6 3l5 5-5 5" />',
+};
+const lineIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+/** An icon-only button (48 px): a line icon with an aria-label and title. */
+export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record<string, string>; variant?: 'danger'; pressed?: boolean }): string {
+  const d = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
+  return `<button type="button" class="icon${o.variant ? ` ${o.variant}` : ''}"${d} aria-label="${esc(o.ariaLabel)}" title="${esc(o.ariaLabel)}"`
+    + `${o.pressed ? ' aria-pressed="true"' : ''}>${lineIcon(icon)}</button>`;
+}
+/** A row that opens and closes its body (aria-expanded); the body is only in the markup while open. */
+export function disclosure(id: string, labelText: string, open: boolean, bodyHtml: string): string {
+  return `<div class="disclosure"><button type="button" class="disclosure-head" data-disclosure="${esc(id)}" aria-expanded="${open}">`
+    + `<span class="layer-name">${esc(labelText)}</span>${lineIcon(open ? 'chevron-left' : 'chevron-right')}</button>`
+    + `${open ? `<div class="disclosure-body">${bodyHtml}</div>` : ''}</div>`;
+}
+/** Four arrows over the canvas (bottom-left) that nudge the selected corner by one screen pixel (data-nudge="dx,dy"). */
+export function canvasNudgePad(): string {
+  const arrow = (glyph: string, dir: string, d: string) => button(glyph, { mods: ['icon'], ariaLabel: `Nudge ${dir}`, data: { nudge: d } });
+  return `<div class="nudge-pad">${arrow('←', 'left', '-1,0')}${arrow('↑', 'up', '0,-1')}${arrow('↓', 'down', '0,1')}${arrow('→', 'right', '1,0')}</div>`;
+}
+
 /** A layer's swatch: the outline kind's look, or a surface's material (its texture). */
 export type Swatch = 'boundary' | 'feature' | { material: MaterialId } | { symbol: string };
 export const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
@@ -139,6 +166,8 @@ export interface LayerRowOptions {
   sub?: string;
   /** Adds an eye beside the row (data-eye, or data-<attr>) that shows or hides layer `id`. */
   eye?: { id: string; hidden: boolean; attr?: string };
+  /** Prefixes a reorder grip (data-grip = the row's data-layer or data-zone id). */
+  grip?: boolean;
 }
 /** An eye toggle: pressed = shown. `what` names it for the label ("Lawn"); `data` says what it toggles. */
 export const eyeButton = (hidden: boolean, what: string, data: Record<string, string>) => {
@@ -149,12 +178,17 @@ export const eyeButton = (hidden: boolean, what: string, data: Record<string, st
 const layerName = (name: string, sub?: string) => sub
   ? `<span class="layer-text"><span class="layer-name">${esc(name)}</span><span class="layer-sub">${esc(sub)}</span></span>`
   : `<span class="layer-name">${esc(name)}</span>`;
+const GRIP_ICON = '<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="4" r=".6" /><circle cx="10" cy="4" r=".6" /><circle cx="6" cy="8" r=".6" /><circle cx="10" cy="8" r=".6" /><circle cx="6" cy="12" r=".6" /><circle cx="10" cy="12" r=".6" /></svg>';
 export function layerRow(name: string, o: LayerRowOptions): string {
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   const row = `<button type="button" class="layer-row${o.selected ? ' selected' : ''}${o.eye?.hidden ? ' off' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
     + `${swatch(o.swatch)}${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
-  return o.eye ? `<div class="layer-item">${eyeButton(o.eye.hidden, name, { [o.eye.attr ?? 'eye']: o.eye.id })}${row}</div>` : row;
+  if (!o.eye && !o.grip) return row;
+  const gripId = o.data?.layer ?? o.data?.zone ?? '';
+  const grip = o.grip ? `<span class="grip" role="button" tabindex="0" aria-label="Reorder ${esc(name)}" data-grip="${esc(gripId)}">${GRIP_ICON}</span>` : '';
+  const eye = o.eye ? eyeButton(o.eye.hidden, name, { [o.eye.attr ?? 'eye']: o.eye.id }) : '';
+  return `<div class="layer-item">${grip}${eye}${row}</div>`;
 }
 /**
  * Layer card: the row of the outline being drawn or edited, expanded in place. The head keeps the swatch and
