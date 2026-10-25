@@ -100,6 +100,7 @@
 
 ### 6.6 Platform ✅
 - Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
+- 🔨 The expanded layer-card header (`.layer-head`) and material-picker rows (`.material-list > button.layer-row`) use `--control-md` (48px); `--control-sm` (40px) stays for non-tap-target uses (text inputs, the texture-scale slider, inline chip fields) and a couple of rows not yet revisited (Issue #43).
 - Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
 
 ### 6.7 Existing features (Step 3) ✅🔨
