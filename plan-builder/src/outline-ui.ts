@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
-  edgeTapOrder, moveInSection, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
+  edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -952,6 +952,13 @@ export class OutlineTool {
    */
   moveLayer(id: string, dir: -1 | 1) {
     const ids = moveInSection(Object.keys(this.outlines), this.outlines, id, dir); if (!ids) return;
+    this.record();
+    this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
+    this.update();
+  }
+  /** Drag-reorder: put layer `id` before layer `beforeId` (null = last) in its section, as one undo step; no step when nothing would change. */
+  moveLayerTo(id: string, beforeId: string | null) {
+    const ids = moveInSectionTo(Object.keys(this.outlines), this.outlines, id, beforeId); if (!ids) return;
     this.record();
     this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
     this.update();

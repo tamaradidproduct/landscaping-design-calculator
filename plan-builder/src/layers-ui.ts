@@ -5,7 +5,7 @@
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import { outlinesHints, panelState } from './panel-state';
 import type { OutlineTool } from './outline-ui';
-import { drawingCard, editActions, wireLayerCard } from './layer-card';
+import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
 import { button, caption, chips, esc, hint, input, label, layerCard, layerForm, layerRow, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
@@ -49,6 +49,7 @@ export class OutlinesSection {
       };
     });
     this.wireCard();
+    wireReorder(this.el, t);
     this.el.querySelector<HTMLButtonElement>('[data-start=boundary]')?.addEventListener('click', () => t.startBoundary());
     this.el.querySelectorAll<HTMLButtonElement>('[data-feature]').forEach(b => { b.onclick = () => t.startFeature(b.dataset.feature!); });
     this.el.querySelector<HTMLButtonElement>('[data-act=name]')?.addEventListener('click', () => {

@@ -2,7 +2,7 @@
 // actions of a selected layer, its layer order, and the wiring of all of them to the outline tool.
 import type { Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, esc, hint, iconButton, layerActions, layerCard, layerOrder, type Swatch } from './ui';
+import { button, esc, hint, iconButton, layerActions, layerCard, type Swatch } from './ui';
 
 const compact = ['compact'];
 
@@ -23,10 +23,52 @@ export const editActions = (deletable: boolean, lead = '') => layerActions(
   iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } }),
   deletable ? iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }) : '');
 
-/** Layer order ↑ ↓ within the layer's section (hidden when it's the only one there). Surfaces still use it until Task 5. */
-export function orderControl(t: OutlineTool, id: string): string {
-  const p = t.layerPosition(id);
-  return p.first && p.last ? '' : layerOrder(p.first, p.last);
+/**
+ * Drag-to-reorder for a section's rows: only a grip (`[data-grip]`) starts a drag, so panel scrolling is untouched.
+ * While dragging, a drop line shows before the row under the pointer; releasing calls `moveLayerTo`; pointercancel or
+ * Escape changes nothing. Only rows with a grip in this list are drop targets, so a layer never leaves its section.
+ * A focused grip also takes Alt+↑ / Alt+↓ (one step). Call after every render of the list.
+ */
+export function wireReorder(listEl: HTMLElement, t: OutlineTool) {
+  const items = () => [...listEl.querySelectorAll<HTMLElement>('.layer-item')].filter(i => i.querySelector('[data-grip]'));
+  const idOf = (i: HTMLElement) => i.querySelector<HTMLElement>('[data-grip]')!.dataset.grip!;
+  listEl.querySelectorAll<HTMLElement>('[data-grip]').forEach(grip => {
+    const id = grip.dataset.grip!;
+    grip.onkeydown = e => {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      t.moveLayer(id, e.key === 'ArrowUp' ? -1 : 1);
+      listEl.querySelector<HTMLElement>(`[data-grip="${CSS.escape(id)}"]`)?.focus(); // the list was redrawn
+    };
+    grip.onpointerdown = down => {
+      if (down.button !== 0 && down.pointerType === 'mouse') return;
+      down.preventDefault();
+      const row = grip.closest<HTMLElement>('.layer-item')!;
+      let before: string | null | undefined; // undefined = not over a target yet
+      const mark = (y: number) => {
+        const others = items().filter(i => i !== row);
+        const next = others.find(i => { const r = i.getBoundingClientRect(); return y < r.top + r.height / 2; });
+        before = next ? idOf(next) : null;
+        items().forEach(i => i.classList.remove('drop-before', 'drop-end'));
+        (next ?? others[others.length - 1])?.classList.add(next ? 'drop-before' : 'drop-end');
+      };
+      const finish = (apply: boolean) => {
+        grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); grip.removeEventListener('pointercancel', cancel);
+        grip.removeEventListener('lostpointercapture', cancel); window.removeEventListener('keydown', key, true);
+        row.classList.remove('dragging'); items().forEach(i => i.classList.remove('drop-before', 'drop-end'));
+        if (grip.hasPointerCapture(down.pointerId)) grip.releasePointerCapture(down.pointerId);
+        if (apply && before !== undefined) t.moveLayerTo(id, before);
+      };
+      const move = (e: PointerEvent) => mark(e.clientY);
+      const up = () => finish(true);
+      const cancel = () => finish(false);
+      const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); finish(false); } };
+      grip.setPointerCapture(down.pointerId);
+      row.classList.add('dragging');
+      grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', cancel);
+      grip.addEventListener('lostpointercapture', cancel); window.addEventListener('keydown', key, true);
+    };
+  });
 }
 
 /** Wire a card's buttons, head (tap closes) and rename field; `extra` adds section-specific acts. */
@@ -35,7 +77,7 @@ export function wireLayerCard(card: HTMLElement, t: OutlineTool, extra: Record<s
   const act: Record<string, () => void> = {
     close: () => t.close(), cancel: () => t.cancel(), collapse: () => t.selectOutline(null),
     'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteLayer(id),
-    up: () => t.moveLayer(id, -1), down: () => t.moveLayer(id, 1), ...extra,
+    ...extra,
   };
   card.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(b => { if (act[b.dataset.act!]) b.onclick = act[b.dataset.act!]; });
   card.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(b => {

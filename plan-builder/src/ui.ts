@@ -217,12 +217,6 @@ export function layerCard(o: LayerCardOptions): string {
     + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`
     + `<div class="layer-body">${o.body}</div></div>`;
 }
-/** "Layer order ↑ ↓" in a layer card (data-act="up" / "down"); higher layers cut the ones below. */
-export function layerOrder(first: boolean, last: boolean): string {
-  const arrow = (glyph: string, dir: 'up' | 'down', disabled: boolean) =>
-    button(glyph, { mods: ['icon', 'small'], ariaLabel: `Move ${dir} (higher layers cut the ones below)`, disabled, data: { act: dir } });
-  return `<div class="layer-order">${inlineHint('Layer order')}${arrow('↑', 'up', first)}${arrow('↓', 'down', last)}</div>`;
-}
 /** Wrapping group of compact actions inside a layer card. */
 export const layerActions = (...buttons: string[]) => `<div class="layer-actions">${buttons.join('')}</div>`;
 /** Layer form: a bordered block inside the layer list (naming a custom outline). */

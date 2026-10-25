@@ -7,7 +7,7 @@ import { formatArea, formatFeet, parseFeet, parseRadius, stepTexScale, type Outl
 import { radiusDisplay, roundAllRequest } from './card-helpers';
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
-import { drawingCard, editActions, wireLayerCard } from './layer-card';
+import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
 import { button, caption, disclosure, esc, field, formStack, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
 
 /** Every material as a list, grouped by family under a caption; `current` is marked. */
@@ -33,7 +33,7 @@ export class SurfacesSection {
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     if (this.adjusting && (this.adjusting !== t.selected || t.drawing)) this.adjusting = null; // collapsed again when the selection changes
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
-      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
+      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, grip: true, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
       ${rows.join('')}
       ${t.drawing || !t.boundaryClosed ? '' : this.picking
@@ -49,6 +49,7 @@ export class SurfacesSection {
     // The picker's chips start a new zone; the card's chips change that zone's material.
     this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
+    wireReorder(this.el, t);
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) wireLayerCard(card, t, { 'change-material': () => { this.changing = card.dataset.card!; this.render(); } });
     card?.querySelector<HTMLButtonElement>('[data-disclosure=adjust]')?.addEventListener('click', () => { this.adjusting = this.adjusting === card.dataset.card ? null : card.dataset.card!; this.render(); });

@@ -31,6 +31,11 @@ button.icon.danger { color: var(--color-warn); }
 /* Reorder grip: a 48 px hit area beside a layer row */
 .grip { flex: none; display: grid; place-content: center; min-width: var(--control-md); min-height: var(--control-md); color: var(--color-muted); cursor: grab; touch-action: none; border-radius: var(--radius-md); }
 .grip:hover, .grip:focus-visible { color: var(--color-ink); }
+.grip:active { cursor: grabbing; }
+/* Dragging a row: it dims, and a line shows where it will land */
+.layer-item.dragging { opacity: var(--opacity-layer-off); }
+.layer-item.drop-before { box-shadow: 0 calc(-1 * var(--space-1)) 0 var(--color-accent); }
+.layer-item.drop-end { box-shadow: 0 var(--space-1) 0 var(--color-accent); }
 /* Disclosure: a row that opens a body beneath it */
 .disclosure { display: flex; flex-direction: column; gap: var(--space-4); }
 .disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: 44px; text-align: left; }
@@ -152,9 +157,6 @@ button.layer-row.off { opacity: var(--opacity-layer-off); }
 .layer-actions > .text-hint { flex: 1 1 auto; align-self: center; }
 /* Nudge arrows in a card: the label on its own line, then the arrows in one row (default button.icon sizing) */
 .layer-body .nudge > .text-hint { flex-basis: 100%; }
-.layer-order { display: flex; align-items: center; gap: var(--space-3); }
-.layer-order > .text-hint { flex: 1; }
-.layer-order > button.icon { font-size: var(--text-2xl); }
 /* Rename in place: an underlined field with a pencil, so it reads as editable before it's touched */
 .layer-rename-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); border-bottom: var(--border-width) dashed var(--color-line); cursor: text; }
 .layer-rename-wrap:hover, .layer-rename-wrap:focus-within { color: var(--color-ink); border-bottom-color: var(--color-accent); }
