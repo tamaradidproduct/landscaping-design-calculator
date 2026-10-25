@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { plantList } from './plant-list';
+import type { MaterialId } from './materials';
 import type { Outline } from './outline';
 import type { PlacedLine, PlacedSymbol } from './plan-model';
 
@@ -22,10 +23,20 @@ describe('plantList', () => {
     expect(l.plants.map(p => p.symbol.id)).toEqual(['oak']);
     expect(l.objects.map(o => [o.symbol.id, o.quantity])).toEqual([['hot-tub', 2]]);
   });
+  test('each surface row carries the area given for its material; none when the plan has no scale', () => {
+    const outlines = { s1: out('s1', 'surface', 'sand'), s2: out('s2', 'surface', 'deck-wood') };
+    expect(plantList({}, outlines, {}, 0.1, new Map<string, number>([['sand', 1240.4]])).surfaces.map(r => [r.material.id, r.sqft])).toEqual([['sand', 1240.4], ['deck-wood', 0]]);
+    expect(plantList({}, outlines).surfaces.map(r => r.sqft)).toEqual([null, null]);
+    expect(plantList({}, outlines, {}, null, null).surfaces.map(r => r.sqft)).toEqual([null, null]);
+  });
+  test('a zone still being drawn (not closed) is not listed, so it never shows as 0 sq ft', () => {
+    const drawing = { ...out('s2', 'surface', 'deck-wood'), closed: false };
+    expect(plantList({}, { s1: out('s1', 'surface', 'sand'), s2: drawing }, {}, 0.1, new Map([['sand', 10]])).surfaces.map(r => r.material.id)).toEqual(['sand']);
+  });
   test('surfaces: the distinct materials the zones use, in library order; boundary, features and material-less zones are ignored', () => {
     const l = plantList({}, { b: out('b', 'boundary'), f1: out('f1', 'feature'), s1: out('s1', 'surface', 'deck-wood'), s2: out('s2', 'surface', 'sand'), s3: out('s3', 'surface', 'sand'), s4: out('s4', 'surface') });
-    expect(l.surfaces.map(s => s.id)).toEqual(['sand', 'deck-wood']);
-    expect(l.surfaces.map(s => s.name)).toEqual(['Sand', 'Deck wood']);
+    expect(l.surfaces.map(s => s.material.id)).toEqual(['sand', 'deck-wood']);
+    expect(l.surfaces.map(s => s.material.name)).toEqual(['Sand', 'Deck wood']);
   });
   test('an unknown symbol id is skipped', () => expect(plantList(placed(['y1', 'nope']), {}).plants).toEqual([]));
   test('stepping stones are objects, utility markers are listed apart with their quantity', () => {

@@ -7,10 +7,10 @@ import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from '
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, swatch } from './ui';
+import { button, caption, choiceLine, esc, field, formStack, hint, input, layerActions, layerCard, layerForm, layerRow, nudgePad, row, swatch } from './ui';
 
 /** Every material as a list, grouped by family under a caption; `current` is marked. */
-const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
+export const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
   button(`${swatch({ material: m.id })}<span class="layer-name">${esc(m.name)}</span>`, { mods: ['layer-row', ...(m.id === current ? ['selected'] : [])], pressed: m.id === current, data: { material: m.id } })).join('')}</div>`).join('');
 
 export class SurfacesSection {
@@ -44,7 +44,9 @@ export class SurfacesSection {
     this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
     // The picker's chips start a new zone; the card's chips change that zone's material.
-    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
+    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => {
+      b.onclick = () => t.startSurface(b.dataset.material as MaterialId);
+    });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) wireLayerCard(card, t, { 'change-material': () => { this.changing = card.dataset.card!; this.render(); } });
@@ -111,6 +113,11 @@ export class SurfacesSection {
       : choiceLine(swatch(sw), material(o.material!).name, button('Change', { mods: ['compact'], data: { act: 'change-material' } }));
     const round = t.cal ? formStack(row(
       input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′ (↑ ↓ to adjust)', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
+    // The plot fill follows the boundary: its material and texture can change, its shape cannot.
+    if (o.base) return layerCard({
+      id: o.id, swatch: sw, name: o.name, done: true,
+      body: `${mat}${this.texScale(o)}${hint('Follows the plot boundary.')}${layerActions(button('Delete', { variant: 'danger', mods: ['compact'], data: { act: 'delete' } }))}`,
+    });
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
       body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,

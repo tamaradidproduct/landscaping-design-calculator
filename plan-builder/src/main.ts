@@ -171,7 +171,6 @@ function updateGroups() {
   const shown = new Set(visibleGroups(state, counts));
   const busy: Record<Group, boolean> = { symbols: !!tool.placing || !!symbolsSection?.pickerOpen, lines: !!tool.lineDraft || !!linesSection?.pickerOpen, surfaces: !!surfaces?.pickerOpen || (!!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface'), outlines: true };
   for (const g of GROUPS) $(`section-${g}`).hidden = !shown.has(g) && !busy[g];
-  document.querySelectorAll<HTMLElement>('[data-eye-group]').forEach(b => { b.hidden = counts[b.dataset.eyeGroup as Group] === 0; });
   addMenu.render(state === 'ready');
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
@@ -181,6 +180,7 @@ function updateGroups() {
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
     const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : g === 'lines' ? 'edges and walls' : 'outlines';
+    b.hidden = counts[g] === 0;
     b.setAttribute('aria-pressed', String(!hidden));
     b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
   });
@@ -198,7 +198,17 @@ symbolsSection.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 // Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
-const addMenu = new AddMenu($('add'), (type: AddType) => { groupsOpen[type] = true; try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ } ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
+const addMenu = new AddMenu($('add'), (type: AddType) => {
+  groupsOpen[type] = true;
+  try {
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen));
+  } catch {
+    /* not remembered */
+  }
+  const section = { symbols: symbolsSection, lines: linesSection, surfaces }[type];
+  section?.openPicker();
+  updateGroups();
+});
 // Edit | Preview (top bar): Preview is the read-only sheet view of the same data. It hides the plot plan for display only
 // (previewing, never planVisible), fits the drawn plan, and switches the drawing tools off until Edit returns.
 let sheetOpen = false;

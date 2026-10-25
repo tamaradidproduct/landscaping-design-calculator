@@ -23,7 +23,7 @@
 ## 4. Workflow
 1. **Open the plot plan** — contractor picks the PDF on site. 🔨 Step 1
 2. **Outline, then set the scale** — trace the plot boundary or a structure, type one printed edge length; other edges and the lot area confirm it. 🔨 Steps 2a–2c
-3. **Draw the design** — fill zones with materials (🔨 Step 4: Surfaces, stage 1 — see §6.8; 📝 later: the lot starts as one default material and zones carve into it), drop plants/objects from the library, mark existing features, edging/walls as lines, plant-spacing fill, dimension labels. ❓ to be defined step by step
+3. **Draw the design** — fill zones with materials (🔨 Step 4: Surfaces, stage 1 — see §6.8; 🔨 Plot fill: the whole lot in one material that follows the boundary, with zones drawn on it cutting it out — see §6.8), drop plants/objects from the library, mark existing features, edging/walls as lines, plant-spacing fill, dimension labels. ❓ to be defined step by step
 4. **Price** from the contractor's own price list. ⏸ deferred
 5. **Present** — plan sheet first, then the price. **Send a PDF.**
 - After the first proposal (versions, tiers, crew sheets): 📝 later.
@@ -42,6 +42,7 @@
 | 5 | Plants & objects (symbols at true mature size) and the Plant list | ✅ done (merged) | `feat/symbols` |
 | 5b | Lines (fence, walls, edging, dry river), stepping stones, utility markers (the rest of the library's surfaces) | 🔨 done, in review | `feat/linear-point-surfaces` |
 | 5c | Panel structure: guided unlock (boundary, then scale), global + Add, new section order, Sheet view, quiet canvas controls | 🔨 done, in review | `feat/handoff-panel` |
+| 5d | Plot fill (the lot in one material, following the boundary) and visible-area surface quantities | 🔨 done, in review | `feat/plot-fill` |
 | 6 | Saved plans + invite-only Google sign-in: many plans per contractor, Firebase sync, works offline | 🔨 in progress | `feat/plans-auth` |
 
 ## 6. Current requirements, by area
@@ -100,6 +101,7 @@
 
 ### 6.6 Platform ✅
 - Web app for any tablet browser; offline-capable. Controls ≥ 44 px. iPad testing deferred for now.
+- 🔨 The expanded layer-card header (`.layer-head`) and material-picker rows (`.material-list > button.layer-row`) use `--control-md` (48px); `--control-sm` (40px) stays for non-tap-target uses (text inputs, the texture-scale slider, inline chip fields) and a couple of rows not yet revisited (Issue #43).
 - Client plot plans are never committed: `samples/` and derived test fixtures are git-ignored.
 
 ### 6.7 Existing features (Step 3) ✅🔨
@@ -116,7 +118,7 @@
 - 📝 Small features: at low zoom the edge-bend handles can cover the middle, so a tap bends/opens an edge instead of selecting — zoom in, or revisit hit priority later.
 
 ### 6.8 Surfaces (Step 4) ✅🔨
-- The contractor adds the **new work** as zones filled with a material. Stage 1 is **visual only** (no quantities yet).
+- The contractor adds the **new work** as zones filled with a material. Stage 1 is **visual only**; **visible-area quantities** (sq ft per material) now show in the Sheet view (see Surface quantities below).
 - **Materials:** the **29 area textures of the Landscaping symbols library** (Figma `0B2UpvIGBFOE1ZEDx8rXPR`), grouped in the picker by family — Turf & seed, Mulch & soil, Rock & gravel, Pavers & stone, Concrete, Decking. Each is a photo-texture tile that **repeats at a real-world size (10 ft by default; each zone can scale it) and scales with zoom and the plan's scale**; a plan with no scale yet uses a default tile (24 page points) that still follows zoom and the zone's texture scale. Plans saved with the earlier 11 flat-colour materials open with the nearest texture. Linear, point and utility surfaces (fences, walls, edging, stepping stones, dry river, gas/electric/drainage markers) come with the symbols step.
 - **Texture scale:** each zone's card has a **Texture scale** control (− / percent / +, ×1.25 per press, 25%–400%; tap the percent to reset). Saved with the zone; one undo step per press.
 - **Show / hide:** an eye on every layer row and on the **Surfaces** and **Outlines** headers. A hidden layer isn't drawn, selected, tapped or snapped to; it still cuts (hiding the House leaves its hole in the lawn). A header's eye hides all its layers without changing their own eyes. Saved **with the plan** (not an undo step); drawing into a hidden layer shows it.
@@ -130,7 +132,9 @@
 - 🔨 **Draw shape default by kind:** outlines (plot boundary, existing features) start in **Freehand**; surfaces start in **Rectangle**. Switching (bar or X) while drawing is remembered **per kind** on the device, so a zone last drawn Freehand starts Freehand next time and the outlines' choice is unaffected.
 - 🔨 **Snap is off by default for surfaces** (designed, not traced) and on for outlines; the Snap toggle switches the one for what's being drawn or edited.
 - 🔨 **Width × Depth (stage 2):** a selected zone's card has a **Size** row — **Width** and **Depth** of the zone's bounding box (axis-aligned to the page, true feet), for any zone, not only rectangles; an irregular shape reports its overall extent. Typing one resizes the zone **from the center of that box**, along that axis only; an unreadable entry snaps back. A **lock** between the fields (off by default) scales both axes in proportion. The lock is a session preference, not saved, and turns off when another zone is selected. Curved sides count with their bulge. One undo step per entry. Needs a scale (hidden until one exists). Zones only: outlines' typed lengths set the scale. Not shown while drawing.
-- 📝 Next: **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, quantities (sq ft per material), default lot material, decks/balconies over surfaces.
+- 🔨 **Plot fill:** **Fill with surface** on the plot boundary card (needs the closed boundary and the scale) covers the whole plot with one surface; pick its material from the same list. It **follows the plot boundary** (reshape, bend or redraw the boundary and the fill re-fits) and is always the lowest surface, so anything drawn on it cuts it out. One per plan; Delete brings the offer back. Its card has material (Change), Texture scale and Delete only: no Width × Depth, rounding, nudge, Redraw or order arrows, and its corners and sides cannot be dragged. Saved as an outline flagged `base`.
+- 🔨 **Surface quantities:** the Sheet view's **Surfaces** rows show each material's **visible area** in square feet, summed over its zones: clipped to the plot boundary, with the house, existing features and any surface above it cut out. Plants, objects, lines and markers do not cut. Needs the plan scale (no scale: the material only). Hidden zones still cut and still count.
+- 📝 Next: **move one corner** as a second resize choice (stage 3). Later: paint-bucket fill between existing lines, quantities with prices, a default material chosen at plan creation, decks/balconies over surfaces.
 
 ### 6.10 Plants & objects ✅🔨
 - The library's **51 plants and 14 objects** (families: evergreen, deciduous and accent trees, accent, privacy and large shrubs, perennials, ground covers, ornamental grasses, other). Each has its plan-view art, a photo (plants), a category and a researched size: a plant is a circle of its **typical mature spread**, an object its footprint (long side researched, the other from the art's proportions). Every size has a source and a range in `docs/symbol-sizes.md`; ⚠️ marks approximate ones.
@@ -138,7 +142,7 @@
 - A placed symbol: tap to select, drag to move, arrow keys nudge, **Rotate** (− / typed angle / +, 15° steps), **Delete**; every change undoes (a drag or a run of nudges is one step). Where symbols overlap, the last placed is on top.
 - **Rows** group by kind ("Blue Diamond Spruce × 3") with an eye per kind and one on the section header (saved with the plan, like the other eyes; hidden symbols still count in the list).
 - Saved with the plan as `symbols` (library id, position, rotation). With no plan scale yet, a symbol is 2.4 page points per foot and still follows zoom.
-- **Sheet view** (the top bar's Edit | Preview switch) replaces the old Plant list under Layers: read-only, live, fed by the same plant list, grouped as Plants, Objects, Utility markers, Edges & walls (feet and runs) and Surfaces (swatch, name). The water-consumption table is 📝 later.
+- **Sheet view** (the top bar's Edit | Preview switch) replaces the old Plant list under Layers: read-only, live, fed by the same plant list, grouped as Plants, Objects, Utility markers, Edges & walls (feet and runs) and Surfaces (swatch, name, visible sq ft once the plan has a scale). The water-consumption table is 📝 later.
 - 📝 Later: plant growth over time, quantities with prices, per-symbol size overrides, the water table.
 
 ### 6.11 Lines, stepping stones and utility markers ✅🔨
