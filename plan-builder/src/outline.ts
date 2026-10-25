@@ -46,6 +46,19 @@ export function moveInSection(ids: string[], outlines: Record<string, Outline>, 
   const at = same.indexOf(id), other = same[at + dir]; if (at < 0 || !other) return null;
   return ids.map(k => k === id ? other : k === other ? id : k);
 }
+/** `keys` with `id` placed directly before `beforeId` (null = the end of its own section); null when `id` is the boundary,
+ * `beforeId` is in another section, or the order would not change. */
+export function moveInSectionTo(keys: string[], outlines: Record<string, Outline>, id: string, beforeId: string | null): string[] | null {
+  const o = outlines[id]; if (!o || o.kind === 'boundary' || !keys.includes(id)) return null;
+  const sec = sectionOf(o.kind), inSec = (k: string) => outlines[k] && sectionOf(outlines[k]!.kind) === sec;
+  if (beforeId !== null && (beforeId === id || !keys.includes(beforeId) || !inSec(beforeId))) return null;
+  const rest = keys.filter(k => k !== id);
+  let at: number;
+  if (beforeId !== null) at = rest.indexOf(beforeId);
+  else { const last = rest.map(inSec).lastIndexOf(true); at = last < 0 ? rest.length : last + 1; }
+  const next = [...rest.slice(0, at), id, ...rest.slice(at)];
+  return next.every((k, i) => k === keys[i]) ? null : next;
+}
 /** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
 export function sectionPosition(ids: string[], outlines: Record<string, Outline>, id: string) {
   const o = outlines[id], same = o ? ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)) : [];
