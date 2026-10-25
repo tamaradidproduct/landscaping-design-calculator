@@ -1,5 +1,5 @@
 // The Layers panel's structure: only Outlines until the boundary is closed and the scale set; then + Add with its three pickers,
-// sections appearing on their first item in the fixed order, the Edit | Sheet toggle, and Undo/Redo and zoom/Fit in the canvas corners.
+// sections appearing on their first item in the fixed order, the Edit | Preview switch in the top bar (Undo/Redo there too), and zoom/Fit in the canvas corner.
 // Usage: node scripts/check-panel.mjs <plot-plan.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
@@ -22,7 +22,7 @@ for (const width of [1180, 820]) {
   const tag = `${width}px: `;
   check(tag + 'empty plan shows Outlines only, no Add', (await shown()) === 'outlines' && !(await addShown()), `${await shown()} · add ${await addShown()}`);
   check(tag + 'hint is "Outline the plot boundary."', (await page.textContent('#outlines')).includes('Outline the plot boundary.'), '');
-  check(tag + 'undo/redo/zoom/fit live on the canvas, none in the sidebar', await page.evaluate(() => ['undo', 'redo', 'zoom-in', 'zoom-out', 'fit'].every(id => document.getElementById(id)?.closest('.canvas-controls') && !document.getElementById(id).closest('#sidebar'))), '');
+  check(tag + 'zoom/fit live on the canvas, undo/redo in the top bar, none in the sidebar', await page.evaluate(() => ['zoom-in', 'zoom-out', 'fit'].every(id => document.getElementById(id)?.closest('.canvas-controls') && !document.getElementById(id).closest('#sidebar')) && ['undo', 'redo'].every(id => document.getElementById(id)?.closest('#top-bar'))), '');
   await page.click('[data-start=boundary]');
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]);
   await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(250); await page.keyboard.press('Escape');
@@ -54,7 +54,7 @@ for (const width of [1180, 820]) {
   check(tag + '⇧⌘Z redoes', (await shown()) === 'symbols,lines,outlines', await shown());
   await page.click('#undo'); await page.waitForTimeout(150); check(tag + 'Undo button works', (await shown()) === 'symbols,outlines', await shown());
   await page.click('#redo'); await page.waitForTimeout(150);
-  await page.click('[data-view=sheet]');
+  await page.click('[data-view=preview]');
   const sheet = await page.$eval('#layers-sheet', e => e.innerText.replace(/\n+/g, ' | '));
   check(tag + 'Sheet shows plants and edges, Edit view hidden', /Plants/.test(sheet) && /Edges & walls/i.test(sheet) && await page.$eval('#layers-edit', e => e.hidden), sheet.slice(0, 120));
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
@@ -62,8 +62,8 @@ for (const width of [1180, 820]) {
   const before = await halos();
   await page.click('#layers-sheet [data-sheet-symbol]'); await page.waitForTimeout(150);
   check(tag + 'tapping a sheet card selects and highlights it on the plan', before === 0 && (await halos()) === 1 && !!(await page.$('#layers-sheet .plant-card.selected')), `halos ${before} → ${await halos()}`);
-  const head = await page.$eval('.side-head', e => ({ w: e.clientWidth, sw: e.scrollWidth }));
-  check(tag + 'Edit | Sheet toggle fits the header', head.sw <= head.w, JSON.stringify(head));
+  const head = await page.$eval('#top-bar', e => ({ w: e.clientWidth, sw: e.scrollWidth }));
+  check(tag + 'top bar fits at this width', head.sw <= head.w, JSON.stringify(head));
   await page.screenshot({ path: `${outDir}/panel-${width}-sheet.png` });
   await page.click('[data-view=edit]');
   await page.screenshot({ path: `${outDir}/panel-${width}-edit.png` });

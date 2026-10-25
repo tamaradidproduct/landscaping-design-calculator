@@ -61,17 +61,15 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .dock > * { pointer-events: auto; }
 .dock > .toggle, .dock > .segmented { box-shadow: var(--shadow-sm); }
 
-/* ---------- Canvas controls: Undo/Redo top right, zoom and Fit bottom right; muted until pressed ---------- */
+/* ---------- Canvas controls: zoom and Fit bottom right; muted until pressed ---------- */
 .canvas-controls { position: absolute; z-index: var(--z-chip); display: flex; gap: var(--space-3); right: calc(var(--space-6) + env(safe-area-inset-right, 0px)); }
-.canvas-controls.top-right { top: calc(var(--space-6) + env(safe-area-inset-top, 0px)); }
 .canvas-controls.bottom-right { bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px)); }
 .canvas-controls > button.icon { background: var(--color-surface); color: var(--color-muted); box-shadow: var(--shadow-sm); }
 .canvas-controls > button.icon:hover:not(:disabled) { color: var(--color-ink); }
 .canvas-controls > button.icon:disabled { opacity: var(--opacity-layer-off); box-shadow: none; }
 
-/* Layers header: the title and the Edit | Sheet toggle */
+/* Layers header: the title */
 .side-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
-.side-head .segmented > button { min-height: var(--control-sm); padding: 0 var(--space-6); font-size: var(--text-base); }
 #layers-edit, #layers-sheet { display: flex; flex-direction: column; gap: var(--space-4); }
 #layers-edit[hidden], #layers-sheet[hidden], .layer-group[hidden] { display: none; }
 .layer-group { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -99,7 +97,7 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .sidebar {
   flex: none; width: var(--width-sidebar); display: flex; flex-direction: column; overflow-y: auto;
   background: var(--color-surface); border-left: var(--border-width) solid var(--color-line);
-  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) 0;
 }
 .side-section { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-6) var(--space-7); border-bottom: var(--border-width) solid var(--color-line); }
 .side-section.layers { border-bottom: 0; }
@@ -151,6 +149,8 @@ input.layer-rename:focus { background: var(--color-surface); }
 .plan-layer { padding-top: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); border-top: var(--border-width) solid var(--color-line); }
 .plan-layer .field-row { flex-wrap: nowrap; }
 .line-icon { flex: none; width: var(--width-icon); height: var(--width-icon); fill: none; stroke: currentColor; stroke-width: var(--stroke-regular); stroke-linejoin: round; stroke-linecap: round; }
+/* Lucide icons are drawn on a 24-unit grid, a quarter larger than the 16 px ones, with Lucide's own 2-unit stroke */
+.line-icon.lucide { width: calc(var(--width-icon) * 1.25); height: calc(var(--width-icon) * 1.25); }
 [aria-pressed="true"] > .line-icon .eye-off { display: none; }
 [aria-pressed="false"] { color: var(--color-muted); }
 input[type="range"] { flex: 1; min-height: var(--control-sm); padding: 0; border: 0; background: none; accent-color: var(--color-accent); }
@@ -214,3 +214,27 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
 .plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
+
+/* ---------- Top bar: back, plan name and gear menu (left), Edit | Preview (centre), Undo / Redo / Export (right) ---------- */
+.top-bar {
+  flex: none; position: relative; z-index: var(--z-chip); height: var(--control-md);
+  padding: 0 calc(var(--space-6) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-6) + env(safe-area-inset-left, 0px));
+  padding-top: env(safe-area-inset-top, 0px); box-sizing: content-box;
+  background: var(--color-surface); box-shadow: 0 var(--border-width) 0 var(--color-line);
+}
+.top-bar[hidden] { display: none; }
+.top-bar-inner { height: var(--control-md); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-4); }
+.top-bar-left { position: relative; display: flex; align-items: center; min-width: 0; }
+.top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+.top-bar button { min-height: var(--control-md); }
+.top-bar button.icon { border-color: transparent; background: transparent; color: var(--color-ink); }
+.top-bar button.quiet { color: var(--color-muted); }
+.top-bar button.icon:hover:not(:disabled) { color: var(--color-ink); }
+.top-bar button.icon:disabled { opacity: var(--opacity-layer-off); }
+.top-bar button.bar-action { min-height: var(--control-sm); gap: var(--space-3); padding: 0 var(--space-5); font-size: var(--text-base); }
+.top-bar-sep { align-self: stretch; margin: var(--space-5) var(--space-4); border-left: var(--border-width) solid var(--color-line); }
+.top-bar .segmented > button { min-height: var(--control-sm); padding: 0 var(--space-6); font-size: var(--text-base); }
+.top-bar.previewing button.quiet { opacity: var(--opacity-layer-off); }
+
+/* Narrow screens: the name truncates first, then Export shows its icon only */
+@media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar button.bar-action { min-width: var(--control-sm); padding: 0; } }

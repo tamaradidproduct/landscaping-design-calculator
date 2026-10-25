@@ -28,3 +28,14 @@ export function zoomAt(v: View, factor: number, p: Point): View {
 export function panBy(v: View, dx: number, dy: number): View {
   return { scale: v.scale, x: v.x + dx, y: v.y + dy };
 }
+
+/**
+ * Centres `rect` (any units) in `stage` with `margin` px around it. `scale` is stage px per rect unit,
+ * so screen = x/y + point * scale. Null for a rectangle with no size: the caller keeps the current view.
+ */
+export function fitRect(rect: { x: number; y: number; w: number; h: number }, stage: Size, margin: number): View | null {
+  if (!(rect.w > 0) || !(rect.h > 0)) return null;
+  const scale = Math.min((stage.w - margin * 2) / rect.w, (stage.h - margin * 2) / rect.h);
+  if (!(scale > 0)) return null;
+  return { scale, x: (stage.w - rect.w * scale) / 2 - rect.x * scale, y: (stage.h - rect.h * scale) / 2 - rect.y * scale };
+}
