@@ -5,7 +5,8 @@ body {
   background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans);
   -webkit-user-select: none; user-select: none; overscroll-behavior: none;
 }
-.app { position: fixed; inset: 0; display: flex; }
+.app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+.workspace { flex: 1; min-height: 0; display: flex; }
 .canvas { position: relative; flex: 1; min-width: 0; } /* the plan and everything floating over it */
 
 /* Layout primitives */

@@ -57,22 +57,13 @@ button.archived-toggle:hover { color: var(--color-ink); }
 button.archived-toggle[aria-expanded="false"] .chevron { transform: rotate(-90deg); }
 .plan-row.archived .plan-address { color: var(--color-muted); }
 
-/* Editor header, top left of the plan: "← Plans", the plan's name and its ⋯ menu */
-.plan-head {
-  position: absolute; z-index: var(--z-chip); left: calc(var(--space-6) + env(safe-area-inset-left, 0px)); top: calc(var(--space-6) + env(safe-area-inset-top, 0px));
-  width: min(var(--width-plan-head), calc(100% - 2 * var(--space-6))); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
-}
-.plan-bar {
-  display: flex; align-items: center; width: 100%; box-sizing: border-box; padding: var(--space-2);
-  background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
-}
+/* Editor top bar: its left cluster (back, plan name, gear menu); the bar itself is in components.css */
+.plan-bar { display: flex; align-items: center; min-width: 0; }
 .plan-bar > button { flex: none; }
-.plan-bar > #back-to-plans { border-color: transparent; }
-/* Dividers either side of the name */
-.plan-title { flex: 1; min-width: 0; margin: 0 var(--space-2); padding: 0 var(--space-5); border-inline: var(--border-width) solid var(--color-line); font-size: var(--text-lg); font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plan-bar > #plan-more { border-color: transparent; }
+.plan-title { flex: 0 1 auto; min-width: 0; margin: 0 var(--space-1) 0 var(--space-3); font-size: var(--text-lg); font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-bar > #plan-more[aria-expanded="true"] { background: var(--color-bg); }
-.plan-menu { width: min(var(--width-card), 100%); padding: var(--space-4); }
+.plan-menu { position: absolute; top: 100%; left: 0; margin-top: var(--space-4); width: var(--width-card); max-width: calc(100vw - 2 * var(--space-4)); box-sizing: border-box; padding: var(--space-4); }
+.plan-menu[hidden] { display: none; }
 .plan-menu .plan-confirm { margin: var(--space-2) var(--space-3); }
 .menu-list { display: flex; flex-direction: column; }
 button.menu-item { min-height: var(--control-md); padding: 0 var(--space-5); font-size: var(--text-base); text-align: left; background: transparent; border-color: transparent; }

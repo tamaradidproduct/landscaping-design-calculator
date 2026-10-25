@@ -23,6 +23,8 @@ export interface Outline {
   radii?: number[];
   /** A surface's texture scale: 1 = the material's own repeat (see TEX_SCALE for the range). */
   texScale?: number;
+  /** The plot fill: the one surface that covers the whole plot and follows the boundary's shape (see plot-fill.ts). */
+  base?: true;
 }
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
@@ -41,16 +43,16 @@ export const cutOrder = (outlines: Outline[]): Outline[] =>
 
 /** `ids` with `id` swapped with its nearest neighbour of the same section (dir −1 = up); null at the section's end. */
 export function moveInSection(ids: string[], outlines: Record<string, Outline>, id: string, dir: -1 | 1): string[] | null {
-  const o = outlines[id]; if (!o || o.kind === 'boundary') return null;
-  const same = ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind));
+  const o = outlines[id]; if (!o || o.kind === 'boundary' || o.base) return null;
+  const same = ids.filter(k => outlines[k] && !outlines[k]!.base && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)); // the fill stays last: nothing swaps with it
   const at = same.indexOf(id), other = same[at + dir]; if (at < 0 || !other) return null;
   return ids.map(k => k === id ? other : k === other ? id : k);
 }
 /** `keys` with `id` placed directly before `beforeId` (null = the end of its own section); null when `id` is the boundary,
  * `beforeId` is in another section, or the order would not change. */
 export function moveInSectionTo(keys: string[], outlines: Record<string, Outline>, id: string, beforeId: string | null): string[] | null {
-  const o = outlines[id]; if (!o || o.kind === 'boundary' || !keys.includes(id)) return null;
-  const sec = sectionOf(o.kind), inSec = (k: string) => outlines[k] && sectionOf(outlines[k]!.kind) === sec;
+  const o = outlines[id]; if (!o || o.kind === 'boundary' || o.base || !keys.includes(id)) return null;
+  const sec = sectionOf(o.kind), inSec = (k: string) => outlines[k] && !outlines[k]!.base && sectionOf(outlines[k]!.kind) === sec;
   if (beforeId !== null && (beforeId === id || !keys.includes(beforeId) || !inSec(beforeId))) return null;
   const rest = keys.filter(k => k !== id);
   let at: number;
@@ -58,6 +60,14 @@ export function moveInSectionTo(keys: string[], outlines: Record<string, Outline
   else { const last = rest.map(inSec).lastIndexOf(true); at = last < 0 ? rest.length : last + 1; }
   const next = [...rest.slice(0, at), id, ...rest.slice(at)];
   return next.every((k, i) => k === keys[i]) ? null : next;
+}
+
+/** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
+export function sectionPosition(ids: string[], outlines: Record<string, Outline>, id: string) {
+  const o = outlines[id];
+  if (o?.base) return { first: true, last: true }; // the fill is pinned at the bottom
+  const same = o ? ids.filter(k => outlines[k] && !outlines[k]!.base && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)) : [];
+  return { first: same[0] === id, last: same[same.length - 1] === id };
 }
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();

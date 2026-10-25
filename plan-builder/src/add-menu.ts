@@ -22,7 +22,8 @@ export class AddMenu {
       : button('+ Add', { variant: 'primary', id: 'add-button', expanded: false, data: { act: 'add' }, ariaLabel: 'Add' });
     const btn = this.el.querySelector<HTMLButtonElement>('[data-act=add]');
     if (btn) btn.onclick = () => { this.open = true; this.render(true); };
-    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-add]')?.addEventListener('click', () => { this.open = false; this.render(true); });
+    const cancelBtn = this.el.querySelector<HTMLButtonElement>('[data-act=cancel-add]');
+    if (cancelBtn) cancelBtn.onclick = () => { this.open = false; this.render(true); };
     this.el.querySelectorAll<HTMLButtonElement>('[data-add]').forEach(b => { b.onclick = () => { this.open = false; this.render(true); this.choose(b.dataset.add as AddType); }; });
   }
 }

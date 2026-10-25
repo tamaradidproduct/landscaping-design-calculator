@@ -11,16 +11,13 @@
   </head>
   <body>
     <main class="app">
+      <header class="top-bar" id="top-bar" hidden></header>
+      <div class="workspace">
       <div class="canvas" id="canvas" hidden>
         <div class="stage" id="stage">
           <div class="page" id="page" hidden><canvas id="base"></canvas></div>
           <canvas class="sharp" id="sharp" hidden></canvas>
           <div class="loading" id="loading" hidden>Opening plot plan…</div>
-        </div>
-        <header class="plan-head" id="plan-head"></header>
-        <div class="canvas-controls top-right">
-          <button type="button" class="icon" id="undo" disabled aria-label="Undo" title="Undo (⌘Z)"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3L2.5 6.5 6 10M3 6.5h6a4 4 0 010 8H6" /></svg></button>
-          <button type="button" class="icon" id="redo" disabled aria-label="Redo" title="Redo (⇧⌘Z)"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3l3.5 3.5L10 10M13 6.5H7a4 4 0 000 8h3" /></svg></button>
         </div>
         <div class="canvas-controls bottom-right">
           <button type="button" class="icon" id="zoom-out" aria-label="Zoom out" title="Zoom out"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10" /></svg></button>
@@ -42,10 +39,6 @@
         <section class="side-section layers">
           <div class="side-head">
             <h2 class="side-title">Layers</h2>
-            <div class="segmented" id="layers-view" role="group" aria-label="Panel view">
-              <button type="button" data-view="edit" aria-pressed="true">Edit</button>
-              <button type="button" data-view="sheet" aria-pressed="false">Sheet</button>
-            </div>
           </div>
           <div id="layers-edit">
             <div id="add" class="add-menu" hidden></div>
@@ -134,6 +127,7 @@
         </section>
       </aside>
       <div class="sidebar-resize" id="sidebar-resize" role="separator" aria-orientation="vertical" aria-controls="sidebar" aria-label="Resize the side panel" title="Drag to resize the panel · double-tap to reset" tabindex="0"></div>
+      </div>
       <div class="bubble toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" hidden />
     </main>

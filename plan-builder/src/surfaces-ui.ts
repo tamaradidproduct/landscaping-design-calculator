@@ -8,10 +8,10 @@ import { radiusDisplay, roundAllRequest } from './card-helpers';
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
-import { button, caption, disclosure, esc, field, formStack, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
+import { button, caption, disclosure, esc, field, formStack, hint, iconButton, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
 
 /** Every material as a list, grouped by family under a caption; `current` is marked. */
-const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
+export const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
   button(`${swatch({ material: m.id })}<span class="layer-name">${esc(m.name)}</span>`, { mods: ['layer-row', ...(m.id === current ? ['selected'] : [])], pressed: m.id === current, data: { material: m.id } })).join('')}</div>`).join('');
 
 export class SurfacesSection {
@@ -33,7 +33,7 @@ export class SurfacesSection {
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     if (this.adjusting && (this.adjusting !== t.selected || t.drawing)) this.adjusting = null; // collapsed again when the selection changes
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
-      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, grip: true, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
+      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, grip: !o.base, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
       ${rows.join('')}
       ${t.drawing || !t.boundaryClosed ? '' : this.picking
@@ -47,7 +47,9 @@ export class SurfacesSection {
     this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
     // The picker's chips start a new zone; the card's chips change that zone's material.
-    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
+    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => {
+      b.onclick = () => t.startSurface(b.dataset.material as MaterialId);
+    });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
     wireReorder(this.el, t);
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
@@ -122,6 +124,11 @@ export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; cha
   const rd = radiusDisplay(t.cornerRadiiFt(o.id));
   const round = t.cal ? formStack(field('round-all', 'Corner radius', row(
     input('round-all', { inputmode: 'decimal', value: rd.value, placeholder: rd.placeholder, ariaLabel: 'Corner radius' }), button('Done', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
+  if (o.base) return layerCard({
+    id: o.id, name: o.name,
+    actions: iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }),
+    body: `${st.changing ? picker(o.material) : change}${texScale(o)}${hint('Follows the plot boundary.')}`,
+  });
   const adjust = disclosure('adjust', 'Corners and texture', st.open, `${round}${texScale(o)}`);
   const area = t.areaSqft(o);
   return layerCard({

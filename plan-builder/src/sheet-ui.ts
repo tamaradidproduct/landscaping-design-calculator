@@ -2,6 +2,7 @@
 // the one source of quantity for the panel counts, this sheet and export. Tapping a card selects that item on the plan.
 import { plantList, type PlantList } from './plant-list';
 import { lengthText } from './lines-ui';
+import { formatArea } from './outline';
 import { caption, esc, hint, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import type { LibrarySymbol } from './symbols';
@@ -26,7 +27,7 @@ export function sheetHtml(l: PlantList, sel: SheetSelection): string {
   return [
     cards('Plants', l.plants), cards('Objects', l.objects), cards('Utility markers', l.markers),
     l.lines.length ? `${caption('Edges &amp; walls')}${l.lines.map(x => lineRow(x, sel.line === x.item.id)).join('')}` : '',
-    l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(m => `<button type="button" class="plant-surface${sel.material === m.id ? ' selected' : ''}" data-sheet-material="${esc(m.id)}">${swatch({ material: m.id })}<span class="plant-name">${esc(m.name)}</span></button>`).join('')}` : '',
+    l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(r => `<button type="button" class="plant-surface${sel.material === r.material.id ? ' selected' : ''}" data-sheet-material="${esc(r.material.id)}">${swatch({ material: r.material.id })}<span class="plant-text"><span class="plant-name">${esc(r.material.name)}</span>${r.sqft !== null ? `<span class="plant-measure">${formatArea(r.sqft)}</span>` : ''}</span></button>`).join('')}` : '',
   ].join('');
 }
 
@@ -37,14 +38,23 @@ export function renderSheet(el: HTMLElement, tool: OutlineTool) {
     line: tool.selectedLine ? tool.lines.placed[tool.selectedLine]?.item : undefined,
     material: tool.selected ? tool.outlines[tool.selected]?.material : undefined,
   };
-  el.innerHTML = sheetHtml(plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null), sel);
-  el.querySelectorAll<HTMLElement>('[data-sheet-symbol]').forEach(b => { b.onclick = () => {
-    const id = tool.symbols.groups().find(g => g.symbol === b.dataset.sheetSymbol)?.ids[0]; if (id) tool.selectSymbol(id);
-  }; });
-  el.querySelectorAll<HTMLElement>('[data-sheet-line]').forEach(b => { b.onclick = () => {
-    const id = tool.lines.groups().find(g => g.item === b.dataset.sheetLine)?.ids[0]; if (id) tool.selectLine(id);
-  }; });
-  el.querySelectorAll<HTMLElement>('[data-sheet-material]').forEach(b => { b.onclick = () => {
-    const z = Object.values(tool.outlines).find(o => o.kind === 'surface' && o.material === b.dataset.sheetMaterial); if (z) tool.selectOutline(z.id);
-  }; });
+  el.innerHTML = sheetHtml(plantList(tool.symbols.placed, tool.outlines, tool.lines.placed, tool.cal?.ftPerPt ?? null, tool.surfaceAreasSqft()), sel);
+  el.querySelectorAll<HTMLElement>('[data-sheet-symbol]').forEach(b => {
+    b.onclick = () => {
+      const id = tool.symbols.groups().find(g => g.symbol === b.dataset.sheetSymbol)?.ids[0];
+      if (id) tool.selectSymbol(id);
+    };
+  });
+  el.querySelectorAll<HTMLElement>('[data-sheet-line]').forEach(b => {
+    b.onclick = () => {
+      const id = tool.lines.groups().find(g => g.item === b.dataset.sheetLine)?.ids[0];
+      if (id) tool.selectLine(id);
+    };
+  });
+  el.querySelectorAll<HTMLElement>('[data-sheet-material]').forEach(b => {
+    b.onclick = () => {
+      const z = Object.values(tool.outlines).find(o => o.kind === 'surface' && o.material === b.dataset.sheetMaterial);
+      if (z) tool.selectOutline(z.id);
+    };
+  });
 }

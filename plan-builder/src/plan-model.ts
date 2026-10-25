@@ -50,6 +50,7 @@ function checkOutline(key: string, o: unknown) {
   if (o.bulges !== undefined) numArray(o.bulges, `outline ${key} bulges`);
   if (o.radii !== undefined) numArray(o.radii, `outline ${key} radii`);
   if (o.material !== undefined && typeof o.material !== 'string') invalid(`outline ${key} material`);
+  if (o.base !== undefined && !(o.base === true && o.kind === 'surface')) invalid(`outline ${key} base`);
   if (o.texScale !== undefined && !(typeof o.texScale === 'number' && o.texScale >= TEX_SCALE.min && o.texScale <= TEX_SCALE.max)) invalid(`outline ${key} texScale`);
 }
 
@@ -83,6 +84,7 @@ export function fromDoc(data: unknown): PlanDoc {
   num(pdf.size, 'pdf size'); num(pdf.rev, 'pdf rev');
   if (!isObj(data.outlines)) return invalid('outlines');
   Object.entries(data.outlines).forEach(([k, o]) => checkOutline(k, o));
+  if (Object.values(data.outlines).filter(o => (o as Record<string, unknown>).base).length > 1) invalid('more than one plot fill');
   if (data.hiddenLayers !== undefined && !(Array.isArray(data.hiddenLayers) && data.hiddenLayers.every(x => typeof x === 'string'))) invalid('hiddenLayers');
   if (data.hiddenSections !== undefined && !(Array.isArray(data.hiddenSections) && data.hiddenSections.every(x => GROUPS.includes(x as Group)))) invalid('hiddenSections');
   if (data.symbols !== undefined) {

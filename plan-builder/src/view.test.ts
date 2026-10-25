@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { fitPage, panBy, zoomAt, MIN_ZOOM, MAX_ZOOM } from './view';
+import { fitPage, fitRect, panBy, zoomAt, MIN_ZOOM, MAX_ZOOM } from './view';
 
 const stage = { w: 800, h: 1000 };
 const page = { w: 612, h: 1008 }; // legal portrait, in PDF points
@@ -36,5 +36,21 @@ describe('zoomAt', () => {
 describe('panBy', () => {
   test('moves by the finger delta', () => {
     expect(panBy({ scale: 2, x: 10, y: 20 }, 5, -7)).toEqual({ scale: 2, x: 15, y: 13 });
+  });
+});
+
+describe('fitRect', () => {
+  test('scales to the limiting side and centres the rectangle', () => {
+    const v = fitRect({ x: 0, y: 0, w: 100, h: 50 }, { w: 400, h: 300 }, 20)!;
+    expect(v.scale).toBeCloseTo(3.6, 9);
+    expect(v.x).toBeCloseTo(20, 9);               // width-limited: 100 * 3.6 = 360 fills 400 - 2 * 20
+    expect(v.y).toBeCloseTo((300 - 50 * 3.6) / 2, 9);
+  });
+  test('offsets for a rectangle away from the origin', () => {
+    const v = fitRect({ x: 10, y: 20, w: 100, h: 50 }, { w: 400, h: 300 }, 20)!;
+    expect(10 * v.scale + v.x).toBeCloseTo(20, 9);
+  });
+  test('a zero-size rectangle returns null', () => {
+    expect(fitRect({ x: 0, y: 0, w: 0, h: 0 }, { w: 400, h: 300 }, 20)).toBeNull();
   });
 });

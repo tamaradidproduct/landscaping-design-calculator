@@ -21,8 +21,10 @@ import { material } from './materials';
 import type { OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
-import { fitPage, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
+import { planBounds } from './plan-bounds';
+import { fitPage, fitRect, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 import { docBytes, toDoc } from './plan-model';
+import { topBarHtml, EXPORT_NOTE, type EditorView } from './top-bar';
 import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
@@ -44,6 +46,16 @@ let stageSize: Size = { w: 0, h: 0 };
 let sharpTimer = 0;
 let viewVersion = 0;
 let baseVersion = 0;
+
+// ---------- Top bar: rendered once (PlanHead owns its left cluster); undo/redo and the view switch are patched in place ----------
+const bar = { canUndo: false, canRedo: false, view: 'edit' as EditorView };
+$('top-bar').innerHTML = topBarHtml({ name: '', ...bar });
+function updateBar() {
+  ($('undo') as HTMLButtonElement).disabled = !bar.canUndo;
+  ($('redo') as HTMLButtonElement).disabled = !bar.canRedo;
+  document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === bar.view)));
+  $('top-bar').classList.toggle('previewing', bar.view === 'preview');
+}
 
 let correction: Correction = IDENTITY;   // page points → true-shape points (a stretched plan, once corrected)
 /** The page in true-shape points (only stretches for now, so the sheet's corner stays at the origin). */
@@ -94,8 +106,7 @@ const tool = new OutlineTool({
     applyView(view, false); void renderBase().then(() => renderSharpSoon(0));
   },
   historyChanged(canUndo, canRedo) {
-    ($('undo') as HTMLButtonElement).disabled = !canUndo;
-    ($('redo') as HTMLButtonElement).disabled = !canRedo;
+    bar.canUndo = canUndo; bar.canRedo = canRedo; updateBar();
   },
   changed() {
     rescalePatterns(); // a typed edge length can change the plan's scale
@@ -164,7 +175,6 @@ function updateGroups() {
   const shown = new Set(visibleGroups(state, counts));
   const busy: Record<Group, boolean> = { symbols: !!tool.placing || !!symbolsSection?.pickerOpen, lines: !!tool.lineDraft || !!linesSection?.pickerOpen, surfaces: !!surfaces?.pickerOpen || (!!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface'), outlines: true };
   for (const g of GROUPS) $(`section-${g}`).hidden = !shown.has(g) && !busy[g];
-  document.querySelectorAll<HTMLElement>('[data-eye-group]').forEach(b => { b.hidden = counts[b.dataset.eyeGroup as Group] === 0; });
   addMenu.render(state === 'ready');
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
@@ -174,6 +184,7 @@ function updateGroups() {
   });
   document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => {
     const g = b.dataset.eyeGroup as Group, hidden = tool.hiddenSections.has(g), name = g === 'surfaces' ? 'surfaces' : g === 'symbols' ? 'plants and objects' : g === 'lines' ? 'edges and walls' : 'outlines';
+    b.hidden = counts[g] === 0;
     b.setAttribute('aria-pressed', String(!hidden));
     b.setAttribute('aria-label', `${hidden ? 'Show' : 'Hide'} all ${name}`); b.title = b.getAttribute('aria-label')!;
   });
@@ -191,17 +202,50 @@ symbolsSection.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
 // Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
-const addMenu = new AddMenu($('add'), (type: AddType) => { groupsOpen[type] = true; try { localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen)); } catch { /* not remembered */ } ({ symbols: symbolsSection, lines: linesSection, surfaces })[type]?.openPicker(); updateGroups(); });
-// Edit | Sheet: the sheet is a read-only view of the same data.
-let sheetOpen = false;
-document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(b => {
-  b.onclick = () => {
-    sheetOpen = b.dataset.view === 'sheet';
-    document.querySelectorAll<HTMLButtonElement>('#layers-view [data-view]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-    $('layers-edit').hidden = sheetOpen; $('layers-sheet').hidden = !sheetOpen;
-    if (sheetOpen) renderSheet($('layers-sheet'), tool);
-  };
+const addMenu = new AddMenu($('add'), (type: AddType) => {
+  groupsOpen[type] = true;
+  try {
+    localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen));
+  } catch {
+    /* not remembered */
+  }
+  const section = { symbols: symbolsSection, lines: linesSection, surfaces }[type];
+  section?.openPicker();
+  updateGroups();
 });
+// Edit | Preview (top bar): Preview is the read-only sheet view of the same data. It hides the plot plan for display only
+// (previewing, never planVisible), fits the drawn plan, and switches the drawing tools off until Edit returns.
+let sheetOpen = false;
+let previewing = false;
+let editView: View | null = null; // zoom and pan to restore on returning to Edit
+const previewFitMargin = 32;
+function fitDrawing() {
+  const b = planBounds(tool.state());
+  if (!b) { fitToStage(false); return; }
+  const corners = [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x, y: b.y + b.h }, { x: b.x + b.w, y: b.y + b.h }].map(p => applyCorrection(correction, p));
+  const xs = corners.map(p => p.x), ys = corners.map(p => p.y), x = Math.min(...xs), y = Math.min(...ys);
+  const r = { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+  const f = fitRect(r, { w: stageSize.w / fitScale, h: stageSize.h / fitScale }, previewFitMargin / fitScale);
+  if (!f) { fitToStage(false); return; }
+  const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, f.scale));
+  applyView({ scale, x: stageSize.w / 2 - (r.x + r.w / 2) * fitScale * scale, y: stageSize.h / 2 - (r.y + r.h / 2) * fitScale * scale }, false);
+}
+function setView(v: EditorView) {
+  const preview = v === 'preview';
+  if (preview === previewing) return;
+  previewing = preview; sheetOpen = preview; bar.view = v; updateBar();
+  $('layers-edit').hidden = preview; $('layers-sheet').hidden = !preview;
+  applyPlanLook();
+  if (preview) { renderSheet($('layers-sheet'), tool); if (page) { editView = view; fitDrawing(); } }
+  else { if (page && editView) { applyView(editView, false); renderSharpSoon(0); } editView = null; }
+}
+document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => { b.onclick = () => setView(b.dataset.view === 'preview' ? 'preview' : 'edit'); });
+// The tool's own keys (⌘Z, arrows, Escape, Enter…) are off in Preview, while top-bar and sidebar controls keep their keys.
+window.addEventListener('keydown', e => {
+  // ⌘Z / ⇧⌘Z never act in Preview, wherever focus is (even on the bar); other keys pass inside inputs, the bar and the panel.
+  const history = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z';
+  if (previewing && (history || !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar'))) e.stopImmediatePropagation();
+}, true);
 updateGroups();
 $('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
@@ -217,8 +261,9 @@ window.addEventListener('keydown', e => tool.setModifiers(e.shiftKey, e.altKey))
 window.addEventListener('keyup', e => tool.setModifiers(e.shiftKey, e.altKey));
 window.addEventListener('blur', () => tool.setModifiers(false, false));
 
-$('undo').onclick = () => tool.undo();
-$('redo').onclick = () => tool.redo();
+$('undo').onclick = () => { if (!previewing) tool.undo(); };
+$('redo').onclick = () => { if (!previewing) tool.redo(); };
+$('export').onclick = () => toast(EXPORT_NOTE);
 
 // Freehand | Rectangle, remembered per kind on this device (a convenience: losing it just means the defaults,
 // Freehand for outlines and Rectangle for surfaces). X switches.
@@ -275,7 +320,7 @@ const dpr = () => Math.min(window.devicePixelRatio || 1, 3);
 // ---------- Plot plan layer: show/hide and opacity ----------
 let planVisible = true, planOpacity = 1;
 function applyPlanLook() {
-  for (const el of [pageEl, sharp]) { el.style.visibility = planVisible ? '' : 'hidden'; el.style.opacity = String(planOpacity); }
+  for (const el of [pageEl, sharp]) { el.style.visibility = planVisible && !previewing ? '' : 'hidden'; el.style.opacity = String(planOpacity); }
   const eye = $('plan-visible'), opacity = $<HTMLInputElement>('plan-opacity');
   eye.setAttribute('aria-pressed', String(planVisible));
   eye.setAttribute('aria-label', planVisible ? 'Hide the plot plan' : 'Show the plot plan'); eye.title = eye.getAttribute('aria-label')!;
@@ -423,11 +468,11 @@ stage.addEventListener('pointerdown', e => {
   // Two fingers always move the plan: a second finger cancels whatever the first one started.
   if (pointers.size === 2 && toolDrag) { tool.cancelPointer(); toolDrag = false; }
   if (pointers.size === 2) { startPinch(); moved = true; }
-  if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = tool.pointerDown(local(e), e.pointerType); }
+  if (pointers.size === 1) { downAt = local(e); moved = false; toolPointer = e.pointerId; toolDrag = !previewing && tool.pointerDown(local(e), e.pointerType); }
 });
 stage.addEventListener('pointermove', e => {
   if (e.pointerId === toolPointer || !pointers.size) tool.setModifiers(e.shiftKey, e.altKey);
-  if (!pointers.has(e.pointerId)) { if (page && e.pointerType === 'mouse') tool.hover(local(e)); return; }
+  if (!pointers.has(e.pointerId)) { if (page && !previewing && e.pointerType === 'mouse') tool.hover(local(e)); return; }
   const prev = pointers.get(e.pointerId)!, p = local(e);
   pointers.set(e.pointerId, p);
   if (toolDrag) { if (e.pointerId === toolPointer) tool.pointerMove(p); return; }
@@ -452,7 +497,7 @@ function endPointer(e: PointerEvent) {
   if (pointers.size > 0) return;
   pinch = null;
   const drafting = !!tool.lineDraft; // a tap that ends the line leaves no draft behind, but still isn't a zoom
-  if (!moved) tool.tap(p);
+  if (!moved && !previewing) tool.tap(p);
   if (!moved) {
     const now = performance.now();
     if (now - lastTap.t < 320 && dist(p, lastTap.p) < 30 && !tool.placing && !drafting) { // placing or drawing a line: quick taps drop symbols and points (a double-tap ends the line), not a zoom
@@ -514,7 +559,7 @@ shell = startShell({
   openBytes,
   closePage() {
     openVersion++; page = false; pageEl.hidden = true; sharp.hidden = true; $('loading').hidden = true;
-    clearTimeout(toastTimer); $('toast').hidden = true; // an editor message doesn't follow you to Plans
+    setView('edit'); clearTimeout(toastTimer); $('toast').hidden = true; // an editor message doesn't follow you to Plans
   },
   toast,
   readPdfText: bytes => pdf.text(bytes),

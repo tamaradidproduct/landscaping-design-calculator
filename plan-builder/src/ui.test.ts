@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { applyKeypadKey, canvasNudgePad, disclosure, iconButton, layerRow, numericKeypad, type KeypadKey } from './ui';
+import { applyKeypadKey, button, canvasNudgePad, disclosure, iconButton, layerRow, lineIcon, lucideIcon, numericKeypad, segmented, type KeypadKey } from './ui';
 import { parseFeet } from './outline';
 
 const type = (keys: KeypadKey[]) => keys.reduce((v, k) => applyKeypadKey(v, k), '');
@@ -79,4 +79,15 @@ describe('slim-card primitives', () => {
     expect(html.match(/data-nudge="/g)).toHaveLength(4);
     expect(html).toContain('class="nudge-pad"');
   });
+});
+
+describe('title, lineIcon and segmented', () => {
+  test('button carries a title', () => { expect(button('x', { title: 'Undo (⌘Z)' })).toContain('title="Undo (⌘Z)"'); });
+  test('segmented marks the pressed option', () => {
+    const h = segmented('s', 'View', 'view', [{ label: 'A', value: 'a', pressed: true }, { label: 'B', value: 'b', pressed: false }]);
+    expect(h).toMatch(/data-view="a"[^>]*aria-pressed="true"/);
+    expect(h).not.toMatch(/data-view="b"[^>]*aria-pressed/);
+  });
+  test('lucideIcon draws a named icon', () => { expect(lucideIcon('settings')).toContain('viewBox="0 0 24 24"'); });
+  test('lineIcon draws the path', () => { expect(lineIcon('M0 0')).toContain('d="M0 0"'); });
 });

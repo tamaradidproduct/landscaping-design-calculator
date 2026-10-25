@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, splitEdge, stepTexScale, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
 import { edgeAt } from './fillet';
 import { MARK } from './overlay-tokens';
 
@@ -337,5 +337,22 @@ describe('offHandle', () => {
     const pos = offHandle(a, b, mid, { x: 0, y: 0 });
     expect(Number.isNaN(pos.x)).toBe(false);
     expect(Number.isNaN(pos.y)).toBe(false);
+  });
+});
+
+describe('the plot fill in layer order', () => {
+  const fill: Outline = { id: 'fill', kind: 'surface', name: 'Plot fill', pts: [], closed: true, base: true };
+  const o = (id: string, kind: Outline['kind']): Outline => ({ id, kind, name: id, pts: [], closed: true });
+  const all = Object.fromEntries([o('boundary', 'boundary'), o('s1', 'surface'), o('s2', 'surface'), fill].map(x => [x.id, x]));
+  const ids = ['boundary', 's1', 's2', 'fill'];
+  test('the fill cannot be moved, and no zone can be swapped with it', () => {
+    expect(moveInSection(ids, all, 'fill', -1)).toBeNull(); expect(moveInSection(ids, all, 'fill', 1)).toBeNull();
+    expect(moveInSection(ids, all, 's2', 1)).toBeNull();
+    expect(moveInSection(ids, all, 's2', -1)).toEqual(['boundary', 's2', 's1', 'fill']);
+  });
+  test('positions ignore the fill: the zone above it is last; the fill itself is first and last', () => {
+    expect(sectionPosition(ids, all, 's2')).toEqual({ first: false, last: true });
+    expect(sectionPosition(ids, all, 's1')).toEqual({ first: true, last: false });
+    expect(sectionPosition(ids, all, 'fill')).toEqual({ first: true, last: true });
   });
 });

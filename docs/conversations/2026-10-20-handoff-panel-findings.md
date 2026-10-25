@@ -334,3 +334,26 @@ Reviewed: `docs/superpowers/plans/2026-10-19-handoff-panel.md` and `docs/superpo
 ### Update from `origin/main` (checked 2026-10-21)
 - **Corner insertion has shipped** on main (#26, "Insert a corner on an existing outline, zone or line edge"), so the "cannot add a corner" gap above is already closed; removing a corner is still open. Re-check the outline-edit idea against main before specifying it.
 - **Also on main:** a custom numeric keypad for edge-length and zone-resize entry (#28), JPG/PNG plot plans (#20, relevant to the Sheet view hiding the uploaded plan), duplicate plan-name handling (#21), drag-and-drop upload (#23).
+
+## Surface entry and material grid: decisions (user, 2026-10-24)
+- **Two entry orders:** Add → Surface opens the material grid (material first); a "Draw shape first" button above the grid starts drawing instead.
+- **Shape first:** closing the shape opens the material grid in the card. If it is dismissed, the zone stays with a neutral "unassigned" hatched fill and an "Assign material" line, and counts nowhere (no quantities, not on the Sheet) until a material is assigned.
+- **Material grid:** a search field, family tags (chips) and a two-column grid of large thumbnails with the name below, replacing the long list of small-swatch rows.
+- **Outlines keep their identity:** the House cannot become a surface. The plot boundary can be filled with an overall surface; a deck or patio outline can be redone in another material. Outlines stay as outlines; a "Make surface" action **duplicates** the shape as a surface zone (not a conversion), on the outline's card only (not in the Add flow).
+- **Plot fill already exists** on the unmerged local branch `feat/plot-fill` (Fill the plot…, follows the boundary, lowest surface, plus visible-area quantities). Landing it first (session "Land plot fill into the new panel") before designing on top.
+- **Correction:** the "net area" function and per-material visible-area counts for surfaces exist on `feat/plot-fill`; the calculator spec starts from that, not from zero.
+
+### Design changes (user, 2026-10-24)
+- **Floating canvas tools replace the panel's + Add:** Surface, Plant/object and Line tool buttons float over the canvas at all times, plus a generic Add button that opens a search across every category. Tapping a tool selects it at once (Surface: the drawing tool starts immediately; no "Draw shape first" button). Each tool also has a search that **preselects its category but does not limit the search**. The panel loses its global + Add (built in PR 51); it only lists and edits.
+- **Outline card:** "Redraw" becomes an icon-only **replace** icon (aria-label "Redraw"). **Square corners** leaves the card and floats on the canvas next to the selected outline. The "Make surface" duplicate action needs a clearer description and a clearer icon (to specify in spec 3).
+- **Cascades:** spec 1 (panel Add, locked states), spec 2 (outline card actions, nudge pad and floating square corners placement) and spec 3 (entry flow) all depend on where the floating tool bar sits among the undo/redo (top-right), zoom (bottom-right), nudge pad (bottom-left) and snap bar.
+- **Tool bar placement (user):** a vertical bar on the canvas's left edge, vertically centred, four icon buttons: Surface, Plant/object, Line, Add (generic search across every category). The plan header stays top-left above it.
+- **Tapping a tool:** Surface starts the drawing tool at once and opens a search + grid popover beside the bar (tap a material first and it applies to the next shape, or ignore it and just draw; the grid reopens in the card after Close shape if no material was chosen). Plant/object and Line open their search popover (preselecting their category, searching everything) and arm placing or drawing when an item is chosen (assumed, to confirm).
+- **Scope of the next spec (3):** "Add tools and material grid": the floating tool bar (replacing the panel's + Add), the search popover with category tags, the material grid, shape-first with an unassigned fill, plot fill's entry (after `feat/plot-fill` lands), and the clearer "duplicate as surface" action.
+
+### Revision (user, 2026-10-24, after the full-canvas mockup)
+- **Tools go back in the right panel**, as a horizontal row of four buttons: **Add** (generic search across every category), **Surface**, **Wall/Edge**, **Plant/Object**. The canvas stays free of a tool bar. Tapping a tool still selects it at once and opens the search and grid beside or under the row, preselecting its category without limiting the search.
+- **Edit | Sheet switcher** moves next to the plan's name in the plan header.
+- **Nudge arrows questioned:** the user does not see what the floating pad is for. It nudges a selected corner or zone by one step for fine adjustment (the keyboard does the same with arrow keys; the pad is only for touch).
+- **Nudge pad decision (user):** keep it, but only on touch devices (coarse primary pointer); desktop never shows it. The slim-cards session was told.
+- **Correction (user, 2026-10-24):** the Edit | Sheet switch moves **left, into the canvas plan header** next to the plan name ("← 123 Main St ⋯" pill, top-left of the canvas), not the panel header where PR 51 built it (beside "Layers"). My panel mockup wrongly drew the plan name inside the panel. The panel header keeps only "Layers".

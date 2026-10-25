@@ -1,5 +1,6 @@
 // UI components as HTML-string builders. Every class name the components in styles/components.css
 // rely on is written here, so templates elsewhere compose these instead of spelling out markup.
+import { LUCIDE, type LucideName } from './lucide-icons';
 import type { MaterialId } from './materials';
 import { swatchFill } from './patterns';
 
@@ -13,6 +14,8 @@ export interface ButtonOptions {
   /** A toggle or choice that is on (aria-pressed="true"). */
   pressed?: boolean;
   ariaLabel?: string;
+  /** Tooltip (a shortcut hint, say). */
+  title?: string;
   id?: string;
   /** A button that opens or closes something (aria-expanded="true"/"false"). */
   expanded?: boolean;
@@ -28,7 +31,20 @@ export function button(label: string, o: ButtonOptions = {}): string {
   const cls = [o.variant && o.variant !== 'default' ? o.variant : '', ...(o.mods ?? [])].filter(Boolean).join(' ');
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="${o.type ?? 'button'}"${o.id ? ` id="${o.id}"` : ''}${cls ? ` class="${cls}"` : ''}${data}`
-    + `${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+    + `${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.title ? ` title="${esc(o.title)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+}
+
+/** A Lucide icon by name (lucide-icons.ts), drawn on a 24-unit grid. */
+export const lucideIcon = (name: LucideName) => `<svg class="line-icon lucide" viewBox="0 0 24 24" aria-hidden="true">${LUCIDE[name]}</svg>`;
+
+/** A 16 px line icon from an SVG path (`d`); sized and stroked by .line-icon. */
+export const lineIcon = (d: string) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" /></svg>`;
+
+export interface SegmentedOption { label: string; value: string; pressed: boolean }
+/** Segmented control: one choice of a few, joined. Each button carries data-<attr>="value". */
+export function segmented(id: string, ariaLabel: string, attr: string, options: SegmentedOption[]): string {
+  return `<div class="segmented" id="${id}" role="group" aria-label="${esc(ariaLabel)}">`
+    + options.map(o => button(o.label, { pressed: o.pressed, data: { [attr]: o.value } })).join('') + '</div>';
 }
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
@@ -121,17 +137,17 @@ const ICON_PATHS: Record<IconName, string> = {
   'chevron-right': '<path d="M6 3l5 5-5 5" />',
   replace: '<path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" />',
 };
-const lineIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+const cardIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 /** An icon-only button (48 px): a line icon with an aria-label and title. */
 export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record<string, string>; variant?: 'danger'; pressed?: boolean; expanded?: boolean }): string {
   const d = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="button" class="icon${o.variant ? ` ${o.variant}` : ''}"${d} aria-label="${esc(o.ariaLabel)}" title="${esc(o.ariaLabel)}"`
-    + `${o.pressed ? ' aria-pressed="true"' : ''}${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}>${lineIcon(icon)}</button>`;
+    + `${o.pressed ? ' aria-pressed="true"' : ''}${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}>${cardIcon(icon)}</button>`;
 }
 /** A row that opens and closes its body (aria-expanded); the body is only in the markup while open. */
 export function disclosure(id: string, labelText: string, open: boolean, bodyHtml: string): string {
   return `<div class="disclosure"><button type="button" class="disclosure-head" data-disclosure="${esc(id)}" aria-expanded="${open}">`
-    + `<span class="layer-name">${esc(labelText)}</span>${lineIcon('chevron-right')}</button>`
+    + `<span class="layer-name">${esc(labelText)}</span>${cardIcon('chevron-right')}</button>`
     + `${open ? `<div class="disclosure-body">${bodyHtml}</div>` : ''}</div>`;
 }
 /** Four arrows over the canvas (bottom-left) that nudge the selected corner by one screen pixel (data-nudge="dx,dy"). */
