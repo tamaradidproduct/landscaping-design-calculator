@@ -112,7 +112,7 @@ export class SurfacesSection {
     const round = t.cal ? formStack(row(
       input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′ (↑ ↓ to adjust)', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
     return layerCard({
-      id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
+      id: o.id, swatch: sw, name: o.name, rename: true, renameId: 'surface-rename',
       body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,
     });
   }

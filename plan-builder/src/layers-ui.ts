@@ -5,8 +5,8 @@
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import { outlinesHints, panelState } from './panel-state';
 import type { OutlineTool } from './outline-ui';
-import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, chips, esc, hint, input, label, layerCard, layerForm, layerRow, nudgePad, splitRow, suggestRow, type Swatch } from './ui';
+import { drawingCard, editActions, wireLayerCard } from './layer-card';
+import { button, caption, chips, esc, hint, input, label, layerCard, layerForm, layerRow, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
   private naming = false; // the custom-feature name form is open
@@ -20,7 +20,7 @@ export class OutlinesSection {
     const s = outlineSuggestions(all);
     const ordered = [...all.filter(o => o.kind === 'boundary'), ...all.filter(o => o.kind === 'feature')];
     const rows = ordered.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o) : layerRow(o.name, {
-      swatch: swatchOf(o), data: { layer: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) },
+      swatch: swatchOf(o), data: { layer: o.id }, grip: o.kind === 'feature', eye: { id: o.id, hidden: t.isHidden(o.id) },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
     const placed = Object.values(t.symbols.placed).length + Object.values(t.lines.placed).length + all.filter(o => o.kind === 'surface').length;
@@ -63,15 +63,15 @@ export class OutlinesSection {
     };
   }
 
-  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, nudge, Square all, Redo, Delete. */
+  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, Square corners, Redraw, trash. */
   private card(o: Outline): string {
     const t = this.tool;
     if (o.id === t.drawing) return drawingCard(t, o, swatchOf(o), o.kind === 'boundary' ? 'plot boundary' : o.name);
     const feature = o.kind === 'feature';
     return layerCard({
-      id: o.id, swatch: swatchOf(o), name: o.name, done: true, rename: feature,
+      id: o.id, swatch: swatchOf(o), name: o.name, rename: feature,
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
-      body: `${t.cornerSelected ? nudgePad() : ''}${editActions(feature)}${feature ? orderControl(t, o.id) : ''}`,
+      body: editActions(feature),
     });
   }
   private wireCard() {

@@ -126,13 +126,14 @@ export function nudgePad(): string {
     + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
 }
 
-export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right';
+export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace';
 const ICON_PATHS: Record<IconName, string> = {
   trash: '<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.5 7v4M9.5 7v4" />',
   info: '<circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.1" />',
   more: '<circle cx="3.5" cy="8" r=".6" /><circle cx="8" cy="8" r=".6" /><circle cx="12.5" cy="8" r=".6" />',
   'chevron-left': '<path d="M10 3L5 8l5 5" />',
   'chevron-right': '<path d="M6 3l5 5-5 5" />',
+  replace: '<path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" />',
 };
 const lineIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 /** An icon-only button (48 px): a line icon with an aria-label and title. */
@@ -205,9 +206,8 @@ export interface LayerCardOptions {
 }
 export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
-    // Looks like a field (underline + pencil) so it's clear the name can be changed right here.
-    ? `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}`
-      + `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg></label>`
+    // Looks like a field (underlined) so it's clear the name can be changed right here.
+    ? `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}</label>`
     : layerName(o.name, o.sub);
   return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
