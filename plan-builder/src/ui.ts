@@ -182,7 +182,9 @@ export function layerRow(name: string, o: LayerRowOptions): string {
  * name (a name field when it can be renamed) and a Done button; the body holds the step, nudge arrows and actions.
  */
 export interface LayerCardOptions {
-  id: string; swatch: Swatch; name: string; sub?: string; meta?: string;
+  id: string; name: string; sub?: string; meta?: string;
+  /** The head's swatch; left out when the card shows it elsewhere (a zone's Material button). */
+  swatch?: Swatch;
   /** Show the name as a field (id `renameId`, default "outline-rename") so it can be renamed in place. */
   rename?: boolean;
   renameId?: string;
@@ -200,7 +202,7 @@ export function layerCard(o: LayerCardOptions): string {
       return o.sub ? `<span class="layer-text">${field}<span class="layer-sub">${esc(o.sub)}</span></span>` : field;
     })()
     : layerName(o.name, o.sub);
-  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
+  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${o.swatch ? swatch(o.swatch) : ''}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
     + `${o.actions ? `<span class="layer-head-actions">${o.actions}</span>` : ''}`
     + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`

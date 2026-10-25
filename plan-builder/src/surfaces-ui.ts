@@ -17,7 +17,7 @@ const picker = (current?: MaterialId) => materialsByFamily().map(({ family, mate
 export class SurfacesSection {
   private picking = false; // the material picker for a new zone is open
   private changing: string | null = null; // the zone whose material picker is open in its card
-  private adjusting: string | null = null; // the zone whose "Shape and texture" disclosure is open
+  private adjusting: string | null = null; // the zone whose "Corners and texture" disclosure is open
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
@@ -112,19 +112,20 @@ function texScale(o: Outline): string {
     button('+', { mods: ['icon'], ariaLabel: 'Larger texture', data: { act: 'tex-up' }, disabled: s >= TEX_SCALE.max })}</div></div>`;
 }
 
-/** The selected zone's card: header with area, the Material button (aria-label Change material), the collapsed shape-and-texture disclosure, then the actions. */
+/** The selected zone's card: the name with its area beneath, the Material button (its swatch; aria-label Change material),
+ * Width × Depth, then the closed "Corners and texture" disclosure; Redraw and trash in the header. */
 export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; changing: boolean }): string {
   const sw = { material: o.material! };
   if (o.id === t.drawing) return drawingCard(t, o, sw, o.name.toLowerCase());
-  // Change material shares the action row (keeps the card short); the picker opens in place of the row's button.
-  const change = button('Material', { mods: ['compact'], ariaLabel: 'Change material', data: { act: 'change-material' } });
+  // The swatch lives in the Material button (that's where the material is swapped); the picker opens in its place.
+  const change = button(`${swatch(sw)}<span>Material</span>`, { mods: ['compact', 'with-swatch'], ariaLabel: 'Change material', data: { act: 'change-material' } });
   const rd = radiusDisplay(t.cornerRadiiFt(o.id));
   const round = t.cal ? formStack(field('round-all', 'Corner radius', row(
     input('round-all', { inputmode: 'decimal', value: rd.value, placeholder: rd.placeholder, ariaLabel: 'Corner radius' }), button('Done', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
-  const adjust = disclosure('adjust', 'Shape and texture', st.open, `${sizeForm(t, o)}${round}${texScale(o)}`);
+  const adjust = disclosure('adjust', 'Corners and texture', st.open, `${round}${texScale(o)}`);
   const area = t.areaSqft(o);
   return layerCard({
-    id: o.id, swatch: sw, name: o.name, meta: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
-    actions: editActions(true), body: `${st.changing ? picker(o.material) : change}${adjust}`,
+    id: o.id, name: o.name, sub: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
+    actions: editActions(true), body: `${st.changing ? picker(o.material) : change}${sizeForm(t, o)}${adjust}`,
   });
 }

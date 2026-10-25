@@ -51,6 +51,8 @@ button.icon.danger { color: var(--color-warn); }
 button.toggle[aria-pressed="true"] { border-color: var(--color-accent); }
 button.chip { text-align: center; }
 button.compact { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-base); white-space: nowrap; }
+/* A button that shows what it changes: a swatch before its label (a zone's Material) */
+button.with-swatch { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-4); }
 
 /* ---------- Text field ---------- */
 input {

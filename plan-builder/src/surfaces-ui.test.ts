@@ -16,13 +16,23 @@ describe('surface card', () => {
     expect(html([2, 2, 2, 2], true)).toContain('value="2"');
     expect(html([2, 0, 2, 2], true)).toContain('placeholder="Mixed"');
   });
-  test('shape and texture controls are absent while closed, present when open', () => {
+  test('Width and Depth stay in the card; corner radius and texture sit under the closed disclosure', () => {
     const closed = html([0, 0, 0, 0], false), open = html([0, 0, 0, 0], true);
-    expect(closed).toContain('data-disclosure="adjust"'); expect(closed).toContain('aria-expanded="false"');
-    for (const id of ['zone-width', 'round-all', 'tex-down']) { expect(closed).not.toContain(id); expect(open).toContain(id); }
+    expect(closed).toContain('data-disclosure="adjust"'); expect(closed).toContain('aria-expanded="false"'); expect(closed).toContain('Corners and texture');
+    for (const id of ['zone-width', 'zone-depth']) { expect(closed).toContain(id); expect(open).toContain(id); }
+    for (const id of ['round-all', 'tex-down']) { expect(closed).not.toContain(id); expect(open).toContain(id); }
   });
-  test('header shows the area in its meta; actions are Change material and the edit icons', () => {
+  test('the area is the quiet line under the name, not a meta beside it', () => {
     const h = html([0], false);
-    expect(h).toContain('80 sq ft'); expect(h).toContain('aria-label="Change material"'); expect(h).toContain('>Material<'); expect(h).toContain('data-act="redraw"'); expect(h).not.toContain('data-act="up"');
+    expect(h).toMatch(/class="layer-sub">80 sq ft</); expect(h).not.toContain('layer-meta');
+  });
+  test('the swatch sits in the Material button, not in the header', () => {
+    const h = html([0], false), head = h.slice(0, h.indexOf('layer-body'));
+    expect(head).not.toContain('class="swatch');
+    expect(h).toMatch(/<button[^>]*data-act="change-material"[^>]*aria-label="Change material"[^>]*><span class="swatch material">.*<\/span><span>Material<\/span><\/button>/);
+  });
+  test('actions are Change material and the edit icons', () => {
+    const h = html([0], false);
+    expect(h).toContain('aria-label="Change material"'); expect(h).toContain('data-act="redraw"'); expect(h).not.toContain('data-act="up"');
   });
 });

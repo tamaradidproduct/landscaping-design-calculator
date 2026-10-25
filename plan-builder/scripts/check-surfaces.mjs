@@ -90,7 +90,7 @@ await page.click('#surfaces [data-card] [data-act=change-material]'); await page
 results.push(['Pavers → Flagstone', await zones()]);
 await page.fill('#surface-rename', 'Back patio'); await page.press('#surface-rename', 'Enter'); await page.waitForTimeout(100);
 await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=clear-mountain-granite]'); await page.waitForTimeout(100);
-const mat = () => page.$eval('#surfaces [data-card] .layer-head .swatch rect', e => e.getAttribute('fill'));
+const mat = () => page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'));
 results.push(['Renamed, then → Gravel', `${await zones()} · ${await mat()}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
 results.push(['⌘Z (material only)', `${await zones()} · ${await mat()}`]);
