@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
-  edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
+  edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -973,8 +973,6 @@ export class OutlineTool {
     ids.splice(ids.indexOf(above), 0, id);
     this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
   }
-  /** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
-  layerPosition(id: string) { return sectionPosition(Object.keys(this.outlines), this.outlines, id); }
   /** True while a finished outline has a corner, edge or feature selected. */
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
@@ -1214,6 +1212,7 @@ export class OutlineTool {
   /** Round every corner of a surface to one radius in feet (0 = all sharp). */
   roundAll(id: string, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c) return;
+    if (!steps && this.cornerRadiiFt(id).every(r => r === Math.round(feet * 100) / 100)) return; // already that radius: no undo step
     // Arrow-key steps within 1.5 s undo as one step (like a corner's).
     const t = performance.now(), ln = this.lastNudge, key = -1, run = steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500;
     if (!run) this.record(); else this.revision++;

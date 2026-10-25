@@ -1,5 +1,5 @@
 // The expanded layer card shared by the Outlines and Surfaces sections: the card while drawing, the common
-// actions of a selected layer, its layer order, and the wiring of all of them to the outline tool.
+// actions of a selected layer, drag-to-reorder, and the wiring of all of them to the outline tool.
 import type { Outline } from './outline';
 import type { OutlineTool } from './outline-ui';
 import { button, esc, hint, iconButton, layerActions, layerCard, type Swatch } from './ui';
@@ -17,7 +17,7 @@ export function drawingCard(t: OutlineTool, o: Outline, swatch: Swatch, subject:
     button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
 }
 
-/** A selected layer's actions: a Redraw icon and (unless it's the plot boundary) a trash icon. Square corners moves to the canvas (Task 6); its act stays wired. */
+/** A selected layer's actions: a Redraw icon and (unless it's the plot boundary) a trash icon. (Square corners is a floating canvas button, not part of the card.) */
 export const editActions = (deletable: boolean, lead = '') => layerActions(
   lead,
   iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } }),
@@ -34,9 +34,10 @@ export function wireReorder(listEl: HTMLElement, t: OutlineTool) {
   const idOf = (i: HTMLElement) => i.querySelector<HTMLElement>('[data-grip]')!.dataset.grip!;
   listEl.querySelectorAll<HTMLElement>('[data-grip]').forEach(grip => {
     const id = grip.dataset.grip!;
+    grip.title = 'Drag, or Alt+↑/↓'; grip.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown');
     grip.onkeydown = e => {
       if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation(); // the tool's own key handler would also nudge the selection
       t.moveLayer(id, e.key === 'ArrowUp' ? -1 : 1);
       listEl.querySelector<HTMLElement>(`[data-grip="${CSS.escape(id)}"]`)?.focus(); // the list was redrawn
     };
@@ -62,7 +63,7 @@ export function wireReorder(listEl: HTMLElement, t: OutlineTool) {
       const move = (e: PointerEvent) => mark(e.clientY);
       const up = () => finish(true);
       const cancel = () => finish(false);
-      const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); finish(false); } };
+      const key = (e: KeyboardEvent) => { if (e.key !== 'Escape') return; if (!grip.isConnected) { finish(false); return; } e.preventDefault(); e.stopImmediatePropagation(); finish(false); };
       grip.setPointerCapture(down.pointerId);
       row.classList.add('dragging');
       grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up); grip.addEventListener('pointercancel', cancel);
@@ -76,13 +77,10 @@ export function wireLayerCard(card: HTMLElement, t: OutlineTool, extra: Record<s
   const id = card.dataset.card!;
   const act: Record<string, () => void> = {
     close: () => t.close(), cancel: () => t.cancel(), collapse: () => t.selectOutline(null),
-    'square-all': () => t.squareAll(id), redraw: () => t.redraw(id), delete: () => t.deleteLayer(id),
+    redraw: () => t.redraw(id), delete: () => t.deleteLayer(id),
     ...extra,
   };
   card.querySelectorAll<HTMLButtonElement>('[data-act]').forEach(b => { if (act[b.dataset.act!]) b.onclick = act[b.dataset.act!]; });
-  card.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(b => {
-    b.onclick = () => { const [dx, dy] = b.dataset.nudge!.split(',').map(Number); t.nudge(dx, dy); };
-  });
   // Tapping the head (not its name field or buttons) closes the card, like tapping a row again.
   card.querySelector<HTMLElement>('.layer-head')!.onclick = e => {
     if (!(e.target as Element).closest('input, button') && !t.drawing) t.selectOutline(null);

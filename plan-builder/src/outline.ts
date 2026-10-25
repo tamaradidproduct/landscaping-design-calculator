@@ -59,11 +59,6 @@ export function moveInSectionTo(keys: string[], outlines: Record<string, Outline
   const next = [...rest.slice(0, at), id, ...rest.slice(at)];
   return next.every((k, i) => k === keys[i]) ? null : next;
 }
-/** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
-export function sectionPosition(ids: string[], outlines: Record<string, Outline>, id: string) {
-  const o = outlines[id], same = o ? ids.filter(k => outlines[k] && sectionOf(outlines[k]!.kind) === sectionOf(o.kind)) : [];
-  return { first: same[0] === id, last: same[same.length - 1] === id };
-}
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 /** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,

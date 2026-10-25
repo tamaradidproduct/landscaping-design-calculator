@@ -23,6 +23,6 @@ describe('surface card', () => {
   });
   test('header shows the area in its meta; actions are Change material and the edit icons', () => {
     const h = html([0], false);
-    expect(h).toContain('80 sq ft'); expect(h).toContain('Change material'); expect(h).toContain('data-act="redraw"'); expect(h).not.toContain('data-act="up"');
+    expect(h).toContain('80 sq ft'); expect(h).toContain('aria-label="Change material"'); expect(h).toContain('>Material<'); expect(h).toContain('data-act="redraw"'); expect(h).not.toContain('data-act="up"');
   });
 });

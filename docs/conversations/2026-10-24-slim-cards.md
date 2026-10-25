@@ -10,14 +10,14 @@ Spec: `docs/superpowers/specs/2026-10-24-slim-cards-design.md`. Decisions behind
 - **Nudge arrows** (user amendment) leave the cards. Keyboard arrows are unchanged; a **touch-only floating nudge pad** (coarse pointer) shows only while a corner, or a finished zone with no corner, can be nudged.
 - **Layer order** becomes a **grip on each row** (Outlines features, Surfaces); **Alt+↑ / Alt+↓** on the grip is the keyboard path.
 - **Corner radius** shows its value (`2`), or **Mixed** when corners differ; a blank field changes nothing.
-- The surface card's **Adjust shape and texture** disclosure holds Size, Corner radius and Texture and is **closed by default**.
+- The surface card's **Shape and texture** disclosure holds Size, Corner radius and Texture and is **closed by default**.
 - The **edge chip** replaces the edge popover: length, ⓘ, ⋯; the length opens the numeric keypad (#28) and its Done key saves.
 - Plant card: no photo, no rotation for plants (objects and markers keep a Rotate row), `N of M` with ‹ › and a trash icon.
 
 ## Built
 - Outline card: header (swatch, name or boundary area, eye) and one action row (Redraw, trash). Drawing state keeps the step hint, Close shape and Cancel.
 - Plant and object card: size in the header sub-line ("Evergreen tree · 10 ft wide"), one body row (`N of M`, ‹ ›, trash). Also fixed a bug: tapping a plant row did nothing (a `data-symbolrow` vs `data-symbol-row` mismatch).
-- Surface card: header with area, the disclosure, and an action row with Change material, Redraw and trash. `OutlineTool.cornerRadiiFt` and the pure `radiusDisplay` / `roundAllRequest` helpers back the radius field.
+- Surface card: header with area, the disclosure, and an action row with Material (aria-label Change material), Redraw and trash. `OutlineTool.cornerRadiiFt` and the pure `radiusDisplay` / `roundAllRequest` helpers back the radius field.
 - Drag to reorder: `OutlineTool.moveLayerTo` (one undo step, no-op adds none); Escape or a lost pointer cancels; grips are 48 px with `touch-action: none`; touch drag works.
 - Canvas: nudge pad (`nudgePadVisible`), floating Square corners button, edge chip (`edge-chip.ts`, `chipPositionAvoiding` keeps it inside the plan and clear of the Square corners button). The ⋯ menu lists Make straight (curved edges only), Remove this length (edges with a reference) and Swap fixed end (zone edges).
 - Browser checks: `scripts/check-slim-cards.mjs` (151 checks, absorbs the reorder, nudge-pad and edge-chip scripts); the other check scripts updated for the chip, keypad, Redraw and grips. Lint, typecheck and vitest pass.

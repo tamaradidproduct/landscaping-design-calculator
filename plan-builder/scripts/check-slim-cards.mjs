@@ -178,9 +178,13 @@ if (onlyPart !== 'nudge') {
   check('surface card: no up/down, no Square corners button, no nudge in the card', !(await page.$('#surfaces [data-card] [data-act=up], #surfaces [data-card] [data-act=down], #surfaces [data-card] [data-act=square-all], #surfaces [data-card] .nudge, #surfaces [data-card] .layer-order')), '');
   const sRedraw = await page.$('#surfaces [data-card] [data-act=redraw]'), sTrash = await page.$('#surfaces [data-card] [data-act=delete]');
   check('surface card: icon Redraw and Delete trash', !!sRedraw && (await sRedraw.getAttribute('aria-label')) === 'Redraw' && !!sTrash && (await sTrash.getAttribute('aria-label')) === 'Delete', '');
+  const trunc = await page.evaluate(() => ['#surfaces [data-act=change-material]', '#surfaces [data-disclosure=adjust] .layer-name'].map(q => { const e = document.querySelector(q), r = e.getBoundingClientRect(); return { q, text: e.textContent.trim(), clipped: e.scrollWidth > e.clientWidth + 1, w: Math.round(r.width) }; }));
+  check('surface card: Material and Shape and texture labels are not truncated', trunc.every(t => !t.clipped), JSON.stringify(trunc));
+  check('surface card: the Material button keeps aria-label Change material', (await page.getAttribute('#surfaces [data-act=change-material]', 'aria-label')) === 'Change material', '');
+  check('reorder grips carry a title and aria-keyshortcuts', await page.$$eval('#outlines [data-grip]', g => g.length > 0 && g.every(x => x.title && /Alt\+ArrowUp/.test(x.getAttribute('aria-keyshortcuts') ?? ''))), '');
   await page.screenshot({ path: `${outDir}/slim-surface-closed.png` });
   await page.click('[data-disclosure=adjust]'); await page.waitForTimeout(200);
-  check('surface card: Adjust shape and texture opens the size fields', !!(await page.$('#zone-width')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'true', '');
+  check('surface card: Shape and texture opens the size fields', !!(await page.$('#zone-width')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'true', '');
   await page.screenshot({ path: `${outDir}/slim-surface-open.png` });
   await page.fill('#round-all', '2'); await page.click('.round-all button[type=submit]'); await page.waitForTimeout(250);
   check('surface card: Corner radius shows 2 after Round all 2′', (await page.inputValue('#round-all')) === '2', await page.inputValue('#round-all'));
@@ -219,6 +223,17 @@ if (onlyPart !== 'nudge') {
   check('surfaces: Alt+ArrowUp on a grip moves a zone', (await zorder()) === `${zB},${zA}`, await zorder());
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
   check('surfaces: one ⌘Z restores after Alt+Arrow', (await zorder()) === `${zA},${zB}`, await zorder());
+  // Alt+Arrow on a grip must not also nudge the selected zone (the tool's key handler), and is one undo step.
+  await page.locator(`#surfaces [data-zone="${zA}"]`).click(); await page.waitForTimeout(250);
+  const zpath = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => e.getAttribute('d'));
+  const d0 = await zpath(zA);
+  const zall = () => page.$$eval('#surfaces [data-card], #surfaces [data-zone]', e => e.map(x => x.dataset.card ?? x.dataset.zone).join(','));
+  await zgrip(zB).focus(); await page.keyboard.press('Alt+ArrowUp'); await page.waitForTimeout(250);
+  check('grip Alt+Arrow with a zone selected: the zone is not nudged', (await zpath(zA)) === d0, '');
+  check('grip Alt+Arrow with a zone selected: the layer moved', (await zall()) === `${zB},${zA}`, await zall());
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
+  check('grip Alt+Arrow with a zone selected: one ⌘Z restores the order, zone still in place', (await zall()) === `${zA},${zB}` && (await zpath(zA)) === d0, await zall());
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
 
   // ---- Zone edge chip, with and without a scale ----
   await page.locator(`#surfaces [data-zone="${zA}"]`).click().catch(() => {}); await page.waitForTimeout(250);

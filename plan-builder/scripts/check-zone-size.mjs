@@ -39,7 +39,7 @@ try {
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   await drag([300, 250], [360, 350]); // 12′ × 20′ (60 × 100 pt), stays selected
-  await openAdjust(page); // the size fields live under Adjust shape and texture
+  await openAdjust(page); // the size fields live under Shape and texture
   const sizes = () => page.evaluate(() => [document.querySelector('#zone-width').value, document.querySelector('#zone-depth').value]);
   const box = async () => { const s = await shape('s1'); return `${s.x1 - s.x0} × ${s.y1 - s.y0} pt at (${(s.x0 + s.x1) / 2}, ${(s.y0 + s.y1) / 2})`; };
   results.push(['Card fields', `${await sizes()} · lock pressed ${await page.getAttribute('[data-act=aspect-lock]', 'aria-pressed')} · ${await box()}`]);

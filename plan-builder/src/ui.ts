@@ -97,9 +97,6 @@ export const card = (html: string, cls = '') => `<div class="card${cls ? ` ${cls
 /** Inline field inside a chip: a muted label before a short input ("Round [ 2 ]"). */
 export const chipField = (id: string, labelText: string, o: InputOptions & { title?: string } = {}) =>
   `<label class="chip-field" hidden${o.title ? ` title="${esc(o.title)}"` : ''}>${labelText} ${input(id, o)}</label>`;
-/** One chosen value shown as a line — swatch, name and an action that opens the choices (e.g. a zone's material). */
-export const choiceLine = (swatchHtml: string, name: string, action: string) =>
-  `<div class="choice-line">${swatchHtml}<span class="layer-name">${esc(name)}</span>${action}</div>`;
 
 /** Screen panel: the app name over one centred action (Sign-in, Not invited). */
 export const screenPanel = (titleHtml: string, bodyHtml: string) =>
@@ -114,10 +111,6 @@ export const emptyNote = (text: string) => `<p class="plans-empty">${esc(text)}<
  */
 export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming' | 'archived') =>
   `<div class="plan-row${state ? ` ${state}` : ''}" data-id="${esc(id)}">${children.join('')}</div>`;
-
-/** Card header: a title and a small close button (data-act="close"). */
-export const cardHead = (titleHtml: string) =>
-  `<div class="card-head"><strong>${titleHtml}</strong>${button('×', { mods: ['icon', 'small'], ariaLabel: 'Close', data: { act: 'close' } })}</div>`;
 
 export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace';
 const ICON_PATHS: Record<IconName, string> = {
@@ -138,7 +131,7 @@ export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record
 /** A row that opens and closes its body (aria-expanded); the body is only in the markup while open. */
 export function disclosure(id: string, labelText: string, open: boolean, bodyHtml: string): string {
   return `<div class="disclosure"><button type="button" class="disclosure-head" data-disclosure="${esc(id)}" aria-expanded="${open}">`
-    + `<span class="layer-name">${esc(labelText)}</span>${lineIcon(open ? 'chevron-left' : 'chevron-right')}</button>`
+    + `<span class="layer-name">${esc(labelText)}</span>${lineIcon('chevron-right')}</button>`
     + `${open ? `<div class="disclosure-body">${bodyHtml}</div>` : ''}</div>`;
 }
 /** Four arrows over the canvas (bottom-left) that nudge the selected corner by one screen pixel (data-nudge="dx,dy"). */

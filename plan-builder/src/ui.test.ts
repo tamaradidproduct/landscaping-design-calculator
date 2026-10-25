@@ -66,11 +66,11 @@ describe('slim-card primitives', () => {
     expect(layerRow('Sod', { swatch: 'feature', grip: true, data: { zone: 'z9' } })).toContain('data-grip="z9"');
   });
   test('disclosure shows its body only when open', () => {
-    const closed = disclosure('adjust', 'Adjust shape and texture', false, '<p>x</p>');
+    const closed = disclosure('adjust', 'Shape and texture', false, '<p>x</p>');
     expect(closed).toContain('aria-expanded="false"');
     expect(closed).toContain('data-disclosure="adjust"');
     expect(closed).not.toContain('<p>x</p>');
-    const open = disclosure('adjust', 'Adjust shape and texture', true, '<p>x</p>');
+    const open = disclosure('adjust', 'Shape and texture', true, '<p>x</p>');
     expect(open).toContain('aria-expanded="true"');
     expect(open).toContain('<p>x</p>');
   });

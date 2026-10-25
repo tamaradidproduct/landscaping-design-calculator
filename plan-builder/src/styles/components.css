@@ -38,7 +38,8 @@ button.icon.danger { color: var(--color-warn); }
 .layer-item.drop-end { box-shadow: 0 var(--space-1) 0 var(--color-accent); }
 /* Disclosure: a row that opens a body beneath it */
 .disclosure { display: flex; flex-direction: column; gap: var(--space-4); }
-.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: 44px; text-align: left; }
+.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: var(--control-md); text-align: left; }
+.disclosure-head[aria-expanded="true"] svg { transform: rotate(90deg); }
 .disclosure-body { display: flex; flex-direction: column; gap: var(--space-4); }
 /* Canvas nudge pad: four arrows at the canvas's bottom-left, one control row above the dock so a narrow canvas keeps it clear of Snap */
 .nudge-pad { position: absolute; z-index: var(--z-chip); left: var(--space-8); bottom: calc(var(--space-8) + var(--control-md) + var(--space-4) + env(safe-area-inset-bottom, 0px)); display: flex; gap: var(--space-3); }
@@ -116,7 +117,6 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 /* ---------- Field group: label + input (+ action) on one wrapping line ---------- */
 .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); font-size: var(--text-base); font-variant-numeric: tabular-nums; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.nudge { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
 /* ---------- Numeric keypad: stands in for the native keyboard on a readonly edge-length / zone-resize field ---------- */
 .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
@@ -167,7 +167,6 @@ button.layer-row.off { opacity: var(--opacity-layer-off); }
 .layer-actions:has(> button.icon) > button:not(.icon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layer-actions > .text-hint { flex: 1 1 auto; align-self: center; }
 /* Nudge arrows in a card: the label on its own line, then the arrows in one row (default button.icon sizing) */
-.layer-body .nudge > .text-hint { flex-basis: 100%; }
 /* Rename in place: an underlined field with a pencil, so it reads as editable before it's touched */
 .layer-rename-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); border-bottom: var(--border-width) dashed var(--color-line); cursor: text; }
 .layer-rename-wrap:hover, .layer-rename-wrap:focus-within { color: var(--color-ink); border-bottom-color: var(--color-accent); }

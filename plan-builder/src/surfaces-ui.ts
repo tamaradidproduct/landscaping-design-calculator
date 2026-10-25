@@ -17,7 +17,7 @@ const picker = (current?: MaterialId) => materialsByFamily().map(({ family, mate
 export class SurfacesSection {
   private picking = false; // the material picker for a new zone is open
   private changing: string | null = null; // the zone whose material picker is open in its card
-  private adjusting: string | null = null; // the zone whose "Adjust shape and texture" disclosure is open
+  private adjusting: string | null = null; // the zone whose "Shape and texture" disclosure is open
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
@@ -112,16 +112,16 @@ function texScale(o: Outline): string {
     button('+', { mods: ['icon'], ariaLabel: 'Larger texture', data: { act: 'tex-up' }, disabled: s >= TEX_SCALE.max })}</div></div>`;
 }
 
-/** The selected zone's card: header with area, Change material, the collapsed shape-and-texture disclosure, then the actions. */
+/** The selected zone's card: header with area, the Material button (aria-label Change material), the collapsed shape-and-texture disclosure, then the actions. */
 export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; changing: boolean }): string {
   const sw = { material: o.material! };
   if (o.id === t.drawing) return drawingCard(t, o, sw, o.name.toLowerCase());
   // Change material shares the action row (keeps the card short); the picker opens in place of the row's button.
-  const change = button('Change material', { mods: ['compact'], data: { act: 'change-material' } });
+  const change = button('Material', { mods: ['compact'], ariaLabel: 'Change material', data: { act: 'change-material' } });
   const rd = radiusDisplay(t.cornerRadiiFt(o.id));
   const round = t.cal ? formStack(field('round-all', 'Corner radius', row(
     input('round-all', { inputmode: 'decimal', value: rd.value, placeholder: rd.placeholder, ariaLabel: 'Corner radius' }), button('Done', { mods: ['compact'], type: 'submit' }))), 'round-all') : '';
-  const adjust = disclosure('adjust', 'Adjust shape and texture', st.open, `${sizeForm(t, o)}${round}${texScale(o)}`);
+  const adjust = disclosure('adjust', 'Shape and texture', st.open, `${sizeForm(t, o)}${round}${texScale(o)}`);
   const area = t.areaSqft(o);
   return layerCard({
     id: o.id, swatch: sw, name: o.name, meta: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
