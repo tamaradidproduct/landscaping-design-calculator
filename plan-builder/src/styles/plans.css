@@ -60,7 +60,7 @@ button.archived-toggle[aria-expanded="false"] .chevron { transform: rotate(-90de
 /* Editor top bar: back, plan name and ⋯ menu (left), Edit | Preview (centre), Undo / Redo / Export (right) */
 .top-bar {
   flex: none; position: relative; z-index: var(--z-chip); height: var(--control-md); box-sizing: border-box;
-  padding: 0 calc(var(--space-4) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-4) + env(safe-area-inset-left, 0px));
+  padding: 0 calc(var(--space-6) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-6) + env(safe-area-inset-left, 0px));
   padding-top: env(safe-area-inset-top, 0px); box-sizing: content-box;
   background: var(--color-surface); box-shadow: 0 var(--border-width) 0 var(--color-line);
 }
@@ -73,9 +73,9 @@ button.archived-toggle[aria-expanded="false"] .chevron { transform: rotate(-90de
 .top-bar #undo, .top-bar #redo { color: var(--color-muted); }
 .top-bar button.icon:hover:not(:disabled) { color: var(--color-ink); }
 .top-bar button.icon:disabled { opacity: var(--opacity-layer-off); }
-.top-bar #export { gap: var(--space-3); padding: 0 var(--space-5); font-size: var(--text-base); }
-.top-bar-sep { align-self: stretch; margin: var(--space-5) var(--space-3); border-left: var(--border-width) solid var(--color-line); }
-.top-bar #view-switch > button { padding: 0 var(--space-6); font-size: var(--text-base); }
+.top-bar #export { min-height: var(--control-sm); gap: var(--space-3); padding: 0 var(--space-5); font-size: var(--text-base); }
+.top-bar-sep { align-self: stretch; margin: var(--space-5) var(--space-4); border-left: var(--border-width) solid var(--color-line); }
+.top-bar #view-switch > button { min-height: var(--control-sm); padding: 0 var(--space-6); font-size: var(--text-base); }
 .top-bar.previewing #undo, .top-bar.previewing #redo { opacity: var(--opacity-layer-off); }
 .plan-bar { display: flex; align-items: center; min-width: 0; flex: 1; }
 .plan-bar > button { flex: none; }

@@ -215,4 +215,4 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
 
 /* Narrow screens: the name truncates first, then Export shows its icon only */
-@media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar #export { min-width: var(--control-md); padding: 0; } }
+@media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar #export { min-width: var(--control-sm); padding: 0; } }
