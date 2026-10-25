@@ -7,7 +7,7 @@ import { formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from '
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, choiceLine, esc, field, formStack, hint, input, layerCard, layerForm, layerRow, nudgePad, row, swatch } from './ui';
+import { button, caption, choiceLine, esc, field, formStack, hint, input, layerActions, layerCard, layerForm, layerRow, nudgePad, row, suggestRow, swatch } from './ui';
 
 /** Every material as a list, grouped by family under a caption; `current` is marked. */
 const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
@@ -15,36 +15,41 @@ const picker = (current?: MaterialId) => materialsByFamily().map(({ family, mate
 
 export class SurfacesSection {
   private picking = false; // the material picker for a new zone is open
+  private filling = false; // the material picker for the plot fill is open
   private changing: string | null = null; // the zone whose material picker is open in its card
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
-  get pickerOpen() { return this.picking; }
+  get pickerOpen() { return this.picking || this.filling; }
   /** The global Add menu's "Surface": open the material picker (adding a zone closes the selected one's card). */
-  openPicker() { this.picking = true; if (this.tool.selected) this.tool.selectOutline(null); else this.render(); }
+  openPicker() { this.picking = true; this.filling = false; if (this.tool.selected) this.tool.selectOutline(null); else this.render(); }
 
   render() {
     const t = this.tool;
     const zones = Object.values(t.outlines).filter(o => o.kind === 'surface');
-    if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = ''; return; }
-    if (t.drawing || !t.boundaryClosed) this.picking = false;
+    if (!t.boundaryClosed && !zones.length) { this.picking = this.filling = false; this.el.innerHTML = ''; return; }
+    if (t.drawing || !t.boundaryClosed) this.picking = this.filling = false;
+    if (!t.fillable) this.filling = false;
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
       : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
       ${rows.join('')}
-      ${t.drawing || !t.boundaryClosed ? '' : this.picking
-        ? layerForm(`${picker()}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-picker' } })}`)
+      ${t.drawing || !t.boundaryClosed ? '' : this.picking || this.filling
+        ? layerForm(`${this.filling ? hint('Pick the surface to cover the whole plot. It follows the plot boundary.') : t.fillable ? suggestRow('Fill the plot…', { act: 'fill-plot' }) : ''}${picker()}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-picker' } })}`)
         : ''}`;
 
     this.el.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach(b => {
       b.onclick = () => { const id = b.dataset.zone!; t.selectOutline(id !== t.selected ? id : null); };
     });
-    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
+    this.el.querySelector<HTMLButtonElement>('[data-act=fill-plot]')?.addEventListener('click', () => { this.picking = false; this.filling = true; this.render(); });
+    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = this.filling = false; this.render(); });
     this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
     // The picker's chips start a new zone; the card's chips change that zone's material.
-    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => { b.onclick = () => t.startSurface(b.dataset.material as MaterialId); });
+    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => {
+      b.onclick = () => { if (this.filling) { this.filling = false; t.fillPlot(b.dataset.material as MaterialId); } else t.startSurface(b.dataset.material as MaterialId); };
+    });
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());
     if (card) wireLayerCard(card, t, { 'change-material': () => { this.changing = card.dataset.card!; this.render(); } });
@@ -111,6 +116,11 @@ export class SurfacesSection {
       : choiceLine(swatch(sw), material(o.material!).name, button('Change', { mods: ['compact'], data: { act: 'change-material' } }));
     const round = t.cal ? formStack(row(
       input('round-all', { inputmode: 'decimal', placeholder: 'Round all corners, e.g. 2′ (↑ ↓ to adjust)', ariaLabel: 'Round all corners' }), button('Apply', { mods: ['compact'], type: 'submit' })), 'round-all') : '';
+    // The plot fill follows the boundary: its material and texture can change, its shape cannot.
+    if (o.base) return layerCard({
+      id: o.id, swatch: sw, name: o.name, done: true,
+      body: `${mat}${this.texScale(o)}${hint('Follows the plot boundary.')}${layerActions(button('Delete', { variant: 'danger', mods: ['compact'], data: { act: 'delete' } }))}`,
+    });
     return layerCard({
       id: o.id, swatch: sw, name: o.name, done: true, rename: true, renameId: 'surface-rename',
       body: `${mat}${this.texScale(o)}${this.size(o)}${t.cornerSelected ? nudgePad() : ''}${round}${editActions(true)}${orderControl(t, o.id)}`,

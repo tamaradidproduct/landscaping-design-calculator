@@ -33,6 +33,22 @@ describe('placed symbols', () => {
   });
 });
 
+describe('the plot fill', () => {
+  const b = { id: 'boundary', kind: 'boundary' as const, name: 'Plot boundary', pts: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 9, y: 9 }], closed: true };
+  const fill = { id: 'fill', kind: 'surface' as const, name: 'Plot fill', pts: b.pts, closed: true, material: 'premium-sod' as const, base: true as const };
+  const withFill = (over: any = {}) => JSON.parse(JSON.stringify(toDoc({ ...state, outlines: { boundary: b, fill: { ...fill, ...over } } }, meta)));
+  test('round-trips through toDoc / fromDoc', () => expect(fromDoc(withFill()).outlines.fill.base).toBe(true));
+  test('a plan without a fill is unchanged', () => expect(fromDoc(valid()).outlines.s1.base).toBeUndefined());
+  test.each([
+    ['base on a feature', (d: any) => { d.outlines.fill.kind = 'feature'; delete d.outlines.fill.material; }],
+    ['base: false', (d: any) => { d.outlines.fill.base = false; }],
+    ['base that is not a boolean', (d: any) => { d.outlines.fill.base = 'yes'; }],
+    ['two fills', (d: any) => { d.outlines.fill2 = { ...d.outlines.fill, id: 'fill2' }; }],
+  ])('%s is an invalid plan', (_, mutate) => {
+    const doc = withFill(); mutate(doc); expect(reasonOf(doc)).toBe('invalid');
+  });
+});
+
 describe('placed lines', () => {
   const lines = {
     l1: { id: 'l1', item: 'wood-privacy-fence', points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 30 }], widthFt: 0.33 },
