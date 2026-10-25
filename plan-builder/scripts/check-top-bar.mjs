@@ -1,4 +1,4 @@
-// The editor's top bar on Riesberg (memory store): above canvas and panel; Back, the ⋯ menu (Rename), Edit | Preview (plot plan hidden,
+// The editor's top bar on Riesberg (memory store): above canvas and panel; Back, the gear menu (Rename), Edit | Preview (plot plan hidden,
 // drawing fitted, drawing tools off), Undo/Redo from the bar and by ⌘Z / ⇧⌘Z, Export's toast, nothing left of the old header, 820 px.
 // Usage: node scripts/check-top-bar.mjs <plot-plan.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
@@ -27,10 +27,10 @@ for (const width of [1180, 820]) {
   check(tag + 'long name truncates without overlapping the switch', left.r <= sw.l + 0.5 && sw.r <= right.l + 0.5, `${JSON.stringify(left)} ${JSON.stringify(sw)}`);
   check(tag + 'Redo faint with nothing to redo, Undo too on a fresh plan', await page.$eval('#redo', e => e.disabled) && await page.$eval('#undo', e => e.disabled), '');
 
-  // ⋯ menu
+  // gear menu
   await page.click('#plan-more');
   const items = await page.$$eval('.plan-menu [role=menuitem]', b => b.map(x => x.textContent.trim()));
-  check(tag + '⋯ lists Rename, Archive, Delete', items.join() === 'Rename,Archive,Delete…', items.join());
+  check(tag + 'gear lists Rename, Archive, Delete', items.join() === 'Rename,Archive,Delete…', items.join());
   await page.click('[data-act=rename]'); await page.fill('#plan-rename', 'Renamed job'); await page.click('[data-act=rename-save]'); await page.waitForTimeout(200);
   check(tag + 'Rename works', (await page.textContent('#plan-title')) === 'Renamed job', await page.textContent('#plan-title'));
 

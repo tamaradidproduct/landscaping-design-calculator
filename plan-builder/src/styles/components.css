@@ -214,7 +214,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
 
-/* ---------- Top bar: back, plan name and ⋯ menu (left), Edit | Preview (centre), Undo / Redo / Export (right) ---------- */
+/* ---------- Top bar: back, plan name and gear menu (left), Edit | Preview (centre), Undo / Redo / Export (right) ---------- */
 .top-bar {
   flex: none; position: relative; z-index: var(--z-chip); height: var(--control-md); box-sizing: border-box;
   padding: 0 calc(var(--space-6) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-6) + env(safe-area-inset-left, 0px));

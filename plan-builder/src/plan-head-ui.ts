@@ -1,4 +1,4 @@
-// The top bar's left cluster: "←" (Plans), the plan's name, and a ⋯ menu (Rename, Archive, Delete).
+// The top bar's left cluster: "←" (Plans), the plan's name, and a gear menu (Rename, Archive, Delete).
 import { cleanAddress } from './plan-model';
 import { planBarHtml } from './top-bar';
 import { button, card, error, esc, input, splitRow } from './ui';
