@@ -130,6 +130,15 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .keypad-key { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 
 /* ---------- Side panel: history, view and layers, docked on the right ---------- */
+/* Its left edge is a drag handle (a separator): a thin hit strip over the seam, mostly over the panel's own padding so it
+   stays clear of the canvas controls; it shows an accent line on hover, focus and while dragging. */
+.sidebar-resize {
+  position: absolute; z-index: var(--z-chip); top: 0; bottom: 0; right: calc(var(--width-sidebar) - var(--space-5)); width: calc(2 * var(--space-5));
+  cursor: col-resize; touch-action: none; outline: none;
+}
+.sidebar[hidden] + .sidebar-resize { display: none; }
+.sidebar-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: calc(50% - var(--space-1)); width: calc(2 * var(--space-1)); background: transparent; }
+.sidebar-resize:hover::after, .sidebar-resize:focus-visible::after, .sidebar-resize.dragging::after { background: var(--color-accent); }
 .sidebar {
   flex: none; width: var(--width-sidebar); display: flex; flex-direction: column; overflow-y: auto;
   background: var(--color-surface); border-left: var(--border-width) solid var(--color-line);

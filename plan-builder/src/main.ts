@@ -10,6 +10,7 @@ import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
 import { canvasNudgePad } from './ui';
 import { nudgePadVisible } from './card-helpers';
+import { wireSidebarResize } from './sidebar-resize';
 import { renderSheet } from './sheet-ui';
 import { AddMenu, type AddType } from './add-menu';
 import { panelState, visibleGroups } from './panel-state';
@@ -257,6 +258,9 @@ function refreshFloating() {
   tool.avoidChip({ left, top: topPx, right: left + w, bottom: topPx + h });
 }
 coarse.addEventListener('change', refreshFloating);
+
+// The side panel's left edge widens it; the stage's ResizeObserver (below) refits the plan, which re-clamps the floating controls.
+wireSidebarResize(document.querySelector<HTMLElement>('.app')!, $('sidebar-resize'));
 squareBtn.onclick = () => { const t = tool.squareTarget; if (t) tool.squareAll(t.id); };
 
 // Snap is kept separately for tracing outlines (on by default) and designing surfaces (off by default).
