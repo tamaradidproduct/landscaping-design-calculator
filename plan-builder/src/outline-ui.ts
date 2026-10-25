@@ -137,7 +137,7 @@ export class OutlineTool {
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
   private popover: HTMLElement;
-  private edgeUi: { key: string; editing: boolean; menuOpen: boolean } | null = null;
+  private edgeUi: { key: string; editing: boolean; menuOpen: boolean; tipOpen: boolean } | null = null;
   private chipAvoid: Zone | null = null;
   private tip: HTMLElement;
   private squareChip: HTMLElement;
@@ -1461,28 +1461,37 @@ export class OutlineTool {
   }
   private hideTip() { this.tip.hidden = true; }
 
-  /** The chip beside the selected edge: its length, an info tip and a ⋯ menu; tapping the length opens the keypad. */
+  /** The chip beside the selected edge: its length, an info tip and a ⋯ menu; tapping the length opens the field
+   * (typed on a desktop keyboard; the on-screen keypad on touch). */
   private renderPopover() {
     const e = this.selectedEdge;
     if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; this.edgeUi = null; return; }
     const o = this.outlines[e.id]!, surface = o.kind === 'surface', ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
     const ref = surface ? undefined : this.refs.find(r => r.id === e.id && r.i === e.i);
     const key = `${e.id}:${e.i}`;
-    const typed = this.edgeUi?.key === key && this.edgeUi.editing ? this.popover.querySelector<HTMLInputElement>('#edge-len')?.value : undefined;
-    if (this.edgeUi?.key !== key) this.edgeUi = { key, editing: false, menuOpen: false };
+    const prevField = this.edgeUi?.key === key && this.edgeUi.editing ? this.popover.querySelector<HTMLInputElement>('#edge-len') : null;
+    const typed = prevField?.value, refocus = !!prevField && document.activeElement === prevField;
+    const sel = prevField ? [prevField.selectionStart, prevField.selectionEnd] as const : null;
+    if (this.edgeUi?.key !== key) this.edgeUi = { key, editing: false, menuOpen: false, tipOpen: false };
     const ui = this.edgeUi;
     const canEdit = !surface || ft !== null;
     const editing = ui.editing && canEdit;
     const tip = 'Drag the square in the middle of the edge to curve it, or tap the + to add a corner.'
       + (surface ? ' The marked end stays put.' : ft ? ' Lengths on edges running across and down also correct a stretched plan.' : '');
     const menu = edgeMenuItems({ kind: surface ? 'surface' : o.kind === 'feature' ? 'feature' : 'boundary', curved, hasRef: !!ref });
+    const keyboard = !window.matchMedia('(pointer: coarse)').matches; // a desktop keyboard types the length; touch gets the keypad
     this.popover.innerHTML = edgeChip({
       text: ft ? `${formatFeet(ft)}${curved ? ' along the curve' : ''}` : surface ? 'No scale' : 'Set length',
-      editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip,
+      editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip, tipOpen: ui.tipOpen, keyboard,
       field: { value: typed ?? (ref ? String(ref.feet) : ''), placeholder: surface ? `e.g. 16 or 16' 6"` : `e.g. 116.45 or 116' 5"` },
     });
     this.popover.hidden = false;
-    this.popover.querySelector<HTMLButtonElement>('[data-act=edit-length]')?.addEventListener('click', () => { ui.editing = true; ui.menuOpen = false; this.renderPopover(); });
+    this.popover.querySelector<HTMLButtonElement>('[data-act=edit-length]')?.addEventListener('click', () => {
+      ui.editing = true; ui.menuOpen = false; this.renderPopover();
+      const f = this.popover.querySelector<HTMLInputElement>('#edge-len');
+      if (f && keyboard) { f.focus(); f.select(); }
+    });
+    this.popover.querySelector<HTMLButtonElement>('[data-act=tip]')?.addEventListener('click', () => { ui.tipOpen = !ui.tipOpen; this.renderPopover(); this.popover.querySelector<HTMLButtonElement>('[data-act=tip]')?.focus(); });
     this.popover.querySelector<HTMLButtonElement>('[data-act=menu]')?.addEventListener('click', () => { ui.menuOpen = !ui.menuOpen; this.renderPopover(); });
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
     if (straighten) straighten.onclick = () => { this.record(); o.bulges![e.i] = 0; this.update(); };
@@ -1498,7 +1507,11 @@ export class OutlineTool {
         if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
         if (surface) this.resizeEdge(e.id, e.i, feet); else this.setEdgeLength(e.id, e.i, feet);
       };
-      this.wireLengthKeypad(form);
+      const f = form.querySelector<HTMLInputElement>('#edge-len')!;
+      // Escape leaves the field and goes back to the length (the edge stays selected); the tool ignores keys typed in a field.
+      f.onkeydown = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); ui.editing = false; this.renderPopover(); } };
+      if (refocus) { f.focus(); if (sel) f.setSelectionRange(sel[0], sel[1]); }
+      if (!keyboard) this.wireLengthKeypad(form);
     }
     this.positionPopover();
   }
@@ -1563,6 +1576,7 @@ export class OutlineTool {
     if (mod && key === 'y') { e.preventDefault(); this.redo(); return; }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (this.placing && e.key === 'Escape') { this.stopPlacing(); return; }
+    if (e.key === 'Escape' && this.edgeUi?.tipOpen && !this.popover.hidden) { this.edgeUi.tipOpen = false; this.renderPopover(); return; } // Escape closes the edge tip first
     if (this.lineDraft) {
       if (e.key === 'Escape') { this.cancelLine(); return; }
       if (e.key === 'Enter') { e.preventDefault(); this.finishLine(); return; }

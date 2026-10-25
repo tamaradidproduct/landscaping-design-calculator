@@ -123,10 +123,10 @@ const ICON_PATHS: Record<IconName, string> = {
 };
 const lineIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 /** An icon-only button (48 px): a line icon with an aria-label and title. */
-export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record<string, string>; variant?: 'danger'; pressed?: boolean }): string {
+export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record<string, string>; variant?: 'danger'; pressed?: boolean; expanded?: boolean }): string {
   const d = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="button" class="icon${o.variant ? ` ${o.variant}` : ''}"${d} aria-label="${esc(o.ariaLabel)}" title="${esc(o.ariaLabel)}"`
-    + `${o.pressed ? ' aria-pressed="true"' : ''}>${lineIcon(icon)}</button>`;
+    + `${o.pressed ? ' aria-pressed="true"' : ''}${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}>${lineIcon(icon)}</button>`;
 }
 /** A row that opens and closes its body (aria-expanded); the body is only in the markup while open. */
 export function disclosure(id: string, labelText: string, open: boolean, bodyHtml: string): string {
