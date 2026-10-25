@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { chipPosition, edgeMenuItems, instanceLabel, radiusDisplay, roundAllRequest } from './card-helpers';
+import { chipPosition, nudgePadVisible, edgeMenuItems, instanceLabel, radiusDisplay, roundAllRequest } from './card-helpers';
 
 describe('instanceLabel', () => {
   test('1-based position of the selection', () => expect(instanceLabel('b', ['a', 'b', 'c'])).toBe('2 of 3'));
@@ -49,5 +49,14 @@ describe('roundAllRequest', () => {
   test('a blank field (mixed radii) applies nothing; 0 squares; a value rounds', () => {
     expect(roundAllRequest('')).toBeNull(); expect(roundAllRequest('  ')).toBeNull();
     expect(roundAllRequest('0')).toBe(0); expect(roundAllRequest("2'")).toBe(2);
+  });
+});
+
+describe('nudgePadVisible', () => {
+  test('shown only for something nudgeable on a touch (coarse) pointer', () => expect(nudgePadVisible(true, true)).toBe(true));
+  test('never on a fine pointer', () => expect(nudgePadVisible(true, false)).toBe(false));
+  test('hidden when nothing is nudgeable', () => {
+    expect(nudgePadVisible(false, true)).toBe(false);
+    expect(nudgePadVisible(false, false)).toBe(false);
   });
 });

@@ -1187,6 +1187,15 @@ export class OutlineTool {
   }
   /** True when a corner is selected and still exists (the nudge arrows apply to it). */
   get cornerSelected() { const c = this.selectedCorner; return !!(c && this.outlines[c.id]?.pts[c.i]); }
+  /** True while the arrows have something to move: a corner, or a finished surface with no corner selected (what nudge() handles). */
+  get nudgeable() { return this.cornerSelected || (!!this.selectedZone && !this.selectedCorner); }
+  /** The selected finished outline or surface (its corner counts as selecting it) with its screen bounding box, or null. */
+  get squareTarget(): { id: string; bbox: { left: number; top: number; right: number; bottom: number } } | null {
+    const id = this.selected ?? this.selectedCorner?.id ?? null, o = id ? this.outlines[id] : undefined;
+    if (!id || !o?.closed || this.drawing || !o.pts.length) return null;
+    const s = o.pts.map(p => this.host.toScreen(p));
+    return { id, bbox: { left: Math.min(...s.map(p => p.x)), top: Math.min(...s.map(p => p.y)), right: Math.max(...s.map(p => p.x)), bottom: Math.max(...s.map(p => p.y)) } };
+  }
   /** Round surface corner i to a radius in feet (0 = sharp). */
   setCornerRadius(id: string, i: number, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c || !o.pts[i]) return;

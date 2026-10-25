@@ -119,13 +119,6 @@ export const listRow = (id: string, children: string[], state?: 'editing' | 'con
 export const cardHead = (titleHtml: string) =>
   `<div class="card-head"><strong>${titleHtml}</strong>${button('×', { mods: ['icon', 'small'], ariaLabel: 'Close', data: { act: 'close' } })}</div>`;
 
-/** Arrow pad that nudges the selected corner by one screen pixel (data-nudge="dx,dy"). */
-export function nudgePad(): string {
-  const arrow = (glyph: string, dir: string, d: string) => button(glyph, { mods: ['icon'], ariaLabel: `Nudge ${dir}`, data: { nudge: d } });
-  return `<div class="nudge">${inlineHint('Nudge corner')}`
-    + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
-}
-
 export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace';
 const ICON_PATHS: Record<IconName, string> = {
   trash: '<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.5 7v4M9.5 7v4" />',

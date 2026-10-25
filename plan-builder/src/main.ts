@@ -8,6 +8,8 @@ import { OutlineTool } from './outline-ui';
 import { OutlinesSection } from './layers-ui';
 import { SurfacesSection } from './surfaces-ui';
 import { SymbolsSection } from './symbols-ui';
+import { canvasNudgePad } from './ui';
+import { nudgePadVisible } from './card-helpers';
 import { renderSheet } from './sheet-ui';
 import { AddMenu, type AddType } from './add-menu';
 import { panelState, visibleGroups } from './panel-state';
@@ -105,6 +107,7 @@ const tool = new OutlineTool({
     updateGroups();
     $('snap').hidden = !tool.drawing && !tool.selecting; // snapping matters only while drawing or editing an outline
     showSnap();
+    refreshFloating();
     $('shape').hidden = !tool.drawing; // Freehand | Rectangle: only while an outline is being drawn
     stage.classList.toggle('drawing', !!tool.drawing);
     $('shape').querySelectorAll<HTMLButtonElement>('[data-shape]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.shape === tool.shape)));
@@ -231,6 +234,28 @@ window.addEventListener('keydown', e => {
   e.preventDefault(); pickShape(tool.shape === 'rect' ? 'freehand' : 'rect');
 });
 
+// Floating canvas aids: the touch-only nudge pad (bottom-left) and Square corners beside the selected outline or zone.
+const canvasEl = $('canvas'), squareBtn = $<HTMLButtonElement>('square-corners');
+canvasEl.insertAdjacentHTML('beforeend', canvasNudgePad());
+const nudgePadEl = canvasEl.querySelector<HTMLElement>('.nudge-pad')!;
+nudgePadEl.hidden = true;
+nudgePadEl.querySelectorAll<HTMLButtonElement>('[data-nudge]').forEach(b => {
+  b.onclick = () => { const [dx, dy] = b.dataset.nudge!.split(',').map(Number); tool.nudge(dx!, dy!); };
+});
+const coarse = window.matchMedia('(pointer: coarse)');
+function refreshFloating() {
+  nudgePadEl.hidden = !nudgePadVisible(tool.nudgeable, coarse.matches);
+  const t = tool.squareTarget;
+  squareBtn.hidden = !t;
+  if (!t) return;
+  // Beside the shape's top-right, kept inside the stage and clear of Undo/Redo (top right) and the zoom, nudge and Snap rows (bottom).
+  const w = squareBtn.offsetWidth, h = squareBtn.offsetHeight, gap = 8, top = 80, bottom = 72;
+  squareBtn.style.left = `${Math.max(gap, Math.min(stageSize.w - w - gap, t.bbox.right + gap))}px`;
+  squareBtn.style.top = `${Math.max(top, Math.min(stageSize.h - h - bottom, t.bbox.top - h - gap))}px`;
+}
+coarse.addEventListener('change', refreshFloating);
+squareBtn.onclick = () => { const t = tool.squareTarget; if (t) tool.squareAll(t.id); };
+
 // Snap is kept separately for tracing outlines (on by default) and designing surfaces (off by default).
 const showSnap = () => {
   $('snap').setAttribute('aria-pressed', String(tool.snapOn));
@@ -345,6 +370,7 @@ function applyView(next: View, settle = true) {
   $<HTMLButtonElement>('zoom-in').disabled = view.scale >= MAX_ZOOM;
   rescalePatterns();
   tool.render();
+  refreshFloating();
   if (settle) renderSharpSoon();
 }
 

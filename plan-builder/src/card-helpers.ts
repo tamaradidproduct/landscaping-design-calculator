@@ -39,3 +39,8 @@ export function chipPosition(
 export function roundAllRequest(text: string): number | null {
   return text.trim() === '' ? null : parseRadius(text);
 }
+
+/** The canvas nudge pad is a touch aid: shown only for something nudgeable on a coarse pointer (desktop uses the arrow keys). */
+export function nudgePadVisible(nudgeable: boolean, coarse: boolean): boolean {
+  return nudgeable && coarse;
+}
