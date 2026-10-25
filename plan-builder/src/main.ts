@@ -226,8 +226,8 @@ function setView(v: EditorView) {
   else { if (page && editView) { applyView(editView, false); renderSharpSoon(0); } editView = null; }
 }
 document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => { b.onclick = () => setView(b.dataset.view === 'preview' ? 'preview' : 'edit'); });
-// The tool's own keys (⌘Z, arrows, Escape, Enter…) are off in Preview; this listener runs first and swallows them.
-window.addEventListener('keydown', e => { if (previewing && !(e.target as HTMLElement).closest('input, textarea')) e.stopImmediatePropagation(); }, true);
+// The tool's own keys (⌘Z, arrows, Escape, Enter…) are off in Preview, while top-bar and sidebar controls keep their keys.
+window.addEventListener('keydown', e => { if (previewing && !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar')) e.stopImmediatePropagation(); }, true);
 updateGroups();
 $('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 

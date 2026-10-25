@@ -218,7 +218,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 
 /* ---------- Top bar: back, plan name and gear menu (left), Edit | Preview (centre), Undo / Redo / Export (right) ---------- */
 .top-bar {
-  flex: none; position: relative; z-index: var(--z-chip); height: var(--control-md); box-sizing: border-box;
+  flex: none; position: relative; z-index: var(--z-chip); height: var(--control-md);
   padding: 0 calc(var(--space-6) + env(safe-area-inset-right, 0px)) 0 calc(var(--space-6) + env(safe-area-inset-left, 0px));
   padding-top: env(safe-area-inset-top, 0px); box-sizing: content-box;
   background: var(--color-surface); box-shadow: 0 var(--border-width) 0 var(--color-line);
