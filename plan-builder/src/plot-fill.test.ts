@@ -51,9 +51,12 @@ describe('syncFill', () => {
     const b = boundary(), m = map(b, house, fillOutline(b, 'sand'), zone('s1'), zone('s2'));
     expect(Object.keys(syncFill(m, false))).toEqual(['boundary', 'f1', 's1', 's2', FILL_ID]);
   });
-  test('a fill already in step with the boundary (and last) comes back as the same map', () => {
+  test('a fill already in step with the boundary (and last) preserves all references', () => {
     const b = boundary({ bulges: [0, 3, 0, 0], radii: [1, 1, 1, 1] }), m = map(b, zone('s1'), fillOutline(b, 'sand'));
-    expect(syncFill(m, false)).toBe(m);
+    const fill = m[FILL_ID], pts = fill.pts, bulges = fill.bulges, radii = fill.radii;
+    const next = syncFill(m, false);
+    expect(next).toBe(m); expect(next[FILL_ID]).toBe(fill);
+    expect(next[FILL_ID].pts).toBe(pts); expect(next[FILL_ID].bulges).toBe(bulges); expect(next[FILL_ID].radii).toBe(radii);
   });
   test('does not change its input', () => {
     const b = boundary(), m = map(b, fillOutline(b, 'sand')); m.boundary = boundary({ pts: [P(0, 0), P(9, 0), P(9, 9)] });

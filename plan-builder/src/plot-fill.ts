@@ -12,6 +12,23 @@ const shapeOf = (b: Outline): Pick<Outline, 'pts' | 'bulges' | 'radii'> => ({
   pts: b.pts.map(p => ({ ...p })), ...(b.bulges ? { bulges: [...b.bulges] } : {}), ...(b.radii ? { radii: [...b.radii] } : {}),
 });
 
+const samePoints = (a: Outline['pts'], b: Outline['pts']): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
+  }
+  return true;
+};
+
+const sameNumbers = (a?: number[], b?: number[]): boolean => {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
 /** A new plot fill of a material, in the boundary's shape. */
 export const fillOutline = (boundary: Outline, material: MaterialId): Outline =>
   ({ id: FILL_ID, kind: 'surface', name: 'Plot fill', closed: true, base: true, material, ...shapeOf(boundary) });
@@ -34,8 +51,8 @@ export function syncFill(outlines: Record<string, Outline>, boundaryDrawing: boo
   const b = outlines[BOUNDARY];
   if (!b) { const { [FILL_ID]: _gone, ...rest } = outlines; return rest; }
   if (boundaryDrawing || !b.closed) return outlines;
+  if (samePoints(fill.pts, b.pts) && sameNumbers(fill.bulges, b.bulges) && sameNumbers(fill.radii, b.radii)) return keepFillLast(outlines);
   const shape = shapeOf(b);
-  if (JSON.stringify([fill.pts, fill.bulges, fill.radii]) === JSON.stringify([shape.pts, shape.bulges, shape.radii])) return keepFillLast(outlines); // already in step
   const { bulges: _b, radii: _r, ...kept } = fill;
   return keepFillLast({ ...outlines, [FILL_ID]: { ...kept, ...shape } });
 }
