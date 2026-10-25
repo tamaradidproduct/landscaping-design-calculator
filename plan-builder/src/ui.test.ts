@@ -25,6 +25,12 @@ describe('applyKeypadKey (edge-length / zone-resize numeric keypad)', () => {
   });
 });
 
+describe('layerRow', () => {
+  test('a data key with a dash becomes the dashed attribute the symbol row handler queries', () => {
+    expect(layerRow('Spruce', { swatch: 'feature', data: { 'symbol-row': 'spruce' } })).toContain('data-symbol-row="spruce"');
+  });
+});
+
 describe('numericKeypad', () => {
   test('renders digits 0-9, the feet/inches/decimal marks, backspace, clear and done — one key each', () => {
     const html = numericKeypad();

@@ -145,6 +145,8 @@ button.layer-row.off { opacity: var(--opacity-layer-off); }
 .layer-body { display: flex; flex-direction: column; gap: var(--space-4); }
 .layer-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .layer-actions > button { flex: 1 1 auto; }
+.layer-actions > button.icon { flex: none; }
+.layer-actions > .text-hint { flex: 1 1 auto; align-self: center; }
 /* Nudge arrows in a card: the label on its own line, then the arrows in one row (default button.icon sizing) */
 .layer-body .nudge > .text-hint { flex-basis: 100%; }
 .layer-order { display: flex; align-items: center; gap: var(--space-3); }

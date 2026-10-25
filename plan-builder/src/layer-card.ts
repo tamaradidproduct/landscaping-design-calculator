@@ -28,7 +28,7 @@ export function orderControl(t: OutlineTool, id: string): string {
   return p.first && p.last ? '' : layerOrder(p.first, p.last);
 }
 
-/** Wire a card's buttons, nudge arrows, head (tap closes) and rename field; `extra` adds section-specific acts. */
+/** Wire a card's buttons, head (tap closes) and rename field; `extra` adds section-specific acts. */
 export function wireLayerCard(card: HTMLElement, t: OutlineTool, extra: Record<string, () => void> = {}) {
   const id = card.dataset.card!;
   const act: Record<string, () => void> = {

@@ -46,7 +46,7 @@ export class SymbolsSection {
     this.wire(sel?.id ?? null);
   }
 
-  /** The selected symbol's card: its size, `1 of N` with ‹ › to step through the placed copies, a trash icon; objects and markers also Rotate. */
+  /** The selected symbol's card: its size in the sub-line, `1 of N` with ‹ › to step through the placed copies, a trash icon; objects and markers also Rotate. */
   private card(id: string): string {
     const t = this.tool, s = t.symbols.placed[id], lib = symbolById(s.symbol)!, deg = Math.round((s.rot ?? 0) * 10) / 10;
     const size = lib.kind === 'plant' ? `${fmt(lib.size.w)} ft wide` : `${fmt(lib.size.w)} × ${fmt(lib.size.d)} ft`;
@@ -56,10 +56,11 @@ export class SymbolsSection {
       button('−', { mods: ['icon'], ariaLabel: 'Turn 15° left', data: { act: 'rot-down' } }),
       input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: 'Rotation in degrees' }),
       button('+', { mods: ['icon'], ariaLabel: 'Turn 15° right', data: { act: 'rot-up' } }));
+    const sizeText = `${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`;
     return layerCard({
-      id, swatch: { symbol: lib.thumb }, name: lib.name, sub: lib.category || undefined,
-      body: `${hint(`${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`)}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}`
-        + `<div class="layer-actions">${step}${iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } })}</div>`,
+      id, swatch: { symbol: lib.thumb }, name: lib.name, sub: [lib.category, sizeText].filter(Boolean).join(' · '),
+      body: `<div class="layer-actions">${step}${iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } })}</div>`
+        + `${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}`,
     });
   }
 

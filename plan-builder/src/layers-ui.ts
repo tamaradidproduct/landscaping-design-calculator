@@ -1,6 +1,6 @@
 // The Layers panel's Outlines section: one row per outline, then what to outline next (the plot boundary,
 // House, or a custom feature named from quick picks or typed). Tapping a row selects that outline; the row of
-// the outline being drawn or edited expands into a card with its step, nudge arrows and actions (there is no
+// the outline being drawn or edited expands into a card with its step and actions (there is no
 // panel over the plan).
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import { outlinesHints, panelState } from './panel-state';
@@ -63,7 +63,7 @@ export class OutlinesSection {
     };
   }
 
-  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, Square corners, Redraw, trash. */
+  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, Redraw, trash. */
   private card(o: Outline): string {
     const t = this.tool;
     if (o.id === t.drawing) return drawingCard(t, o, swatchOf(o), o.kind === 'boundary' ? 'plot boundary' : o.name);
