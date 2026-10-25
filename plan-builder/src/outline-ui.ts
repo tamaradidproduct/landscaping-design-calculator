@@ -2,7 +2,7 @@
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
-  edgeTapOrder, moveInSection, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners, sectionPosition,
+  edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
   TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
@@ -27,7 +27,9 @@ import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFr
 import { zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
-import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, numericKeypad, row, token, type KeypadKey } from './ui';
+import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
+import { chipPositionAvoiding, edgeMenuItems, type Zone } from './card-helpers';
+import { edgeChip } from './edge-chip';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -137,6 +139,8 @@ export class OutlineTool {
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
   private popover: HTMLElement;
+  private edgeUi: { key: string; editing: boolean; menuOpen: boolean; tipOpen: boolean } | null = null;
+  private chipAvoid: Zone | null = null;
   private tip: HTMLElement;
   private squareChip: HTMLElement;
 
@@ -146,7 +150,7 @@ export class OutlineTool {
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.classList.add('overlay');
     this.magnifier = Object.assign(document.createElement('canvas'), { className: 'magnifier', hidden: true });
-    this.popover = Object.assign(document.createElement('div'), { className: 'card popover', hidden: true });
+    this.popover = Object.assign(document.createElement('div'), { className: 'edge-chip-mount', hidden: true });
     this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
     this.squareChip = Object.assign(document.createElement('div'), { className: 'card square-chip', hidden: true });
     this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } })
@@ -975,14 +979,19 @@ export class OutlineTool {
     this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
     this.update();
   }
+  /** Drag-reorder: put layer `id` before layer `beforeId` (null = last) in its section, as one undo step; no step when nothing would change. */
+  moveLayerTo(id: string, beforeId: string | null) {
+    const ids = moveInSectionTo(Object.keys(this.outlines), this.outlines, id, beforeId); if (!ids) return;
+    this.record();
+    this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
+    this.update();
+  }
   /** Put layer `id` directly above layer `above` (no undo step of its own: part of whatever made it). */
   private placeAbove(id: string, above: string) {
     const ids = Object.keys(this.outlines).filter(k => k !== id);
     ids.splice(ids.indexOf(above), 0, id);
     this.outlines = Object.fromEntries(ids.map(k => [k, this.outlines[k]!]));
   }
-  /** Where a layer sits within its section (for disabling Move up / Move down at the ends). */
-  layerPosition(id: string) { return sectionPosition(Object.keys(this.outlines), this.outlines, id); }
   /** True while a finished outline has a corner, edge or feature selected. */
   get selecting() { return this.selected !== null || this.selectedCorner !== null || this.selectedEdge !== null; }
   /** Escape: drop every selection. */
@@ -1200,6 +1209,15 @@ export class OutlineTool {
   }
   /** True when a corner is selected and still exists (the nudge arrows apply to it). */
   get cornerSelected() { const c = this.selectedCorner; return !!(c && this.outlines[c.id]?.pts[c.i]); }
+  /** True while the arrows have something to move: a corner, or a finished surface with no corner selected (what nudge() handles). */
+  get nudgeable() { return this.cornerSelected || (!!this.selectedZone && !this.selectedCorner); }
+  /** The selected finished outline or surface (its corner counts as selecting it) with its screen bounding box, or null. */
+  get squareTarget(): { id: string; bbox: { left: number; top: number; right: number; bottom: number } } | null {
+    const id = this.selected ?? this.selectedCorner?.id ?? null, o = id ? this.outlines[id] : undefined;
+    if (!id || !o?.closed || this.drawing || !o.pts.length) return null;
+    const s = o.pts.map(p => this.host.toScreen(p));
+    return { id, bbox: { left: Math.min(...s.map(p => p.x)), top: Math.min(...s.map(p => p.y)), right: Math.max(...s.map(p => p.x)), bottom: Math.max(...s.map(p => p.y)) } };
+  }
   /** Round surface corner i to a radius in feet (0 = sharp). */
   setCornerRadius(id: string, i: number, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c || !o.pts[i]) return;
@@ -1214,6 +1232,7 @@ export class OutlineTool {
   /** Round every corner of a surface to one radius in feet (0 = all sharp). */
   roundAll(id: string, feet: number, steps = false) {
     const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || o.base || !c) return;
+    if (!steps && this.cornerRadiiFt(id).every(r => r === Math.round(feet * 100) / 100)) return; // already that radius: no undo step
     // Arrow-key steps within 1.5 s undo as one step (like a corner's).
     const t = performance.now(), ln = this.lastNudge, key = -1, run = steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500;
     if (!run) this.record(); else this.revision++;
@@ -1221,10 +1240,10 @@ export class OutlineTool {
     o.radii = o.pts.map(() => feet / c.ftPerPt);
     this.update();
   }
-  /** The one radius (feet) every corner of a surface has, or 0 when they differ or are sharp. */
-  uniformRadius(id: string): number {
-    const o = this.outlines[id], c = this.cal, r = o?.radii; if (!o || !c || !r?.length || r.length !== o.pts.length || r.some(x => x !== r[0])) return 0;
-    return Math.round(r[0] * c.ftPerPt * 100) / 100;
+  /** Each corner's radius in feet (0 for sharp), rounded to 0.01; empty without a scale. */
+  cornerRadiiFt(id: string): number[] {
+    const o = this.outlines[id], c = this.cal; if (!o || !c) return [];
+    return o.pts.map((_, k) => Math.round((o.radii?.[k] ?? 0) * c.ftPerPt * 100) / 100);
   }
   /** Square all corners: line every corner of an outline up with the others at once. */
   squareAll(id: string) {
@@ -1472,64 +1491,58 @@ export class OutlineTool {
   }
   private hideTip() { this.tip.hidden = true; }
 
+  /** The chip beside the selected edge: its length, an info tip and a ⋯ menu; tapping the length opens the field
+   * (typed on a desktop keyboard; the on-screen keypad on touch). */
   private renderPopover() {
     const e = this.selectedEdge;
-    if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
-    if (this.outlines[e.id]!.kind === 'surface') { this.renderSurfacePopover(e); return; }
-    const ft = this.edgeFeet(e.id, e.i);
-    const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i], ref = this.refs.find(r => r.id === e.id && r.i === e.i);
-    this.popover.innerHTML = `
-      ${cardHead(`${esc(o.name)} edge`)}
-      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
-      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it, or tap the + to add a corner.')}
-      ${formStack(`
-        ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { readonly: true, placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
-        ${numericKeypad()}
-        ${ref ? button('Remove this length', { variant: 'danger', data: { act: 'unref' } })
-          : this.cal ? hint('Lengths on edges running across and down also correct a stretched plan.') : ''}
-        ${error(`Type a length in feet, like 116.45 or 116' 5".`)}`)}`;
+    if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; this.edgeUi = null; return; }
+    const o = this.outlines[e.id]!, surface = o.kind === 'surface', ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
+    const ref = surface ? undefined : this.refs.find(r => r.id === e.id && r.i === e.i);
+    const key = `${e.id}:${e.i}`;
+    const prevField = this.edgeUi?.key === key && this.edgeUi.editing ? this.popover.querySelector<HTMLInputElement>('#edge-len') : null;
+    const typed = prevField?.value, refocus = !!prevField && document.activeElement === prevField;
+    const sel = prevField ? [prevField.selectionStart, prevField.selectionEnd] as const : null;
+    if (this.edgeUi?.key !== key) this.edgeUi = { key, editing: false, menuOpen: false, tipOpen: false };
+    const ui = this.edgeUi;
+    const canEdit = !surface || ft !== null;
+    const editing = ui.editing && canEdit;
+    const tip = 'Drag the square in the middle of the edge to curve it, or tap the + to add a corner.'
+      + (surface ? ' The marked end stays put.' : ft ? ' Lengths on edges running across and down also correct a stretched plan.' : '');
+    const menu = edgeMenuItems({ kind: surface ? 'surface' : o.kind === 'feature' ? 'feature' : 'boundary', curved, hasRef: !!ref });
+    const keyboard = !window.matchMedia('(pointer: coarse)').matches; // a desktop keyboard types the length; touch gets the keypad
+    this.popover.innerHTML = edgeChip({
+      text: ft ? `${formatFeet(ft)}${curved ? ' along the curve' : ''}` : surface ? 'No scale' : 'Set length',
+      editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip, tipOpen: ui.tipOpen, keyboard,
+      field: { value: typed ?? (ref ? String(ref.feet) : ''), placeholder: surface ? `e.g. 16 or 16' 6"` : `e.g. 116.45 or 116' 5"` },
+    });
     this.popover.hidden = false;
-    this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
-    const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
-    if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.id]!.bulges![e.i] = 0; this.update(); };
-    const unref = this.popover.querySelector<HTMLButtonElement>('[data-act=unref]');
-    if (unref) unref.onclick = () => { this.selectedEdge = null; this.removeReference(this.refs.indexOf(ref!)); };
-    const form = this.popover.querySelector('form')!;
-    form.onsubmit = ev => {
-      ev.preventDefault();
-      const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
-      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
-      this.setEdgeLength(e.id, e.i, feet);
-    };
-    this.wireLengthKeypad(form);
-    this.positionPopover();
-  }
-  /** A surface edge: its length can be typed to resize the zone (never the scale). */
-  private renderSurfacePopover(e: { id: string; i: number; fixed: 0 | 1 }) {
-    const o = this.outlines[e.id]!, ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
-    this.popover.innerHTML = `
-      ${cardHead(`${esc(o.name)} edge`)}
-      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
-      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : ''}
-      ${ft === null ? hint('Set the scale on an outline edge first.') : formStack(`
-        ${field('edge-len', 'Length', row(input('edge-len', { readonly: true, placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' })))}
-        ${numericKeypad()}
-        ${row(inlineHint('Stays put: the marked end'), button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
-        ${error(`Type a length in feet, like 16 or 16' 6".`)}`)}`;
-    this.popover.hidden = false;
-    this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
+    this.popover.querySelector<HTMLButtonElement>('[data-act=edit-length]')?.addEventListener('click', () => {
+      ui.editing = true; ui.menuOpen = false; this.renderPopover();
+      const f = this.popover.querySelector<HTMLInputElement>('#edge-len');
+      if (f && keyboard) { f.focus(); f.select(); }
+    });
+    this.popover.querySelector<HTMLButtonElement>('[data-act=tip]')?.addEventListener('click', () => { ui.tipOpen = !ui.tipOpen; this.renderPopover(); this.popover.querySelector<HTMLButtonElement>('[data-act=tip]')?.focus(); });
+    this.popover.querySelector<HTMLButtonElement>('[data-act=menu]')?.addEventListener('click', () => { ui.menuOpen = !ui.menuOpen; this.renderPopover(); });
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
     if (straighten) straighten.onclick = () => { this.record(); o.bulges![e.i] = 0; this.update(); };
+    const unref = this.popover.querySelector<HTMLButtonElement>('[data-act=unref]');
+    if (unref) unref.onclick = () => { this.selectedEdge = null; this.removeReference(this.refs.indexOf(ref!)); };
     const swap = this.popover.querySelector<HTMLButtonElement>('[data-act=swap]');
     if (swap) swap.onclick = () => this.swapFixedEnd();
     const form = this.popover.querySelector('form');
-    if (form) form.onsubmit = ev => {
-      ev.preventDefault();
-      const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
-      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
-      this.resizeEdge(e.id, e.i, feet);
-    };
-    if (form) this.wireLengthKeypad(form);
+    if (form) {
+      form.onsubmit = ev => {
+        ev.preventDefault();
+        const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
+        if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
+        if (surface) this.resizeEdge(e.id, e.i, feet); else this.setEdgeLength(e.id, e.i, feet);
+      };
+      const f = form.querySelector<HTMLInputElement>('#edge-len')!;
+      // Escape leaves the field and goes back to the length (the edge stays selected); the tool ignores keys typed in a field.
+      f.onkeydown = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); ui.editing = false; this.renderPopover(); } };
+      if (refocus) { f.focus(); if (sel) f.setSelectionRange(sel[0], sel[1]); }
+      if (!keyboard) this.wireLengthKeypad(form);
+    }
     this.positionPopover();
   }
   /** Wires the numericKeypad() beside an edge-length field: each key edits #edge-len's value at the cursor
@@ -1560,10 +1573,16 @@ export class OutlineTool {
     const e = this.selectedEdge; if (!e || this.popover.hidden) return;
     const o = this.outlines[e.id]; if (!o) return;
     const a = this.host.toScreen(o.pts[e.i]), b = this.host.toScreen(o.pts[(e.i + 1) % o.pts.length]);
-    const stage = this.svg.getBoundingClientRect(), w = this.popover.offsetWidth || POPOVER.fallbackWidth, hgt = this.popover.offsetHeight || POPOVER.fallbackHeight, mg = POPOVER.margin;
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    this.popover.style.left = `${Math.max(mg, Math.min(stage.width - w - mg, mx - w / 2))}px`;
-    this.popover.style.top = `${Math.max(mg, Math.min(stage.height - hgt - mg, my + POPOVER.below))}px`;
+    const stage = this.svg.getBoundingClientRect();
+    const p = chipPositionAvoiding({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, { w: this.popover.offsetWidth || POPOVER.fallbackWidth, h: this.popover.offsetHeight || POPOVER.fallbackHeight },
+      { w: stage.width, h: stage.height }, POPOVER.below, POPOVER.margin, this.chipAvoid);
+    this.popover.style.left = `${p.left}px`; this.popover.style.top = `${p.top}px`;
+  }
+  /** The floating Square corners button's rect (stage coordinates, or null when hidden): the edge chip keeps clear of it. */
+  avoidChip(zone: Zone | null) {
+    const same = this.chipAvoid === zone || (!!zone && !!this.chipAvoid && zone.left === this.chipAvoid.left && zone.top === this.chipAvoid.top && zone.right === this.chipAvoid.right && zone.bottom === this.chipAvoid.bottom);
+    this.chipAvoid = zone;
+    if (!same) this.positionPopover();
   }
 
 
@@ -1587,6 +1606,7 @@ export class OutlineTool {
     if (mod && key === 'y') { e.preventDefault(); this.redo(); return; }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     if (this.placing && e.key === 'Escape') { this.stopPlacing(); return; }
+    if (e.key === 'Escape' && this.edgeUi?.tipOpen && !this.popover.hidden) { this.edgeUi.tipOpen = false; this.renderPopover(); return; } // Escape closes the edge tip first
     if (this.lineDraft) {
       if (e.key === 'Escape') { this.cancelLine(); return; }
       if (e.key === 'Enter') { e.preventDefault(); this.finishLine(); return; }

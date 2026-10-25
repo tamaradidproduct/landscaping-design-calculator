@@ -62,7 +62,7 @@ await page.mouse.click(...bl); await page.waitForTimeout(150);
 await page.mouse.move(...bl); await page.mouse.down(); await page.mouse.move(bl[0] - 9, bl[1] + 6, { steps: 4 }); await page.mouse.up(); await page.waitForTimeout(150);
 const all0 = await corners();
 results.push(['Knock bottom-left off', `angle there ${angleAt(all0, 4).toFixed(2)}°`]);
-await page.click('#outlines [data-act=square-all]'); await page.waitForTimeout(150);
+await page.click('#square-corners'); await page.waitForTimeout(150);
 const all1 = await corners();
 results.push(['Square all corners', `bottom-left ${angleAt(all1, 4).toFixed(3)}° · top-left ${angleAt(all1, 0).toFixed(3)}° · bent edges ${await bent()}`]);
 results.push(['  moved', `TL ${moved(all0[0], all1[0])} · TR ${moved(all0[1], all1[1])} · BR ${moved(all0[2], all1[2])} · P ${moved(all0[3], all1[3])} · BL ${moved(all0[4], all1[4])} px`]);

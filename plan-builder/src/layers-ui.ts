@@ -1,14 +1,14 @@
 // The Layers panel's Outlines section: one row per outline, then what to outline next (the plot boundary,
 // House, or a custom feature named from quick picks or typed). Tapping a row selects that outline; the row of
-// the outline being drawn or edited expands into a card with its step, nudge arrows and actions (there is no
+// the outline being drawn or edited expands into a card with its step and actions (there is no
 // panel over the plan).
 import { formatArea, outlineSuggestions, type Outline } from './outline';
 import { outlinesHints, panelState } from './panel-state';
 import type { OutlineTool } from './outline-ui';
 import { picker } from './surfaces-ui';
 import type { MaterialId } from './materials';
-import { drawingCard, editActions, orderControl, wireLayerCard } from './layer-card';
-import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerRow, nudgePad, splitRow, suggestRow, type Swatch } from './ui';
+import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
+import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerRow, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
   private naming = false; // the custom-feature name form is open
@@ -24,7 +24,7 @@ export class OutlinesSection {
     const s = outlineSuggestions(all);
     const ordered = [...all.filter(o => o.kind === 'boundary'), ...all.filter(o => o.kind === 'feature')];
     const rows = ordered.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o) : layerRow(o.name, {
-      swatch: swatchOf(o), data: { layer: o.id }, eye: { id: o.id, hidden: t.isHidden(o.id) },
+      swatch: swatchOf(o), data: { layer: o.id }, grip: o.kind === 'feature', eye: { id: o.id, hidden: t.isHidden(o.id) },
       sub: o.kind === 'boundary' && o.closed ? areaText(t.areaSqft(o)) : undefined, // the plot area, quietly, once scaled
     }));
     const placed = Object.values(t.symbols.placed).length + Object.values(t.lines.placed).length + all.filter(o => o.kind === 'surface').length;
@@ -53,6 +53,7 @@ export class OutlinesSection {
       };
     });
     this.wireCard();
+    wireReorder(this.el, t);
     this.el.querySelector<HTMLButtonElement>('[data-act=fill-plot]')?.addEventListener('click', () => { this.filling = true; this.render(); });
     this.el.querySelector<HTMLButtonElement>('[data-act=cancel-fill]')?.addEventListener('click', () => { this.filling = false; this.render(); });
     this.el.querySelectorAll<HTMLButtonElement>('[data-fill-material]').forEach(b => { b.onclick = () => { this.filling = false; t.fillPlot(b.dataset.fillMaterial as MaterialId); }; });
@@ -70,15 +71,15 @@ export class OutlinesSection {
     };
   }
 
-  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, nudge, Square all, Redo, Delete. */
+  /** The expanded row: drawing — the step and Close shape / Cancel; selected — rename, Redraw, trash. */
   private card(o: Outline): string {
     const t = this.tool;
     if (o.id === t.drawing) return drawingCard(t, o, swatchOf(o), o.kind === 'boundary' ? 'plot boundary' : o.name);
     const feature = o.kind === 'feature';
     return layerCard({
-      id: o.id, swatch: swatchOf(o), name: o.name, done: true, rename: feature,
+      id: o.id, swatch: swatchOf(o), name: o.name, rename: feature,
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
-      body: `${t.cornerSelected ? nudgePad() : ''}${editActions(feature)}${feature ? orderControl(t, o.id) : ''}${o.kind === 'boundary' ? this.fillOffer() : ''}`,
+      actions: editActions(feature), body: o.kind === 'boundary' ? this.fillOffer() : '',
     });
   }
   /** The plot boundary card's "Fill with surface": one surface over the whole lot (once scaled, and only if there is no fill yet). */

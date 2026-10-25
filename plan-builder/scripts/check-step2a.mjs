@@ -3,6 +3,7 @@
 // Usage: node scripts/check-step2a.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // PDF points (page 612 x 1008). TL/TR/BL: intersections/ends of the drawn property lines.
@@ -39,8 +40,7 @@ results.push(['Closes with the Close button', String(await page.evaluate(() => d
 
 // Set the scale on the top edge.
 await page.mouse.click(...await toScreen(mid(C.TL, C.TR)));
-await page.$eval('#edge-len', (e, v) => { e.value = v; }, '116.45');
-await page.click('.popover button[type=submit]');
+await setEdgeLength(page, '116.45');
 results.push(['Scale', await page.textContent('#toast')]); // the toast after typing a length names the scale
 
 async function hoverLength(a, b) {

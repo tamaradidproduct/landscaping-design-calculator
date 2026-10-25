@@ -4,7 +4,9 @@
 // Usage: node scripts/check-zone-edit.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
+import { openAdjust } from './lib/adjust.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -35,7 +37,7 @@ try {
   await page.click('[data-start=boundary]');
   results.push(['Snap while tracing the boundary', await snapLabel()]);
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
+  await tap([250, 560]); await setEdgeLength(page, '100'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['Snap while drawing a surface', await snapLabel()]);
@@ -54,11 +56,11 @@ try {
   results.push(['Hover near the bottom-right corner (not selected)', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
   await page.mouse.move(...await toScreen([330, 300])); await page.waitForTimeout(150);
   results.push(['Pointer back in the middle', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
-  results.push(['Material in the card', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Material in the card', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
   await page.click('#surfaces [data-act=change-material]');
   results.push(['Change', `chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
   await page.click('#surfaces [data-card] [data-material=red-flagstone]'); await page.waitForTimeout(150);
-  results.push(['Pick Flagstone', `${(await page.textContent('#surfaces .choice-line')).trim()} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Pick Flagstone', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
 
   const before = await shape('s1');
   await drag([330, 320], [345, 330]);
@@ -95,6 +97,7 @@ try {
   results.push(['Drag the round handle inward', `hover "${handleTip}" · while dragging "${dragTip}" · area ${(await shape('s1')).area} (< ${r2.area})`]);
 
   await page.keyboard.press('Escape'); await page.click('#surfaces [data-zone=s1]').catch(() => {});
+  await openAdjust(page);
   await page.fill('#round-all', '1'); await page.click('.round-all button[type=submit]'); await page.waitForTimeout(200);
   results.push(['Round all corners 1′ (5 pt)', `area ${(await shape('s1')).area} (8000 − 4·25·(1 − π/4) ≈ 7979)`]);
   await page.screenshot({ path: `${outDir}/zone-edit.png` });

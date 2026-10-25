@@ -3,6 +3,7 @@
 // Usage: node scripts/check-step2c.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // Property corners in PDF points, from the drawn lines (see scripts/check-step2a.mjs):
@@ -28,8 +29,7 @@ await page.click('[data-start=boundary]');
 for (const k of ['TL', 'TR', 'BR', 'P', 'BL']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
 await page.click('#outlines [data-act=close]');
 await page.mouse.click(...await toScreen([(C.TL[0] + C.TR[0]) / 2, (C.TL[1] + C.TR[1]) / 2]));
-await page.$eval('#edge-len', (e, v) => { e.value = v; }, '116.45');
-await page.click('.popover button[type=submit]');
+await setEdgeLength(page, '116.45');
 const area = async () => page.$eval('#outlines [data-layer=boundary] .layer-sub, #outlines [data-card=boundary] .layer-sub', e => e.textContent);
 results.push(['Area with the street edge straight', await area()]);
 

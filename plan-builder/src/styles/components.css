@@ -27,9 +27,32 @@ button.large { min-height: var(--control-xl); padding: 0 var(--space-11); }
 button.icon { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-2xl); line-height: var(--leading-tight); }
 button.icon.small { min-width: var(--control-sm); min-height: var(--control-sm); font-size: var(--text-3xl); }
 button.toggle[aria-pressed="false"] { color: var(--color-muted); }
+button.icon.danger { color: var(--color-warn); }
+/* Reorder grip: a 48 px hit area beside a layer row */
+.grip { flex: none; display: grid; place-content: center; min-width: var(--control-md); min-height: var(--control-md); color: var(--color-muted); cursor: grab; touch-action: none; border-radius: var(--radius-md); }
+.grip:hover, .grip:focus-visible { color: var(--color-ink); }
+.grip:active { cursor: grabbing; }
+/* Dragging a row: it dims, and a line shows where it will land */
+.layer-item.dragging { opacity: var(--opacity-layer-off); }
+.layer-item.drop-before { box-shadow: 0 calc(-1 * var(--space-1)) 0 var(--color-accent); }
+.layer-item.drop-end { box-shadow: 0 var(--space-1) 0 var(--color-accent); }
+/* Disclosure: a row that opens a body beneath it */
+.disclosure { display: flex; flex-direction: column; gap: var(--space-4); }
+.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: var(--control-md); text-align: left; }
+.disclosure-head[aria-expanded="true"] svg { transform: rotate(90deg); }
+.disclosure-body { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Canvas nudge pad: four arrows at the canvas's bottom-left, one control row above the dock so a narrow canvas keeps it clear of Snap */
+.nudge-pad { position: absolute; z-index: var(--z-chip); left: var(--space-8); bottom: calc(var(--space-8) + var(--control-md) + var(--space-4) + env(safe-area-inset-bottom, 0px)); display: flex; gap: var(--space-3); }
+.nudge-pad[hidden] { display: none; }
+/* Square corners: floats beside the selected outline or zone */
+.square-float { position: absolute; z-index: var(--z-chip); min-height: var(--control-md); padding: 0 var(--space-7); border-radius: var(--radius-pill); background: var(--color-accent); color: var(--color-on-accent); border: var(--border-width) solid var(--color-surface); box-shadow: var(--shadow-md); }
+/* Floating canvas controls: a solid accent fill with a surface ring, so they stand out on a white plan. */
+.nudge-pad > button.icon { background: var(--color-accent); color: var(--color-on-accent); border: var(--border-width) solid var(--color-surface); box-shadow: var(--shadow-md); }
 button.toggle[aria-pressed="true"] { border-color: var(--color-accent); }
 button.chip { text-align: center; }
 button.compact { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-base); white-space: nowrap; }
+/* A button that shows what it changes: a swatch before its label (a zone's Material) */
+button.with-swatch { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-4); }
 
 /* ---------- Text field ---------- */
 input {
@@ -50,8 +73,20 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .square-chip { position: absolute; z-index: var(--z-chip); flex-direction: row; align-items: center; gap: var(--space-5); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6); border-radius: var(--radius-pill); box-shadow: var(--shadow-sm); }
 .square-chip .text-figure { font-size: var(--text-base); }
 .square-chip button { min-height: var(--control-sm); padding: 0 var(--space-7); border-radius: var(--radius-pill); font-size: var(--text-base); }
-/* Popover: card anchored next to what it describes (an edge) */
-.popover { position: absolute; width: min(var(--width-card), calc(100% - 2 * var(--space-4))); }
+/* Edge chip: a small card anchored beside the selected edge — its length, an info tip and a ⋯ menu; the keypad opens in place */
+.edge-chip-mount { position: absolute; z-index: var(--z-chip); width: max-content; max-width: calc(100% - 2 * var(--space-4)); }
+.edge-chip-mount[hidden] { display: none; }
+.edge-chip { background: var(--color-surface); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.edge-chip .row { align-items: center; gap: var(--space-2); }
+.edge-chip button.length { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.edge-chip.editing { width: min(var(--width-card), calc(100vw - 2 * var(--space-4))); padding: var(--space-5); gap: var(--space-5); }
+.edge-chip.editing form { gap: var(--space-5); }
+.edge-chip.editing .row { flex-wrap: nowrap; }
+.edge-chip.editing #edge-len { flex: 1; min-width: 0; }
+/* The info button's tip, opened in the chip (tap again, Escape or deselecting the edge closes it) */
+.edge-tip { margin: 0; max-width: calc(var(--width-card) - 2 * var(--space-5)); padding: 0 var(--space-3); font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-muted); }
+.edge-menu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.edge-menu button { width: 100%; justify-content: flex-start; }
 
 /* ---------- Dock: a floating bar at the bottom of the plan — Corners | Rectangle and the Snap toggle ---------- */
 .dock {
@@ -87,13 +122,21 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 /* ---------- Field group: label + input (+ action) on one wrapping line ---------- */
 .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4) var(--space-6); font-size: var(--text-base); font-variant-numeric: tabular-nums; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-3); }
-.nudge { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
 /* ---------- Numeric keypad: stands in for the native keyboard on a readonly edge-length / zone-resize field ---------- */
 .keypad { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3); }
 .keypad-key { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 
 /* ---------- Side panel: history, view and layers, docked on the right ---------- */
+/* Its left edge is a drag handle (a separator): a thin hit strip over the seam, mostly over the panel's own padding so it
+   stays clear of the canvas controls; it shows an accent line on hover, focus and while dragging. */
+.sidebar-resize {
+  position: absolute; z-index: var(--z-chip); top: 0; bottom: 0; right: calc(var(--width-sidebar) - var(--space-5)); width: calc(2 * var(--space-5));
+  cursor: col-resize; touch-action: none; outline: none;
+}
+.sidebar[hidden] + .sidebar-resize { display: none; }
+.sidebar-resize::after { content: ''; position: absolute; top: 0; bottom: 0; left: calc(50% - var(--space-1)); width: calc(2 * var(--space-1)); background: transparent; }
+.sidebar-resize:hover::after, .sidebar-resize:focus-visible::after, .sidebar-resize.dragging::after { background: var(--color-accent); }
 .sidebar {
   flex: none; width: var(--width-sidebar); display: flex; flex-direction: column; overflow-y: auto;
   background: var(--color-surface); border-left: var(--border-width) solid var(--color-line);
@@ -130,13 +173,15 @@ button.layer-row.off { opacity: var(--opacity-layer-off); }
 .layer-card { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4) var(--space-5) var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
 .layer-head { display: flex; align-items: center; gap: var(--space-5); min-height: var(--control-md); font-size: var(--text-base); }
 .layer-body { display: flex; flex-direction: column; gap: var(--space-4); }
+.layer-head-actions { display: flex; gap: var(--space-2); margin-left: auto; flex: none; }
 .layer-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .layer-actions > button { flex: 1 1 auto; }
+.layer-actions > button.icon { flex: none; }
+/* An action row with icon buttons stays on one line; its text button shrinks (ellipsis) instead of wrapping the icons. */
+.layer-actions:has(> button.icon) { flex-wrap: nowrap; }
+.layer-actions:has(> button.icon) > button:not(.icon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-actions > .text-hint { flex: 1 1 auto; align-self: center; }
 /* Nudge arrows in a card: the label on its own line, then the arrows in one row (default button.icon sizing) */
-.layer-body .nudge > .text-hint { flex-basis: 100%; }
-.layer-order { display: flex; align-items: center; gap: var(--space-3); }
-.layer-order > .text-hint { flex: 1; }
-.layer-order > button.icon { font-size: var(--text-2xl); }
 /* Rename in place: an underlined field with a pencil, so it reads as editable before it's touched */
 .layer-rename-wrap { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--color-muted); border-bottom: var(--border-width) dashed var(--color-line); cursor: text; }
 .layer-rename-wrap:hover, .layer-rename-wrap:focus-within { color: var(--color-ink); border-bottom-color: var(--color-accent); }

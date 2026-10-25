@@ -113,9 +113,6 @@ export const card = (html: string, cls = '') => `<div class="card${cls ? ` ${cls
 /** Inline field inside a chip: a muted label before a short input ("Round [ 2 ]"). */
 export const chipField = (id: string, labelText: string, o: InputOptions & { title?: string } = {}) =>
   `<label class="chip-field" hidden${o.title ? ` title="${esc(o.title)}"` : ''}>${labelText} ${input(id, o)}</label>`;
-/** One chosen value shown as a line — swatch, name and an action that opens the choices (e.g. a zone's material). */
-export const choiceLine = (swatchHtml: string, name: string, action: string) =>
-  `<div class="choice-line">${swatchHtml}<span class="layer-name">${esc(name)}</span>${action}</div>`;
 
 /** Screen panel: the app name over one centred action (Sign-in, Not invited). */
 export const screenPanel = (titleHtml: string, bodyHtml: string) =>
@@ -131,15 +128,32 @@ export const emptyNote = (text: string) => `<p class="plans-empty">${esc(text)}<
 export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming' | 'archived') =>
   `<div class="plan-row${state ? ` ${state}` : ''}" data-id="${esc(id)}">${children.join('')}</div>`;
 
-/** Card header: a title and a small close button (data-act="close"). */
-export const cardHead = (titleHtml: string) =>
-  `<div class="card-head"><strong>${titleHtml}</strong>${button('×', { mods: ['icon', 'small'], ariaLabel: 'Close', data: { act: 'close' } })}</div>`;
-
-/** Arrow pad that nudges the selected corner by one screen pixel (data-nudge="dx,dy"). */
-export function nudgePad(): string {
+export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace';
+const ICON_PATHS: Record<IconName, string> = {
+  trash: '<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.5 7v4M9.5 7v4" />',
+  info: '<circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.1" />',
+  more: '<circle cx="3.5" cy="8" r=".6" /><circle cx="8" cy="8" r=".6" /><circle cx="12.5" cy="8" r=".6" />',
+  'chevron-left': '<path d="M10 3L5 8l5 5" />',
+  'chevron-right': '<path d="M6 3l5 5-5 5" />',
+  replace: '<path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13" />',
+};
+const cardIcon = (name: IconName) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+/** An icon-only button (48 px): a line icon with an aria-label and title. */
+export function iconButton(icon: IconName, o: { ariaLabel: string; data?: Record<string, string>; variant?: 'danger'; pressed?: boolean; expanded?: boolean }): string {
+  const d = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
+  return `<button type="button" class="icon${o.variant ? ` ${o.variant}` : ''}"${d} aria-label="${esc(o.ariaLabel)}" title="${esc(o.ariaLabel)}"`
+    + `${o.pressed ? ' aria-pressed="true"' : ''}${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}>${cardIcon(icon)}</button>`;
+}
+/** A row that opens and closes its body (aria-expanded); the body is only in the markup while open. */
+export function disclosure(id: string, labelText: string, open: boolean, bodyHtml: string): string {
+  return `<div class="disclosure"><button type="button" class="disclosure-head" data-disclosure="${esc(id)}" aria-expanded="${open}">`
+    + `<span class="layer-name">${esc(labelText)}</span>${cardIcon('chevron-right')}</button>`
+    + `${open ? `<div class="disclosure-body">${bodyHtml}</div>` : ''}</div>`;
+}
+/** Four arrows over the canvas (bottom-left) that nudge the selected corner by one screen pixel (data-nudge="dx,dy"). */
+export function canvasNudgePad(): string {
   const arrow = (glyph: string, dir: string, d: string) => button(glyph, { mods: ['icon'], ariaLabel: `Nudge ${dir}`, data: { nudge: d } });
-  return `<div class="nudge">${inlineHint('Nudge corner')}`
-    + arrow('←', 'left', '-1,0') + arrow('↑', 'up', '0,-1') + arrow('↓', 'down', '0,1') + arrow('→', 'right', '1,0') + '</div>';
+  return `<div class="nudge-pad">${arrow('←', 'left', '-1,0')}${arrow('↑', 'up', '0,-1')}${arrow('↓', 'down', '0,1')}${arrow('→', 'right', '1,0')}</div>`;
 }
 
 /** A layer's swatch: the outline kind's look, or a surface's material (its texture). */
@@ -155,6 +169,8 @@ export interface LayerRowOptions {
   sub?: string;
   /** Adds an eye beside the row (data-eye, or data-<attr>) that shows or hides layer `id`. */
   eye?: { id: string; hidden: boolean; attr?: string };
+  /** Prefixes a reorder grip (data-grip = the row's data-layer or data-zone id). */
+  grip?: boolean;
 }
 /** An eye toggle: pressed = shown. `what` names it for the label ("Lawn"); `data` says what it toggles. */
 export const eyeButton = (hidden: boolean, what: string, data: Record<string, string>) => {
@@ -165,42 +181,48 @@ export const eyeButton = (hidden: boolean, what: string, data: Record<string, st
 const layerName = (name: string, sub?: string) => sub
   ? `<span class="layer-text"><span class="layer-name">${esc(name)}</span><span class="layer-sub">${esc(sub)}</span></span>`
   : `<span class="layer-name">${esc(name)}</span>`;
+const GRIP_ICON = '<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="6" cy="4" r=".6" /><circle cx="10" cy="4" r=".6" /><circle cx="6" cy="8" r=".6" /><circle cx="10" cy="8" r=".6" /><circle cx="6" cy="12" r=".6" /><circle cx="10" cy="12" r=".6" /></svg>';
 export function layerRow(name: string, o: LayerRowOptions): string {
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   const row = `<button type="button" class="layer-row${o.selected ? ' selected' : ''}${o.eye?.hidden ? ' off' : ''}"${data}${o.selected ? ' aria-pressed="true"' : ''}>`
     + `${swatch(o.swatch)}${layerName(name, o.sub)}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}</button>`;
-  return o.eye ? `<div class="layer-item">${eyeButton(o.eye.hidden, name, { [o.eye.attr ?? 'eye']: o.eye.id })}${row}</div>` : row;
+  if (!o.eye && !o.grip) return row;
+  const gripId = o.data?.layer ?? o.data?.zone ?? '';
+  const grip = o.grip ? `<span class="grip" role="button" tabindex="0" aria-label="Reorder ${esc(name)}" data-grip="${esc(gripId)}">${GRIP_ICON}</span>` : '';
+  const eye = o.eye ? eyeButton(o.eye.hidden, name, { [o.eye.attr ?? 'eye']: o.eye.id }) : '';
+  return `<div class="layer-item">${grip}${eye}${row}</div>`;
 }
 /**
  * Layer card: the row of the outline being drawn or edited, expanded in place. The head keeps the swatch and
  * name (a name field when it can be renamed) and a Done button; the body holds the step, nudge arrows and actions.
  */
 export interface LayerCardOptions {
-  id: string; swatch: Swatch; name: string; sub?: string; meta?: string;
+  id: string; name: string; sub?: string; meta?: string;
+  /** The head's swatch; left out when the card shows it elsewhere (a zone's Material button). */
+  swatch?: Swatch;
   /** Show the name as a field (id `renameId`, default "outline-rename") so it can be renamed in place. */
   rename?: boolean;
   renameId?: string;
   /** Show a Done button (data-act="collapse") that closes the card. */
   done?: boolean;
+  /** Icon buttons at the right of the head (Redraw, trash). */
+  actions?: string;
   body: string;
 }
 export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
-    // Looks like a field (underline + pencil) so it's clear the name can be changed right here.
-    ? `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}`
-      + `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" /></svg></label>`
+    // Looks like a field (underlined) so it's clear the name can be changed right here.
+    ? (() => {
+      const field = `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}</label>`;
+      return o.sub ? `<span class="layer-text">${field}<span class="layer-sub">${esc(o.sub)}</span></span>` : field;
+    })()
     : layerName(o.name, o.sub);
-  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
+  return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${o.swatch ? swatch(o.swatch) : ''}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
+    + `${o.actions ? `<span class="layer-head-actions">${o.actions}</span>` : ''}`
     + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`
-    + `<div class="layer-body">${o.body}</div></div>`;
-}
-/** "Layer order ↑ ↓" in a layer card (data-act="up" / "down"); higher layers cut the ones below. */
-export function layerOrder(first: boolean, last: boolean): string {
-  const arrow = (glyph: string, dir: 'up' | 'down', disabled: boolean) =>
-    button(glyph, { mods: ['icon', 'small'], ariaLabel: `Move ${dir} (higher layers cut the ones below)`, disabled, data: { act: dir } });
-  return `<div class="layer-order">${inlineHint('Layer order')}${arrow('↑', 'up', first)}${arrow('↓', 'down', last)}</div>`;
+    + `${o.body ? `<div class="layer-body">${o.body}</div>` : ''}</div>`;
 }
 /** Wrapping group of compact actions inside a layer card. */
 export const layerActions = (...buttons: string[]) => `<div class="layer-actions">${buttons.join('')}</div>`;

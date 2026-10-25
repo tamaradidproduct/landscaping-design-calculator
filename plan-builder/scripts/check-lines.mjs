@@ -4,6 +4,7 @@
 // Usage: node scripts/check-lines.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia, onSheet } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
@@ -27,7 +28,7 @@ const listText = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerT
 try {
   await page.click('[data-start=boundary]'); await page.mouse.move(...await toScreen([250, 150]));
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]); await drag(a, b); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   const k = await pxPerPt();
   // Picker
   await addVia(page, 'lines'); await page.fill('#line-search', 'fence'); await page.waitForTimeout(150);
@@ -89,7 +90,7 @@ try {
   await addVia(page, 'lines'); await page.click('#line-results [data-line-item=white-stone-edging]'); await tap([250, 200]); await tap([250, 400]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(250);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await tap([250, 300]);
-  check('Tapping edging that lies on the boundary selects the line, not the edge', (await page.$$('.overlay .line-point')).length === 2 && (await page.$$('.popover:not([hidden])')).length === 0, `${(await page.$$('.overlay .line-point')).length} points, ${(await page.$$('.popover:not([hidden])')).length} popovers`);
+  check('Tapping edging that lies on the boundary selects the line, not the edge', (await page.$$('.overlay .line-point')).length === 2 && (await page.$$('.edge-chip-mount:not([hidden])')).length === 0, `${(await page.$$('.overlay .line-point')).length} points, ${(await page.$$('.edge-chip-mount:not([hidden])')).length} edge chips`);
   await page.keyboard.press('Escape');
   // Starting a symbol while a line is selected leaves no stuck state
   await addVia(page, 'symbols'); await page.fill('#symbol-search', 'hot'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);

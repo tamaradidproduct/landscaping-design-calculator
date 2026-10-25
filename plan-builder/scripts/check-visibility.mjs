@@ -4,7 +4,9 @@
 // Usage: node scripts/check-visibility.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
+import { openAdjust } from './lib/adjust.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -23,10 +25,11 @@ const pressed = sel => page.$eval(sel, b => b.getAttribute('aria-pressed'));
 const tile = id => page.$eval(`#zone-defs pattern#zone-${id}`, p => Number(p.getAttribute('width')));
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // the scale unlocks + Add
+  await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // the scale unlocks + Add
   await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
   // Before any scale is set, the texture scale still works (and follows zoom).
   if (await page.$('#surfaces [data-zone=s1]')) await page.click('#surfaces [data-zone=s1]'); // else its card is already open
+  await openAdjust(page);
   const u0 = await tile('s1');
   await page.click('#surfaces [data-act=tex-up]'); await page.waitForTimeout(150);
   const u1 = await tile('s1');
@@ -39,7 +42,7 @@ try {
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');
 
   // Texture scale (zone s2 = the deck): select it and step.
-  await page.click('#surfaces [data-zone=s2]');
+  await page.click('#surfaces [data-zone=s2]'); await openAdjust(page);
   const t0 = await tile('s2');
   await page.click('#surfaces [data-act=tex-up]'); await page.waitForTimeout(150);
   check('+ makes the texture 25% larger', Math.abs(await tile('s2') / t0 - 1.25) < 0.001, `${t0} → ${await tile('s2')} · readout ${await page.textContent('#surfaces [data-act=tex-reset]')}`);
@@ -86,7 +89,7 @@ try {
   await page.waitForTimeout(800);
   check('Hidden layers and sections are still hidden after reopening', (await pressed('[data-eye-group=surfaces]')) === 'false' && (await pressed(`#outlines [data-eye=${houseEye}]`)) === 'false' && !(await page.$('.overlay .label.feature')), `${await shapes() || 'no zone shapes'}`);
   await page.click('[data-eye-group=surfaces]'); await page.waitForTimeout(300);
-  await page.click('#surfaces [data-zone=s2]');
+  await page.click('#surfaces [data-zone=s2]'); await openAdjust(page);
   check('Texture scale is still 125% after reopening', (await page.textContent('#surfaces [data-act=tex-reset]')) === '125%', await page.textContent('#surfaces [data-act=tex-reset]'));
   await page.screenshot({ path: `${outDir}/visibility-end.png` });
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }

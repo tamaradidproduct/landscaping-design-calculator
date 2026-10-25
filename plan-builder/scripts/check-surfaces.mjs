@@ -4,6 +4,7 @@
 // Usage: node scripts/check-surfaces.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
@@ -40,7 +41,7 @@ results.push(['After the plot boundary', `${(await page.textContent('#surfaces')
 
 // Scale from the boundary's left edge: 500 pt = 100 ft (0.2 ft/pt).
 await tap([250, 560]);
-await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
+await setEdgeLength(page, '100');
 results.push(['Scale set on the boundary', await toast()]);
 await page.keyboard.press('Escape');
 
@@ -68,15 +69,15 @@ await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-ma
 results.push(['Add surface… while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
 await drag([250, 150], [330, 190]); // its top edge lies on the lot line
 await tap([290, 150]);
-results.push(['Tap the mulch edge on the lot line', `${(await page.textContent('.popover .card-head').catch(() => '?')).trim()} · field label "${await page.textContent('.popover .text-label').catch(() => '?')}"`]);
+results.push(['Tap the mulch edge on the lot line', `chip "${(await page.textContent('.edge-chip-mount').catch(() => '?')).trim().replace(/\s+/g, ' ')}"`]);
 await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 // Zoom in on the patio so its edge can be tapped clear of corners and the bend handle.
 await page.mouse.move(...await toScreen([330, 300]));
 await page.keyboard.down('Control'); for (let i = 0; i < 10; i++) { await page.mouse.wheel(0, -12); await page.waitForTimeout(20); } await page.keyboard.up('Control');
 await page.waitForTimeout(600);
 await tap([320, 250]); // top edge, near the left corner → the left corner stays
-results.push(['Pavers top edge', `${(await page.textContent('.popover .text-figure')).trim()} · label "${(await page.textContent('.popover .text-label'))}" · fixed mark in accent ${await page.$eval('.overlay .fixed-end', e => getComputedStyle(e).stroke === getComputedStyle(document.querySelector('button.primary') ?? document.body).backgroundColor).catch(() => 'missing')}`]);
-await page.$eval('#edge-len', (e, v) => { e.value = v; }, '16'); await page.click('.popover button[type=submit]');
+results.push(['Pavers top edge', `chip "${(await page.textContent('.edge-chip-mount')).trim().replace(/\s+/g, ' ')}" · fixed mark in accent ${await page.$eval('.overlay .fixed-end', e => getComputedStyle(e).stroke === getComputedStyle(document.querySelector('button.primary') ?? document.body).backgroundColor).catch(() => 'missing')}`]);
+await setEdgeLength(page, '16');
 const p16 = await shape('s2');
 results.push(['Typed 16′', `${await toast()} · x ${p16.x0}..${p16.x1} (expect 300..380) · y ${p16.y0}..${p16.y1} (expect 250..350)`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
@@ -89,16 +90,16 @@ await page.click('#surfaces [data-card] [data-act=change-material]'); await page
 results.push(['Pavers → Flagstone', await zones()]);
 await page.fill('#surface-rename', 'Back patio'); await page.press('#surface-rename', 'Enter'); await page.waitForTimeout(100);
 await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=clear-mountain-granite]'); await page.waitForTimeout(100);
-const mat = () => page.$eval('#surfaces [data-card] .layer-head .swatch rect', e => e.getAttribute('fill'));
+const mat = () => page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'));
 results.push(['Renamed, then → Gravel', `${await zones()} · ${await mat()}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
 results.push(['⌘Z (material only)', `${await zones()} · ${await mat()}`]);
 
 // Layer order stays within Surfaces.
 const outlinesBefore = await page.$$eval('#outlines .layer-name, #outlines .layer-rename', e => e.length);
-await page.click('#surfaces [data-act=down]'); await page.waitForTimeout(150);
-results.push(['Back patio ↓', `${await zones()} · patio visible rings ${(await shape('s2'))?.rings ?? 0} (0 = under the sod) · outlines rows ${outlinesBefore} → ${await page.$$eval('#outlines .layer-name, #outlines .layer-rename', e => e.length)} · down disabled ${await page.$eval('#surfaces [data-act=down]', b => b.disabled)}`]);
-await page.click('#surfaces [data-act=up]'); await page.waitForTimeout(150);
+await page.keyboard.press('Escape'); await page.focus('#surfaces [data-grip=s2]'); await page.keyboard.press('Alt+ArrowDown'); await page.waitForTimeout(150);
+results.push(['Back patio ↓', `${await zones()} · patio visible rings ${(await shape('s2'))?.rings ?? 0} (0 = under the sod) · outlines rows ${outlinesBefore} → ${await page.$$eval('#outlines .layer-name, #outlines .layer-rename', e => e.length)}`]);
+await page.focus('#surfaces [data-grip=s2]'); await page.keyboard.press('Alt+ArrowUp'); await page.waitForTimeout(150);
 
 // Redraw the boundary: zones stay; Add surface hidden until it closes; Cancel restores.
 await page.keyboard.press('Escape');

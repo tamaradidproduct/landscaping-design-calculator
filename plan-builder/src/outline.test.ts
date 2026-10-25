@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
 import { edgeAt } from './fillet';
 import { MARK } from './overlay-tokens';
 
@@ -200,9 +200,15 @@ describe('sections', () => {
     expect(moveInSection(ids, all, 'f2', 1)).toBeNull();
     expect(moveInSection(ids, all, 'boundary', 1)).toBeNull();
   });
-  test('position within the section', () => {
-    expect(sectionPosition(ids, all, 'f1')).toEqual({ first: true, last: false });
-    expect(sectionPosition(['boundary', 'f1', 's1'], all, 'f1')).toEqual({ first: true, last: true });
+  test('moveInSectionTo places a layer before another in its section, or at the end', () => {
+    const three = ['boundary', 'f1', 'f2', 'f3'];
+    const set = Object.fromEntries([o('boundary', 'boundary'), o('f1', 'feature'), o('f2', 'feature'), o('f3', 'feature')].map(x => [x.id, x]));
+    expect(moveInSectionTo(three, set, 'f3', 'f1')).toEqual(['boundary', 'f3', 'f1', 'f2']);
+    expect(moveInSectionTo(three, set, 'f1', null)).toEqual(['boundary', 'f2', 'f3', 'f1']);
+    expect(moveInSectionTo(three, set, 'boundary', 'f1')).toBeNull();
+    expect(moveInSectionTo(ids, all, 'f1', 's2')).toBeNull();
+    expect(moveInSectionTo(three, set, 'f2', 'f3')).toBeNull();
+    expect(moveInSectionTo(three, set, 'f3', null)).toBeNull();
   });
 });
 

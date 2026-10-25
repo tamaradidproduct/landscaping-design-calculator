@@ -24,6 +24,7 @@
           <button type="button" class="icon" id="zoom-in" aria-label="Zoom in" title="Zoom in"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10" /></svg></button>
           <button type="button" class="icon" id="fit" aria-label="Fit page" title="Fit page"><svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /></svg></button>
         </div>
+        <button type="button" class="square-float" id="square-corners" aria-label="Square corners" title="Square corners" hidden>Square corners</button>
         <div class="dock">
           <div class="segmented" id="shape" role="group" aria-label="Draw the outline" hidden>
             <button type="button" data-shape="freehand" aria-pressed="true" title="Freehand (X switches)">Freehand</button>
@@ -125,6 +126,7 @@
           <div id="layers-sheet" class="sheet" hidden></div>
         </section>
       </aside>
+      <div class="sidebar-resize" id="sidebar-resize" role="separator" aria-orientation="vertical" aria-controls="sidebar" aria-label="Resize the side panel" title="Drag to resize the panel · double-tap to reset" tabindex="0"></div>
       </div>
       <div class="bubble toast" id="toast" role="status" hidden></div>
       <input type="file" id="file" accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png" hidden />

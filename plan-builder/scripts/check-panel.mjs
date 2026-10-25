@@ -3,6 +3,7 @@
 // Usage: node scripts/check-panel.mjs <plot-plan.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
@@ -27,7 +28,7 @@ for (const width of [1180, 820]) {
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]);
   await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(250); await page.keyboard.press('Escape');
   check(tag + 'closed boundary, no scale: Outlines only, scale hint, no Add', (await shown()) === 'outlines' && !(await addShown()) && (await page.textContent('#outlines')).includes('printed length'), await shown());
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape');
+  await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape');
   check(tag + 'scale set: Add appears, empty sections stay hidden', (await addShown()) && (await shown()) === 'outlines', `${await shown()} · add ${await addShown()}`);
   await page.click('#add-button');
   check(tag + 'menu lists the three types', (await page.$$eval('#add [data-add]', b => b.map(x => x.dataset.add).join())) === 'symbols,surfaces,lines', '');

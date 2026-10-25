@@ -1,9 +1,10 @@
 // Stretch correction on the Riesberg plot plan. The real plan is true to scale, so typing its printed top and
 // left lengths must leave it unstretched; typing a left length 10% too long must stretch it 10% down the page
-// (as a plan printed 10% short vertically would need), and removing that length (edge popover) must undo it.
+// (as a plan printed 10% short vertically would need), and removing that length (edge chip) must undo it.
 // Usage: node scripts/check-stretch.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 // Same corners as check-step2a (PDF points on the 612 x 1008 page).
@@ -28,7 +29,7 @@ const aspect = () => page.evaluate(() => { const r = document.getElementById('pa
 const scaleText = () => page.textContent('#toast'); // the toast after typing a length names the scale
 async function typeLength(a, b, feet) {
   await page.mouse.click(...await toScreen(mid(a, b))); await page.waitForTimeout(150);
-  await page.$eval('#edge-len', (e, v) => { e.value = v; }, feet); await page.click('.popover button[type=submit]'); await page.waitForTimeout(600);
+  await setEdgeLength(page, feet); await page.waitForTimeout(600);
 }
 async function hoverLength(a, b) {
   await page.mouse.move(...await toScreen(mid(a, b))); await page.waitForTimeout(150);
@@ -56,8 +57,8 @@ await page.screenshot({ path: `${outDir}/stretch.png` });
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(600);
 results.push(['⌘Z: back to the true lengths', `page stretch ×${(await aspect()).toFixed(4)}`]);
 await page.mouse.click(...await toScreen(mid(C.TL, C.BL))); await page.waitForTimeout(150);
-await page.$eval('.popover [data-act=unref]', b => b.click()); await page.waitForTimeout(600);
-results.push(['Remove the left length (edge popover): one scale again', `page stretch ×${(await aspect()).toFixed(4)} · left edge ${await hoverLength(C.TL, C.BL)}`]);
+await page.click('.edge-chip [data-act=menu]'); await page.click('.edge-menu [data-act=unref]'); await page.waitForTimeout(600);
+results.push(['Remove the left length (edge chip): one scale again', `page stretch ×${(await aspect()).toFixed(4)} · left edge ${await hoverLength(C.TL, C.BL)}`]);
 results.push(['Plot area on the boundary row', await page.textContent('#outlines [data-layer=boundary] .layer-sub, #outlines [data-card=boundary] .layer-sub')]);
 
 console.table(results.map(([check, result]) => ({ check, result })));
