@@ -188,6 +188,8 @@ export interface LayerCardOptions {
   renameId?: string;
   /** Show a Done button (data-act="collapse") that closes the card. */
   done?: boolean;
+  /** Icon buttons at the right of the head (Redraw, trash). */
+  actions?: string;
   body: string;
 }
 export function layerCard(o: LayerCardOptions): string {
@@ -200,8 +202,9 @@ export function layerCard(o: LayerCardOptions): string {
     : layerName(o.name, o.sub);
   return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`
+    + `${o.actions ? `<span class="layer-head-actions">${o.actions}</span>` : ''}`
     + `${o.done ? button('×', { mods: ['icon', 'small'], ariaLabel: 'Done', data: { act: 'collapse' } }) : ''}</div>`
-    + `<div class="layer-body">${o.body}</div></div>`;
+    + `${o.body ? `<div class="layer-body">${o.body}</div>` : ''}</div>`;
 }
 /** Wrapping group of compact actions inside a layer card. */
 export const layerActions = (...buttons: string[]) => `<div class="layer-actions">${buttons.join('')}</div>`;

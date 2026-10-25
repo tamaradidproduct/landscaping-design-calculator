@@ -72,7 +72,7 @@ export class OutlinesSection {
     return layerCard({
       id: o.id, swatch: swatchOf(o), name: o.name, rename: feature,
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
-      body: editActions(feature),
+      actions: editActions(feature), body: '',
     });
   }
   private wireCard() {

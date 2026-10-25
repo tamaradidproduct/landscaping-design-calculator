@@ -125,6 +125,6 @@ export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; cha
   const area = t.areaSqft(o);
   return layerCard({
     id: o.id, swatch: sw, name: o.name, meta: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
-    body: `${st.changing ? picker(o.material) : ''}${adjust}${editActions(true, st.changing ? '' : change)}`,
+    actions: editActions(true), body: `${st.changing ? picker(o.material) : change}${adjust}`,
   });
 }

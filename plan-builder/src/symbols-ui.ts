@@ -59,8 +59,8 @@ export class SymbolsSection {
     const sizeText = `${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`;
     return layerCard({
       id, swatch: { symbol: lib.thumb }, name: lib.name, sub: [lib.category, sizeText].filter(Boolean).join(' · '),
-      body: `<div class="layer-actions">${step}${iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } })}</div>`
-        + `${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}`,
+      actions: iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } }),
+      body: `${step ? `<div class="layer-actions">${step}</div>` : ''}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}`,
     });
   }
 

@@ -101,7 +101,8 @@ if (onlyPart !== 'nudge') {
   const cardIn = sel => page.$(`${sel} [data-card]`);
   await selectRow('Driveway');
   const body = await page.$$eval('#outlines [data-card] .layer-body > *', e => e.map(x => x.className));
-  check('outline card: header and one action row only', body.join() === 'layer-actions', body.join());
+  const headActs = await page.$$eval('#outlines [data-card] .layer-head .layer-head-actions > button', e => e.map(x => x.getAttribute('aria-label')));
+  check('outline card: header carries Redraw and Delete, no body row', body.length === 0 && headActs.join() === 'Redraw,Delete', `${body.join()} | ${headActs.join()}`);
   check('outline card: no nudge arrows, no layer order, no nudge pad', !(await page.$('#outlines [data-card] .nudge, #outlines [data-card] .layer-order, #outlines [data-card] .nudge-pad, #outlines [data-card] [data-nudge]')), '');
   check('outline card: no up/down/square-all controls, no Square corners button', !(await page.$('#outlines [data-card] [data-act=up], #outlines [data-card] [data-act=down], #outlines [data-card] [data-act=square-all]')) && !(await page.$('#sidebar [aria-label="Square corners"]')), '');
   const redraw = await page.$('#outlines [data-card] [data-act=redraw]');

@@ -17,11 +17,10 @@ export function drawingCard(t: OutlineTool, o: Outline, swatch: Swatch, subject:
     button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
 }
 
-/** A selected layer's actions: a Redraw icon and (unless it's the plot boundary) a trash icon. (Square corners is a floating canvas button, not part of the card.) */
-export const editActions = (deletable: boolean, lead = '') => layerActions(
-  lead,
-  iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } }),
-  deletable ? iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }) : '');
+/** A selected layer's header actions: a Redraw icon and (unless it's the plot boundary) a trash icon. (Square corners is a floating canvas button, not part of the card.) */
+export const editActions = (deletable: boolean) =>
+  iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } })
+  + (deletable ? iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }) : '');
 
 /**
  * Drag-to-reorder for a section's rows: only a grip (`[data-grip]`) starts a drag, so panel scrolling is untouched.
