@@ -247,11 +247,14 @@ function refreshFloating() {
   nudgePadEl.hidden = !nudgePadVisible(tool.nudgeable, coarse.matches);
   const t = tool.squareTarget;
   squareBtn.hidden = !t;
-  if (!t) return;
+  if (!t) { tool.avoidChip(null); return; }
   // Beside the shape's top-right, kept inside the stage and clear of Undo/Redo (top right) and the zoom, nudge and Snap rows (bottom).
   const w = squareBtn.offsetWidth, h = squareBtn.offsetHeight, gap = 8, top = 80, bottom = 72;
   squareBtn.style.left = `${Math.max(gap, Math.min(stageSize.w - w - gap, t.bbox.right + gap))}px`;
   squareBtn.style.top = `${Math.max(top, Math.min(stageSize.h - h - bottom, t.bbox.top - h - gap))}px`;
+  // The edge chip keeps clear of this button.
+  const left = squareBtn.offsetLeft, topPx = squareBtn.offsetTop;
+  tool.avoidChip({ left, top: topPx, right: left + w, bottom: topPx + h });
 }
 coarse.addEventListener('change', refreshFloating);
 squareBtn.onclick = () => { const t = tool.squareTarget; if (t) tool.squareAll(t.id); };
@@ -409,7 +412,7 @@ function startPinch() {
 
 stage.addEventListener('pointerdown', e => {
   if (!page) return;
-  if ((e.target as Element).closest('.popover, .square-chip')) return; // let the edge popover's and Square chip's own controls work
+  if ((e.target as Element).closest('.edge-chip, .square-chip')) return; // let the edge chip's and Square chip's own controls work
   stage.setPointerCapture(e.pointerId);
   tool.setModifiers(e.shiftKey, e.altKey);
   pointers.set(e.pointerId, local(e));

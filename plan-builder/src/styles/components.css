@@ -69,8 +69,16 @@ input:focus-visible { outline: var(--focus-ring) solid var(--color-accent); outl
 .square-chip { position: absolute; z-index: var(--z-chip); flex-direction: row; align-items: center; gap: var(--space-5); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6); border-radius: var(--radius-pill); box-shadow: var(--shadow-sm); }
 .square-chip .text-figure { font-size: var(--text-base); }
 .square-chip button { min-height: var(--control-sm); padding: 0 var(--space-7); border-radius: var(--radius-pill); font-size: var(--text-base); }
-/* Popover: card anchored next to what it describes (an edge) */
-.popover { position: absolute; width: min(var(--width-card), calc(100% - 2 * var(--space-4))); }
+/* Edge chip: a small card anchored beside the selected edge — its length, an info tip and a ⋯ menu; the keypad opens in place */
+.edge-chip-mount { position: absolute; z-index: var(--z-chip); width: max-content; max-width: calc(100% - 2 * var(--space-4)); }
+.edge-chip-mount[hidden] { display: none; }
+.edge-chip { background: var(--color-surface); border: var(--border-width) solid var(--color-line); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3); }
+.edge-chip .row { align-items: center; gap: var(--space-2); }
+.edge-chip button.length { min-height: var(--control-md); padding: 0 var(--space-6); font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.edge-chip.editing { width: min(var(--width-card), calc(100vw - 2 * var(--space-4))); padding: var(--space-5); gap: var(--space-5); }
+.edge-chip.editing form { gap: var(--space-5); }
+.edge-menu { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.edge-menu button { width: 100%; justify-content: flex-start; }
 
 /* ---------- Dock: a floating bar at the bottom of the plan — Corners | Rectangle and the Snap toggle ---------- */
 .dock {

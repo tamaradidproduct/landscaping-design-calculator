@@ -25,7 +25,9 @@ import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFr
 import { zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
-import { button, cardHead, chipField, error, esc, field, figure, formStack, hint, inlineHint, input, numericKeypad, row, token, type KeypadKey } from './ui';
+import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
+import { chipPositionAvoiding, edgeMenuItems, type Zone } from './card-helpers';
+import { edgeChip } from './edge-chip';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
 
@@ -135,6 +137,8 @@ export class OutlineTool {
   private svg: SVGSVGElement;
   private magnifier: HTMLCanvasElement;
   private popover: HTMLElement;
+  private edgeUi: { key: string; editing: boolean; menuOpen: boolean } | null = null;
+  private chipAvoid: Zone | null = null;
   private tip: HTMLElement;
   private squareChip: HTMLElement;
 
@@ -144,7 +148,7 @@ export class OutlineTool {
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.svg.classList.add('overlay');
     this.magnifier = Object.assign(document.createElement('canvas'), { className: 'magnifier', hidden: true });
-    this.popover = Object.assign(document.createElement('div'), { className: 'card popover', hidden: true });
+    this.popover = Object.assign(document.createElement('div'), { className: 'edge-chip-mount', hidden: true });
     this.tip = Object.assign(document.createElement('div'), { className: 'bubble tip', hidden: true });
     this.squareChip = Object.assign(document.createElement('div'), { className: 'card square-chip', hidden: true });
     this.squareChip.innerHTML = figure('') + button('Square', { data: { act: 'square' } })
@@ -1458,64 +1462,45 @@ export class OutlineTool {
   }
   private hideTip() { this.tip.hidden = true; }
 
+  /** The chip beside the selected edge: its length, an info tip and a ⋯ menu; tapping the length opens the keypad. */
   private renderPopover() {
     const e = this.selectedEdge;
-    if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; return; }
-    if (this.outlines[e.id]!.kind === 'surface') { this.renderSurfacePopover(e); return; }
-    const ft = this.edgeFeet(e.id, e.i);
-    const o = this.outlines[e.id]!, curved = !!o.bulges?.[e.i], ref = this.refs.find(r => r.id === e.id && r.i === e.i);
-    this.popover.innerHTML = `
-      ${cardHead(`${esc(o.name)} edge`)}
-      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
-      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : hint('Drag the square in the middle of the edge to curve it, or tap the + to add a corner.')}
-      ${formStack(`
-        ${field('edge-len', 'Printed length on the plan', row(input('edge-len', { readonly: true, placeholder: `e.g. 116.45 or 116' 5"`, value: ref ? String(ref.feet) : undefined }), button(ref ? 'Update' : this.cal ? 'Add length' : 'Set scale', { variant: 'primary', type: 'submit' })))}
-        ${numericKeypad()}
-        ${ref ? button('Remove this length', { variant: 'danger', data: { act: 'unref' } })
-          : this.cal ? hint('Lengths on edges running across and down also correct a stretched plan.') : ''}
-        ${error(`Type a length in feet, like 116.45 or 116' 5".`)}`)}`;
+    if (!e || !this.outlines[e.id]?.closed) { this.popover.hidden = true; this.edgeUi = null; return; }
+    const o = this.outlines[e.id]!, surface = o.kind === 'surface', ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
+    const ref = surface ? undefined : this.refs.find(r => r.id === e.id && r.i === e.i);
+    const key = `${e.id}:${e.i}`;
+    const typed = this.edgeUi?.key === key && this.edgeUi.editing ? this.popover.querySelector<HTMLInputElement>('#edge-len')?.value : undefined;
+    if (this.edgeUi?.key !== key) this.edgeUi = { key, editing: false, menuOpen: false };
+    const ui = this.edgeUi;
+    const canEdit = !surface || ft !== null;
+    const editing = ui.editing && canEdit;
+    const tip = 'Drag the square in the middle of the edge to curve it, or tap the + to add a corner.'
+      + (surface ? ' The marked end stays put.' : ft ? ' Lengths on edges running across and down also correct a stretched plan.' : '');
+    const menu = edgeMenuItems({ kind: surface ? 'surface' : o.kind === 'feature' ? 'feature' : 'boundary', curved, hasRef: !!ref });
+    this.popover.innerHTML = edgeChip({
+      text: ft ? `${formatFeet(ft)}${curved ? ' along the curve' : ''}` : surface ? 'No scale' : 'Set length',
+      editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip,
+      field: { value: typed ?? (ref ? String(ref.feet) : ''), placeholder: surface ? `e.g. 16 or 16' 6"` : `e.g. 116.45 or 116' 5"` },
+    });
     this.popover.hidden = false;
-    this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
-    const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
-    if (straighten) straighten.onclick = () => { this.record(); this.outlines[e.id]!.bulges![e.i] = 0; this.update(); };
-    const unref = this.popover.querySelector<HTMLButtonElement>('[data-act=unref]');
-    if (unref) unref.onclick = () => { this.selectedEdge = null; this.removeReference(this.refs.indexOf(ref!)); };
-    const form = this.popover.querySelector('form')!;
-    form.onsubmit = ev => {
-      ev.preventDefault();
-      const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
-      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
-      this.setEdgeLength(e.id, e.i, feet);
-    };
-    this.wireLengthKeypad(form);
-    this.positionPopover();
-  }
-  /** A surface edge: its length can be typed to resize the zone (never the scale). */
-  private renderSurfacePopover(e: { id: string; i: number; fixed: 0 | 1 }) {
-    const o = this.outlines[e.id]!, ft = this.edgeFeet(e.id, e.i), curved = !!o.bulges?.[e.i];
-    this.popover.innerHTML = `
-      ${cardHead(`${esc(o.name)} edge`)}
-      ${figure(ft ? `Measures <b>${formatFeet(ft)}</b>${curved ? ' along the curve' : ''}` : 'No scale yet')}
-      ${curved ? button('Make straight', { data: { act: 'straighten' } }) : ''}
-      ${ft === null ? hint('Set the scale on an outline edge first.') : formStack(`
-        ${field('edge-len', 'Length', row(input('edge-len', { readonly: true, placeholder: `e.g. 16 or 16' 6"` }), button('Resize', { variant: 'primary', type: 'submit' })))}
-        ${numericKeypad()}
-        ${row(inlineHint('Stays put: the marked end'), button('Swap', { mods: ['small'], data: { act: 'swap' } }))}
-        ${error(`Type a length in feet, like 16 or 16' 6".`)}`)}`;
-    this.popover.hidden = false;
-    this.popover.querySelector<HTMLButtonElement>('[data-act=close]')!.onclick = () => { this.selectedEdge = null; this.update(); };
+    this.popover.querySelector<HTMLButtonElement>('[data-act=edit-length]')?.addEventListener('click', () => { ui.editing = true; ui.menuOpen = false; this.renderPopover(); });
+    this.popover.querySelector<HTMLButtonElement>('[data-act=menu]')?.addEventListener('click', () => { ui.menuOpen = !ui.menuOpen; this.renderPopover(); });
     const straighten = this.popover.querySelector<HTMLButtonElement>('[data-act=straighten]');
     if (straighten) straighten.onclick = () => { this.record(); o.bulges![e.i] = 0; this.update(); };
+    const unref = this.popover.querySelector<HTMLButtonElement>('[data-act=unref]');
+    if (unref) unref.onclick = () => { this.selectedEdge = null; this.removeReference(this.refs.indexOf(ref!)); };
     const swap = this.popover.querySelector<HTMLButtonElement>('[data-act=swap]');
     if (swap) swap.onclick = () => this.swapFixedEnd();
     const form = this.popover.querySelector('form');
-    if (form) form.onsubmit = ev => {
-      ev.preventDefault();
-      const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
-      if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
-      this.resizeEdge(e.id, e.i, feet);
-    };
-    if (form) this.wireLengthKeypad(form);
+    if (form) {
+      form.onsubmit = ev => {
+        ev.preventDefault();
+        const feet = parseFeet(this.popover.querySelector<HTMLInputElement>('#edge-len')!.value);
+        if (!feet) { this.popover.querySelector<HTMLElement>('.text-error')!.hidden = false; return; }
+        if (surface) this.resizeEdge(e.id, e.i, feet); else this.setEdgeLength(e.id, e.i, feet);
+      };
+      this.wireLengthKeypad(form);
+    }
     this.positionPopover();
   }
   /** Wires the numericKeypad() beside an edge-length field: each key edits #edge-len's value at the cursor
@@ -1546,10 +1531,16 @@ export class OutlineTool {
     const e = this.selectedEdge; if (!e || this.popover.hidden) return;
     const o = this.outlines[e.id]; if (!o) return;
     const a = this.host.toScreen(o.pts[e.i]), b = this.host.toScreen(o.pts[(e.i + 1) % o.pts.length]);
-    const stage = this.svg.getBoundingClientRect(), w = this.popover.offsetWidth || POPOVER.fallbackWidth, hgt = this.popover.offsetHeight || POPOVER.fallbackHeight, mg = POPOVER.margin;
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    this.popover.style.left = `${Math.max(mg, Math.min(stage.width - w - mg, mx - w / 2))}px`;
-    this.popover.style.top = `${Math.max(mg, Math.min(stage.height - hgt - mg, my + POPOVER.below))}px`;
+    const stage = this.svg.getBoundingClientRect();
+    const p = chipPositionAvoiding({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, { w: this.popover.offsetWidth || POPOVER.fallbackWidth, h: this.popover.offsetHeight || POPOVER.fallbackHeight },
+      { w: stage.width, h: stage.height }, POPOVER.below, POPOVER.margin, this.chipAvoid);
+    this.popover.style.left = `${p.left}px`; this.popover.style.top = `${p.top}px`;
+  }
+  /** The floating Square corners button's rect (stage coordinates, or null when hidden): the edge chip keeps clear of it. */
+  avoidChip(zone: Zone | null) {
+    const same = this.chipAvoid === zone || (!!zone && !!this.chipAvoid && zone.left === this.chipAvoid.left && zone.top === this.chipAvoid.top && zone.right === this.chipAvoid.right && zone.bottom === this.chipAvoid.bottom);
+    this.chipAvoid = zone;
+    if (!same) this.positionPopover();
   }
 
 

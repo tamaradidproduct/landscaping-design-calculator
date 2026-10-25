@@ -35,6 +35,25 @@ export function chipPosition(
   return { left: clamp(mid.x - chip.w / 2, chip.w, stage.w), top: clamp(top, chip.h, stage.h) };
 }
 
+export type Zone = { left: number; top: number; right: number; bottom: number };
+
+/** chipPosition, but never over `zone` (the floating Square corners button): tries the other side of the edge, then slides sideways. */
+export function chipPositionAvoiding(
+  mid: { x: number; y: number }, chip: { w: number; h: number }, stage: { w: number; h: number }, gap: number, margin: number, zone: Zone | null,
+): { left: number; top: number } {
+  const pos = chipPosition(mid, chip, stage, gap, margin);
+  if (!zone) return pos;
+  const hits = (p: { left: number; top: number }) => p.left < zone.right && p.left + chip.w > zone.left && p.top < zone.bottom && p.top + chip.h > zone.top;
+  if (!hits(pos)) return pos;
+  const clamp = (v: number, size: number, max: number) => Math.max(margin, Math.min(v, max - size - margin));
+  const other = clamp(pos.top > mid.y ? mid.y - gap - chip.h : mid.y + gap, chip.h, stage.h);
+  const flipped = { left: pos.left, top: other };
+  if (!hits(flipped)) return flipped;
+  const sides = [zone.left - margin - chip.w, zone.right + margin].map(l => ({ left: clamp(l, chip.w, stage.w), top: pos.top })).filter(p => !hits(p));
+  sides.sort((a, b) => Math.abs(a.left - pos.left) - Math.abs(b.left - pos.left));
+  return sides[0] ?? pos;
+}
+
 /** What Enter or Done in the Corner radius field applies: null (nothing) for a blank field, which is how mixed radii show; "0" squares. */
 export function roundAllRequest(text: string): number | null {
   return text.trim() === '' ? null : parseRadius(text);

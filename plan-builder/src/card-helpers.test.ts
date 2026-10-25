@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { chipPosition, nudgePadVisible, edgeMenuItems, instanceLabel, radiusDisplay, roundAllRequest } from './card-helpers';
+import { chipPosition, chipPositionAvoiding, nudgePadVisible, edgeMenuItems, instanceLabel, radiusDisplay, roundAllRequest } from './card-helpers';
 
 describe('instanceLabel', () => {
   test('1-based position of the selection', () => expect(instanceLabel('b', ['a', 'b', 'c'])).toBe('2 of 3'));
@@ -58,5 +58,24 @@ describe('nudgePadVisible', () => {
   test('hidden when nothing is nudgeable', () => {
     expect(nudgePadVisible(false, true)).toBe(false);
     expect(nudgePadVisible(false, false)).toBe(false);
+  });
+});
+
+describe('chipPositionAvoiding', () => {
+  const chip = { w: 120, h: 34 }, stage = { w: 400, h: 300 };
+  const hits = (p: { left: number; top: number }, z: { left: number; top: number; right: number; bottom: number }) =>
+    p.left < z.right && p.left + chip.w > z.left && p.top < z.bottom && p.top + chip.h > z.top;
+  test('no zone: same as chipPosition', () =>
+    expect(chipPositionAvoiding({ x: 100, y: 50 }, chip, stage, 8, 6, null)).toEqual(chipPosition({ x: 100, y: 50 }, chip, stage, 8, 6)));
+  test('flips to the other side of the edge when the zone sits under the chip', () => {
+    const z = { left: 60, top: 55, right: 200, bottom: 100 };
+    const p = chipPositionAvoiding({ x: 100, y: 120 }, chip, stage, 8, 6, z);
+    expect(hits(p, z)).toBe(false);
+  });
+  test('shifts sideways when both sides are covered, staying inside the stage', () => {
+    const z = { left: 40, top: 0, right: 160, bottom: 300 };
+    const p = chipPositionAvoiding({ x: 100, y: 150 }, chip, stage, 8, 6, z);
+    expect(hits(p, z)).toBe(false);
+    expect(p.left).toBeGreaterThanOrEqual(6); expect(p.left + chip.w).toBeLessThanOrEqual(394);
   });
 });
