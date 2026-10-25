@@ -1,4 +1,5 @@
 /** Pure helpers behind the slimmer cards and overlays. */
+import { parseRadius } from './outline';
 
 /** "2 of 3": the selection's 1-based place among its siblings; null for a lone or unknown selection. */
 export function instanceLabel(selectedId: string | null, ids: readonly string[]): string | null {
@@ -32,4 +33,9 @@ export function chipPosition(
   const clamp = (v: number, size: number, max: number) => Math.max(margin, Math.min(v, max - size - margin));
   const below = mid.y + gap, top = below + chip.h + margin > stage.h ? mid.y - gap - chip.h : below;
   return { left: clamp(mid.x - chip.w / 2, chip.w, stage.w), top: clamp(top, chip.h, stage.h) };
+}
+
+/** What Enter or Done in the Corner radius field applies: null (nothing) for a blank field, which is how mixed radii show; "0" squares. */
+export function roundAllRequest(text: string): number | null {
+  return text.trim() === '' ? null : parseRadius(text);
 }

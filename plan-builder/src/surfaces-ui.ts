@@ -4,7 +4,7 @@
 import { materialsByFamily, type MaterialId } from './materials';
 import { TEX_SCALE } from './outline';
 import { formatArea, formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from './outline';
-import { radiusDisplay } from './card-helpers';
+import { radiusDisplay, roundAllRequest } from './card-helpers';
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, wireLayerCard } from './layer-card';
@@ -73,7 +73,7 @@ export class SurfacesSection {
       const field = round.querySelector<HTMLInputElement>('input')!, id = card.dataset.card!;
       round.onsubmit = e => {
         e.preventDefault();
-        const ft = parseRadius(field.value);
+        const ft = roundAllRequest(field.value);
         if (ft !== null) t.roundAll(id, ft);
       };
       // Arrow keys step the radius live (0.5′, Shift 2′), like a corner's; the field keeps focus through the redraw.
@@ -123,7 +123,7 @@ export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; cha
   const adjust = disclosure('adjust', 'Adjust shape and texture', st.open, `${sizeForm(t, o)}${round}${texScale(o)}`);
   const area = t.areaSqft(o);
   return layerCard({
-    id: o.id, swatch: sw, name: o.name, sub: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
+    id: o.id, swatch: sw, name: o.name, meta: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
     body: `${st.changing ? picker(o.material) : ''}${adjust}${editActions(true, st.changing ? '' : change)}`,
   });
 }

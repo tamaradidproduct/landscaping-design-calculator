@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { chipPosition, edgeMenuItems, instanceLabel, radiusDisplay } from './card-helpers';
+import { chipPosition, edgeMenuItems, instanceLabel, radiusDisplay, roundAllRequest } from './card-helpers';
 
 describe('instanceLabel', () => {
   test('1-based position of the selection', () => expect(instanceLabel('b', ['a', 'b', 'c'])).toBe('2 of 3'));
@@ -42,5 +42,12 @@ describe('chipPosition', () => {
   test('clamped to the margin on the left and right', () => {
     expect(chipPosition({ x: 10, y: 50 }, chip, stage, 8, 6).left).toBe(6);
     expect(chipPosition({ x: 395, y: 50 }, chip, stage, 8, 6).left).toBeLessThanOrEqual(400 - 120 - 6);
+  });
+});
+
+describe('roundAllRequest', () => {
+  test('a blank field (mixed radii) applies nothing; 0 squares; a value rounds', () => {
+    expect(roundAllRequest('')).toBeNull(); expect(roundAllRequest('  ')).toBeNull();
+    expect(roundAllRequest('0')).toBe(0); expect(roundAllRequest("2'")).toBe(2);
   });
 });

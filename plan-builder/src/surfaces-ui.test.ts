@@ -21,7 +21,7 @@ describe('surface card', () => {
     expect(closed).toContain('data-disclosure="adjust"'); expect(closed).toContain('aria-expanded="false"');
     for (const id of ['zone-width', 'round-all', 'tex-down']) { expect(closed).not.toContain(id); expect(open).toContain(id); }
   });
-  test('header shows the area; actions are Change material and the edit icons', () => {
+  test('header shows the area in its meta; actions are Change material and the edit icons', () => {
     const h = html([0], false);
     expect(h).toContain('80 sq ft'); expect(h).toContain('Change material'); expect(h).toContain('data-act="redraw"'); expect(h).not.toContain('data-act="up"');
   });

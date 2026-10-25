@@ -33,7 +33,7 @@ button.icon.danger { color: var(--color-warn); }
 .grip:hover, .grip:focus-visible { color: var(--color-ink); }
 /* Disclosure: a row that opens a body beneath it */
 .disclosure { display: flex; flex-direction: column; gap: var(--space-4); }
-.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: var(--control-md); text-align: left; }
+.disclosure-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: 100%; min-height: 44px; text-align: left; }
 .disclosure-body { display: flex; flex-direction: column; gap: var(--space-4); }
 /* Canvas nudge pad: four arrows at the canvas's bottom-left */
 .nudge-pad { position: absolute; left: var(--space-8); bottom: var(--space-8); display: flex; gap: var(--space-3); }
