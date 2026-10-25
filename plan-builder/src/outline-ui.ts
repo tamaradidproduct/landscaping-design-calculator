@@ -12,6 +12,8 @@ import { LineLayer } from './line-layer';
 import { linesSvgParts } from './lines-render';
 import { draftReady, draftTap } from './line-draft';
 import { clampLineWidth, lineItemById } from './line-items';
+import { FILL_ID, fillOutline, syncFill } from './plot-fill';
+import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
@@ -403,6 +405,20 @@ export class OutlineTool {
     while (this.outlines[`s${n}`]) n++;
     this.begin(`s${n}`, 'surface', material(m).name, m);
   }
+  /** True once the plot is outlined and not yet filled: Fill the plot… is offered. */
+  get fillable() { return this.boundaryClosed && !this.hasFill; }
+  get hasFill() { return !!this.outlines[FILL_ID]?.base; }
+  /** Cover the whole plot with one surface of a material; it follows the plot boundary from then on (one undo step). */
+  fillPlot(m: MaterialId) {
+    if (!this.fillable) return;
+    this.record();
+    this.outlines = { ...this.outlines, [FILL_ID]: fillOutline(this.outlines[BOUNDARY]!, m) };
+    this.hiddenLayers.delete(FILL_ID); this.hiddenSections.delete('surfaces'); // a new fill is always shown (as drawing a surface does)
+    this.placing = null; this.selectedSymbol = null; this.clearLines();
+    this.selected = FILL_ID; this.selectedCorner = null; this.selectedEdge = null;
+    this.host.toast('Plot fill added. It follows the plot boundary.');
+    this.update();
+  }
   /** Change a surface's material; a zone still named after its old material takes the new name. */
   setMaterial(id: string, m: MaterialId) {
     const o = this.outlines[id]; if (o?.kind !== 'surface' || o.material === m) return;
@@ -421,7 +437,7 @@ export class OutlineTool {
     this.update();
   }
   /** Draw an existing outline again from scratch, keeping its name; Cancel puts the old one back. */
-  redraw(id: string) { const o = this.outlines[id]; if (o) this.begin(id, o.kind, o.name, o.material); }
+  redraw(id: string) { const o = this.outlines[id]; if (o && !o.base) this.begin(id, o.kind, o.name, o.material); }
   private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
     if (this.drawing) this.cancel();
     this.placing = null; this.selectedSymbol = null; this.clearLines(); // drawing takes over from placing
@@ -1047,7 +1063,7 @@ export class OutlineTool {
   /** The selected, finished surface (it can be moved, pushed and rounded), if any. */
   private get selectedZone(): Outline | null {
     const o = this.selected && !this.drawing ? this.outlines[this.selected] : undefined;
-    return o?.kind === 'surface' && o.closed ? o : null;
+    return o?.kind === 'surface' && o.closed && !o.base ? o : null; // the plot fill follows the boundary: it is never moved, pushed or rounded
   }
   /** Where the selected surface corner's round handle sits (screen), on its bisector at the arc's middle. */
   private roundHandlePos(): { id: string; i: number; at: Point; onArc: boolean } | null {
@@ -1071,7 +1087,7 @@ export class OutlineTool {
   private bendHandleAt(p: Point): { id: string; i: number } | null {
     let best: { id: string; i: number } | null = null, bd: number = HIT.bend;
     for (const o of Object.values(this.outlines)) {
-      if (!o?.closed || o.id !== this.selected) continue; // only the selected outline can be bent
+      if (!o?.closed || o.id !== this.selected || o.base) continue; // only the selected outline can be bent (never the plot fill)
       o.pts.forEach((_, i) => { const d = dist(this.host.toScreen(edgeMid(o.pts, i, o.bulges)), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
@@ -1103,6 +1119,7 @@ export class OutlineTool {
     for (const o of Object.values(this.outlines)) {
       // While drawing, other outlines' corners are snap targets (a shared corner places a new point
       // there), not handles to drag.
+      if (o.base) continue; // the plot fill's corners are the boundary's
       if (this.drawing && o.id !== this.drawing) continue;
       // Otherwise only the selected outline's corners can be dragged: select first, then edit.
       if (!this.drawing && o.id !== this.selected) continue;
@@ -1115,7 +1132,7 @@ export class OutlineTool {
   private edgeAt(p: Point): { id: string; i: number } | null {
     const tol = HIT.edge / this.host.pxPerPt(), pp = this.host.toPage(p);
     for (const o of edgeTapOrder(Object.values(this.outlines), this.selected)) {
-      if (!o?.closed || this.isHidden(o.id)) continue;
+      if (!o?.closed || o.base || this.isHidden(o.id)) continue; // the fill's edges are the boundary's
       const i = nearestEdge(o.pts, pp, tol, o.bulges);
       if (i !== null) return { id: o.id, i };
     }
@@ -1157,7 +1174,7 @@ export class OutlineTool {
   /** A surface's typed Width or Depth: scale it about the center of its bounding box (both sizes when locked). */
   resizeZone(id: string, axis: 'w' | 'h', feet: number) {
     const o = this.outlines[id], c = this.cal;
-    if (o?.kind !== 'surface' || !o.closed || !c || !(feet > 0)) return;
+    if (o?.kind !== 'surface' || o.base || !o.closed || !c || !(feet > 0)) return;
     const before = this.zoneBox(id); if (!before || Math.abs(before[axis] - feet) < 1e-6) return;
     this.record();
     const t = resizeBox(o.pts, o.bulges, axis, feet / c.ftPerPt, this.aspectLock, c.correction);
@@ -1178,7 +1195,7 @@ export class OutlineTool {
   /** Square: line the selected corner (only it) up with its neighbours (see square.ts). */
   squareSelectedCorner() {
     const c = this.selectedCorner, o = c && this.outlines[c.id];
-    if (!c || !o?.closed || this.drawing) return;
+    if (!c || !o?.closed || o.base || this.drawing) return;
     this.applyTidy(o, alignCorner(o.pts, o.bulges, c.i, this.shownCorrection));
   }
   /** True when a corner is selected and still exists (the nudge arrows apply to it). */
@@ -1196,7 +1213,7 @@ export class OutlineTool {
   }
   /** Round every corner of a surface to one radius in feet (0 = all sharp). */
   roundAll(id: string, feet: number, steps = false) {
-    const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || !c) return;
+    const o = this.outlines[id], c = this.cal; if (o?.kind !== 'surface' || o.base || !c) return;
     // Arrow-key steps within 1.5 s undo as one step (like a corner's).
     const t = performance.now(), ln = this.lastNudge, key = -1, run = steps && ln && ln.id === id && ln.i === key && t - ln.t < 1500;
     if (!run) this.record(); else this.revision++;
@@ -1211,7 +1228,7 @@ export class OutlineTool {
   }
   /** Square all corners: line every corner of an outline up with the others at once. */
   squareAll(id: string) {
-    const o = this.outlines[id]; if (!o?.closed || this.drawing) return;
+    const o = this.outlines[id]; if (!o?.closed || o.base || this.drawing) return;
     this.applyTidy(o, alignAll(o.pts, o.bulges, this.shownCorrection));
   }
   /** True when tidying would move some corner by more than a hair (0.05 screen px). */
@@ -1254,9 +1271,18 @@ export class OutlineTool {
   }
   /** Area of a closed outline in square feet (null before the scale is set). */
   areaSqft(o: Outline) {
+    const k = this.sqftPerPt2(); return k === null ? null : areaPt2(o.pts, o.bulges) * k;
+  }
+  /** Square feet in one square page point (the stretch correction included); null until the scale is set. */
+  private sqftPerPt2(): number | null {
     const c = this.cal; if (!c) return null;
     const m = c.correction;
-    return areaPt2(o.pts, o.bulges) * Math.abs(m.a * m.d - m.b * m.c) * c.ftPerPt * c.ftPerPt;
+    return Math.abs(m.a * m.d - m.b * m.c) * c.ftPerPt * c.ftPerPt;
+  }
+  /** What each material's zones show, in square feet: clipped to the lot, with the house, features and surfaces above cut out. Null before the scale is set. */
+  surfaceAreasSqft(): Map<string, number> | null {
+    const k = this.sqftPerPt2(); if (k === null) return null;
+    return new Map([...surfaceAreasPt2(Object.values(this.outlines), this.visible)].map(([m, a]) => [m, a * k]));
   }
   /** Refit the scale to the typed lengths; tell the host when the plan's stretch correction changes. */
   private recalibrate() {
@@ -1271,6 +1297,7 @@ export class OutlineTool {
   update() { this.recalibrate(); this.render(); this.renderPopover(); this.host.historyChanged(this.history.canUndo, this.history.canRedo); this.host.changed(); }
 
   render() {
+    this.outlines = syncFill(this.outlines, this.drawing === BOUNDARY); // the plot fill wears the boundary's shape, live while it is dragged
     const h = this.host;
     // Cutting only depends on the shapes and their order, not the view: redo it only when those change.
     const key = JSON.stringify(Object.values(this.outlines).map(o => [o.id, o.closed, o.pts, o.bulges, o.radii]));
@@ -1314,7 +1341,7 @@ export class OutlineTool {
         top += `<path d="${seg.map((p, k) => `${k ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')}" class="edge-hi" style="--c:${colorOf(o)}"/>`;
       }
       // Only the outline being drawn or edited shows its handles; the rest are just shape and name.
-      const handles = drawingThis || (!this.drawing && this.selected === o.id);
+      const handles = drawingThis || (!this.drawing && this.selected === o.id && !o.base); // the plot fill has none: its corners are the boundary's
       if (o.closed && handles) o.pts.forEach((_, i) => {
         // Edge middle handles: drag to bend the edge into an arc.
         const m = h.toScreen(edgeMid(o.pts, i, o.bulges)), bent = !!o.bulges?.[i];
