@@ -20,19 +20,21 @@ const listText = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerT
 const sqft = async name => { const m = new RegExp(`${name} \\| ([\\d,]+) sq ft`).exec(await listText()); return m ? Number(m[1].replace(/,/g, '')) : null; };
 const lotSqft = async () => Number((await page.$eval('#outlines .layer-sub', e => e.textContent)).replace(/[^\d]/g, ''));
 const fillPaths = () => page.$$eval('.overlay path[data-id=fill]', p => p.length);
-// The offer lives in the global + Add menu's Surface picker (Add is locked until the scale is set).
-const offerShown = async () => { const sel = await page.$eval('#surfaces [data-card]', c => c.dataset.card).catch(() => null); await addVia(page, 'surfaces'); const shown = !!(await page.$('[data-act=fill-plot]')); await page.click('#surfaces [data-act=cancel-picker]'); if (sel) await page.click(`#surfaces [data-zone=${sel}]`); return shown; };
-const pickFill = async material => { await addVia(page, 'surfaces'); await page.click('[data-act=fill-plot]'); await page.click(`#surfaces .layer-form [data-material=${material}]`); await page.waitForTimeout(300); };
+// The offer is "Fill with surface" on the plot boundary's card (needs the scale); selecting the boundary closes any other card.
+const selectBoundary = async () => { if (!(await page.$('#outlines [data-card=boundary]'))) { await page.click('#outlines [data-layer=boundary]'); await page.waitForTimeout(200); } };
+const offerShown = async () => { const sel = await page.$eval('#surfaces [data-card]', c => c.dataset.card).catch(() => null); await selectBoundary(); const shown = !!(await page.$('#outlines [data-act=fill-plot]')); if (sel) await page.click(`#surfaces [data-zone=${sel}]`); else await page.keyboard.press('Escape'); await page.waitForTimeout(150); return shown; };
+const pickFill = async material => { await selectBoundary(); await page.click('#outlines [data-act=fill-plot]'); await page.click(`#outlines [data-fill-material=${material}]`); await page.waitForTimeout(300); };
 try {
   await page.click('[data-start=boundary]'); await drag(await at(0.3, 0.3), await at(0.8, 0.8)); await page.keyboard.press('Escape');
-  check('Before the lot is scaled, Add (and so the fill offer) is locked', !(await page.$('#add-button:not([disabled])')) || !(await page.$eval('#add-button', b => b.offsetParent !== null)), 'Add hidden or disabled');
+  await selectBoundary(); check('Before the lot is scaled, the fill offer is not available', !(await page.$('[data-act=fill-plot]')), 'no Fill with surface yet');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await page.click('[data-layer=boundary]'); await page.waitForTimeout(200);
   const [ex, ey] = await at(0.3, 0.55); await page.mouse.click(ex, ey); await page.waitForTimeout(250);
   if (await page.$('#edge-len')) { await page.$eval('#edge-len', e => { e.value = '100'; }); await page.click('.popover button[type=submit]'); }
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   const lot0 = await lotSqft();
   check('The boundary has an area once scaled', lot0 > 1000, `${lot0} sq ft`);
-  check('Once scaled, the Surface picker offers Fill the plot…', await offerShown(), 'offer shown in Add › Surface');
+  check('Once scaled, the plot boundary card offers Fill with surface', await offerShown(), 'offer on the boundary card');
   // Fill
   await pickFill('premium-sod');
   check('Fill the plot… creates one fill, drawn on the plan', (await fillPaths()) >= 1 && !!(await page.$('#surfaces [data-card=fill]')) && !(await offerShown()), `${await fillPaths()} path(s); offer gone`);
