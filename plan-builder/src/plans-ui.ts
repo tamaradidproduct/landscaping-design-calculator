@@ -311,7 +311,10 @@ export class PlansScreen {
     this.root.classList.remove('drag-over');
     const file = droppedFile(e.dataTransfer);
     if (!file) return;
-    if (!this.newOpen) { this.newOpen = true; this.armNew(); }
+    if (!this.newOpen) {
+      this.newOpen = true; this.armNew(); this.render();
+      this.root.querySelector<HTMLInputElement>('#new-address')?.focus();
+    }
     this.pick(file);
   }
 
