@@ -1,5 +1,6 @@
-// Editor header, top left of the plan: "← Plans", the plan's name, and a ⋯ menu (Rename, Archive, Delete).
+// The top bar's left cluster: "←" (Plans), the plan's name, and a ⋯ menu (Rename, Archive, Delete).
 import { cleanAddress } from './plan-model';
+import { planBarHtml } from './top-bar';
 import { button, card, error, esc, input, splitRow } from './ui';
 
 export interface PlanHeadActions {
@@ -20,10 +21,7 @@ export class PlanHead {
   private menu: HTMLElement;
 
   constructor(root: HTMLElement, private actions: PlanHeadActions) {
-    root.innerHTML = `<div class="plan-bar">${button('←', { mods: ['icon', 'small'], id: 'back-to-plans', ariaLabel: 'Back to Plans' })}`
-      + `<h1 class="plan-title" id="plan-title"></h1>`
-      + `${button('⋯', { mods: ['icon', 'small'], id: 'plan-more', ariaLabel: 'Plan actions', expanded: false })}</div>`
-      + card('', 'plan-menu');
+    root.innerHTML = planBarHtml('') + card('', 'plan-menu');
     this.title = root.querySelector('#plan-title')!;
     this.more = root.querySelector('#plan-more')!;
     this.menu = root.querySelector('.plan-menu')!;

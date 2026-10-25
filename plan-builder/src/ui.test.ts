@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { applyKeypadKey, numericKeypad, type KeypadKey } from './ui';
+import { applyKeypadKey, button, lineIcon, numericKeypad, segmented, type KeypadKey } from './ui';
 import { parseFeet } from './outline';
 
 const type = (keys: KeypadKey[]) => keys.reduce((v, k) => applyKeypadKey(v, k), '');
@@ -36,4 +36,14 @@ describe('numericKeypad', () => {
     expect(html).toContain('data-key="clear"');
     expect(html).toContain('data-key="done"');
   });
+});
+
+describe('title, lineIcon and segmented', () => {
+  test('button carries a title', () => { expect(button('x', { title: 'Undo (⌘Z)' })).toContain('title="Undo (⌘Z)"'); });
+  test('segmented marks the pressed option', () => {
+    const h = segmented('s', 'View', 'view', [{ label: 'A', value: 'a', pressed: true }, { label: 'B', value: 'b', pressed: false }]);
+    expect(h).toMatch(/data-view="a"[^>]*aria-pressed="true"/);
+    expect(h).not.toMatch(/data-view="b"[^>]*aria-pressed/);
+  });
+  test('lineIcon draws the path', () => { expect(lineIcon('M0 0')).toContain('d="M0 0"'); });
 });

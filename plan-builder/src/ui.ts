@@ -13,6 +13,8 @@ export interface ButtonOptions {
   /** A toggle or choice that is on (aria-pressed="true"). */
   pressed?: boolean;
   ariaLabel?: string;
+  /** Tooltip (a shortcut hint, say). */
+  title?: string;
   id?: string;
   /** A button that opens or closes something (aria-expanded="true"/"false"). */
   expanded?: boolean;
@@ -28,7 +30,17 @@ export function button(label: string, o: ButtonOptions = {}): string {
   const cls = [o.variant && o.variant !== 'default' ? o.variant : '', ...(o.mods ?? [])].filter(Boolean).join(' ');
   const data = Object.entries(o.data ?? {}).map(([k, v]) => ` data-${k}="${esc(v)}"`).join('');
   return `<button type="${o.type ?? 'button'}"${o.id ? ` id="${o.id}"` : ''}${cls ? ` class="${cls}"` : ''}${data}`
-    + `${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+    + `${o.expanded !== undefined ? ` aria-expanded="${o.expanded}"` : ''}${o.ariaLabel ? ` aria-label="${esc(o.ariaLabel)}"` : ''}${o.title ? ` title="${esc(o.title)}"` : ''}${o.pressed ? ' aria-pressed="true"' : ''}${o.disabled ? ' disabled' : ''}>${label}</button>`;
+}
+
+/** A 16 px line icon from an SVG path (`d`); sized and stroked by .line-icon. */
+export const lineIcon = (d: string) => `<svg class="line-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" /></svg>`;
+
+export interface SegmentedOption { label: string; value: string; pressed: boolean }
+/** Segmented control: one choice of a few, joined. Each button carries data-<attr>="value". */
+export function segmented(id: string, ariaLabel: string, attr: string, options: SegmentedOption[]): string {
+  return `<div class="segmented" id="${id}" role="group" aria-label="${esc(ariaLabel)}">`
+    + options.map(o => button(o.label, { pressed: o.pressed, data: { [attr]: o.value } })).join('') + '</div>';
 }
 
 /** Text styles. `html` is trusted markup; escape user text with esc() first. */
