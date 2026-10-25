@@ -237,7 +237,11 @@ function setView(v: EditorView) {
 }
 document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => { b.onclick = () => setView(b.dataset.view === 'preview' ? 'preview' : 'edit'); });
 // The tool's own keys (⌘Z, arrows, Escape, Enter…) are off in Preview, while top-bar and sidebar controls keep their keys.
-window.addEventListener('keydown', e => { if (previewing && !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar')) e.stopImmediatePropagation(); }, true);
+window.addEventListener('keydown', e => {
+  // ⌘Z / ⇧⌘Z never act in Preview, wherever focus is (even on the bar); other keys pass inside inputs, the bar and the panel.
+  const history = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z';
+  if (previewing && (history || !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar'))) e.stopImmediatePropagation();
+}, true);
 updateGroups();
 $('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
