@@ -18,7 +18,8 @@ export function drawingCard(t: OutlineTool, o: Outline, swatch: Swatch, subject:
 }
 
 /** A selected layer's actions: a Redraw icon and (unless it's the plot boundary) a trash icon. Square corners moves to the canvas (Task 6); its act stays wired. */
-export const editActions = (deletable: boolean) => layerActions(
+export const editActions = (deletable: boolean, lead = '') => layerActions(
+  lead,
   iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } }),
   deletable ? iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }) : '');
 

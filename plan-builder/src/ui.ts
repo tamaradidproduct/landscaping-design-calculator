@@ -207,7 +207,10 @@ export interface LayerCardOptions {
 export function layerCard(o: LayerCardOptions): string {
   const name = o.rename
     // Looks like a field (underlined) so it's clear the name can be changed right here.
-    ? `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}</label>`
+    ? (() => {
+      const field = `<label class="layer-rename-wrap" title="Rename">${input(o.renameId ?? 'outline-rename', { cls: 'layer-rename', ariaLabel: 'Name', value: o.name })}</label>`;
+      return o.sub ? `<span class="layer-text">${field}<span class="layer-sub">${esc(o.sub)}</span></span>` : field;
+    })()
     : layerName(o.name, o.sub);
   return `<div class="layer-card" data-card="${esc(o.id)}"><div class="layer-head">${swatch(o.swatch)}${name}`
     + `${o.meta ? `<span class="layer-meta">${esc(o.meta)}</span>` : ''}`

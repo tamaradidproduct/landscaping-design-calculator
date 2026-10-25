@@ -1201,6 +1201,11 @@ export class OutlineTool {
     o.radii = o.pts.map(() => feet / c.ftPerPt);
     this.update();
   }
+  /** Each corner's radius in feet (0 for sharp), rounded to 0.01; empty without a scale. */
+  cornerRadiiFt(id: string): number[] {
+    const o = this.outlines[id], c = this.cal; if (!o || !c) return [];
+    return o.pts.map((_, k) => Math.round((o.radii?.[k] ?? 0) * c.ftPerPt * 100) / 100);
+  }
   /** The one radius (feet) every corner of a surface has, or 0 when they differ or are sharp. */
   uniformRadius(id: string): number {
     const o = this.outlines[id], c = this.cal, r = o?.radii; if (!o || !c || !r?.length || r.length !== o.pts.length || r.some(x => x !== r[0])) return 0;

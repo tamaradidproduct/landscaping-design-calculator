@@ -146,6 +146,9 @@ button.layer-row.off { opacity: var(--opacity-layer-off); }
 .layer-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .layer-actions > button { flex: 1 1 auto; }
 .layer-actions > button.icon { flex: none; }
+/* An action row with icon buttons stays on one line; its text button shrinks (ellipsis) instead of wrapping the icons. */
+.layer-actions:has(> button.icon) { flex-wrap: nowrap; }
+.layer-actions:has(> button.icon) > button:not(.icon) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layer-actions > .text-hint { flex: 1 1 auto; align-self: center; }
 /* Nudge arrows in a card: the label on its own line, then the arrows in one row (default button.icon sizing) */
 .layer-body .nudge > .text-hint { flex-basis: 100%; }
