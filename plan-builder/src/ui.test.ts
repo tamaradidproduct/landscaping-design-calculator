@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { applyKeypadKey, button, lineIcon, numericKeypad, segmented, type KeypadKey } from './ui';
+import { applyKeypadKey, button, lineIcon, lucideIcon, numericKeypad, segmented, type KeypadKey } from './ui';
 import { parseFeet } from './outline';
 
 const type = (keys: KeypadKey[]) => keys.reduce((v, k) => applyKeypadKey(v, k), '');
@@ -45,5 +45,6 @@ describe('title, lineIcon and segmented', () => {
     expect(h).toMatch(/data-view="a"[^>]*aria-pressed="true"/);
     expect(h).not.toMatch(/data-view="b"[^>]*aria-pressed/);
   });
+  test('lucideIcon draws a named icon', () => { expect(lucideIcon('settings')).toContain('viewBox="0 0 24 24"'); });
   test('lineIcon draws the path', () => { expect(lineIcon('M0 0')).toContain('d="M0 0"'); });
 });
