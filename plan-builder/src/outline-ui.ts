@@ -642,7 +642,10 @@ export class OutlineTool {
       if (d.touch) d.offsetY = Math.max(d.offsetY, Math.min(GESTURE.touchOffset, (dist(p, d.start) - GESTURE.holdSlop) * 1.5));
       this.rawAt = { x: p.x, y: p.y - d.offsetY };
     }
-    else { this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true; }
+    else {
+      if (!d.moved && this.downFinger && dist(p, this.downFinger) < GESTURE.holdSlop) return;
+      this.rawAt = { x: p.x + d.grab.x, y: p.y + d.grab.y }; d.moved = true;
+    }
     this.applyDrag();
   }
 
