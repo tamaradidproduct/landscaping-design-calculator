@@ -2,6 +2,7 @@
 // Usage: node scripts/check-shape-default.mjs <riesberg.pdf> [url]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
@@ -36,7 +37,7 @@ try {
   await page.keyboard.press('x');
   results.push(['X on the boundary', await pressed()]);
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]');
+  await tap([250, 560]); await setEdgeLength(page, '100');
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   results.push(['First surface starts as', await pressed()]);

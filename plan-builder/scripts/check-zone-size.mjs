@@ -3,7 +3,9 @@
 // Usage: node scripts/check-zone-size.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia } from './lib/add.mjs';
+import { openAdjust } from './lib/adjust.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -33,10 +35,11 @@ const cursor = () => page.$eval('#stage', e => e.style.cursor || 'default');
 try {
   await page.click('[data-start=boundary]');
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); // 0.2 ft/pt
+  await tap([250, 560]); await setEdgeLength(page, '100'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
   await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
   await drag([300, 250], [360, 350]); // 12′ × 20′ (60 × 100 pt), stays selected
+  await openAdjust(page); // the size fields live under Adjust shape and texture
   const sizes = () => page.evaluate(() => [document.querySelector('#zone-width').value, document.querySelector('#zone-depth').value]);
   const box = async () => { const s = await shape('s1'); return `${s.x1 - s.x0} × ${s.y1 - s.y0} pt at (${(s.x0 + s.x1) / 2}, ${(s.y0 + s.y1) / 2})`; };
   results.push(['Card fields', `${await sizes()} · lock pressed ${await page.getAttribute('[data-act=aspect-lock]', 'aria-pressed')} · ${await box()}`]);
@@ -50,7 +53,7 @@ try {
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
   results.push(['⌘Z', `${await sizes()}`]);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-  await page.click('#surfaces [data-zone]'); await page.waitForTimeout(150);
+  await page.click('#surfaces [data-zone]'); await page.waitForTimeout(150); await openAdjust(page);
   results.push(['Reselect: lock resets', await page.getAttribute('[data-act=aspect-lock]', 'aria-pressed')]);
   await page.screenshot({ path: `${outDir}/zone-size.png` });
 } catch (e) { results.push(['STOPPED', e.message.split('\n')[0]]); }

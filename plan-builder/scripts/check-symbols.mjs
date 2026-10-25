@@ -4,6 +4,7 @@
 // Usage: node scripts/check-symbols.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 import { addVia, onSheet } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
@@ -23,7 +24,7 @@ const counts = () => onSheet(page, p => p.$$eval('#layers-sheet .plant-count', c
 const arm = async (id, query = '') => { await addVia(page, 'symbols'); if (query) { await page.fill('#symbol-search', query); await page.waitForTimeout(150); } await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
-  await tap([250, 560]); await page.$eval('#edge-len', (e, v) => { e.value = v; }, '100'); await page.click('.popover button[type=submit]'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
+  await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   // Picker
   await addVia(page, 'symbols'); await page.fill('#symbol-search', 'spruce'); await page.waitForTimeout(150);
   const found = await page.$$eval('#symbol-results [data-symbol]', b => b.map(x => x.textContent.trim()));
@@ -39,8 +40,8 @@ try {
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   check('The Sheet counts them', (await counts()).join() === '2', (await counts()).join());
   // Disarming: the card's ×; and starting a surface while armed
-  await arm('hot-tub'); await page.click('#symbols [data-act=collapse]'); await page.waitForTimeout(150);
-  check('The × on the placing card stops placing', !(await page.$('[data-act=stop-placing]')), 'Done button gone');
+  await arm('hot-tub'); await page.click('#symbols [data-act=stop-placing]'); await page.waitForTimeout(150);
+  check('Done on the placing card stops placing', !(await page.$('[data-act=stop-placing]')), 'Done button gone');
   await arm('hot-tub'); await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await page.waitForTimeout(150);
   await drag([300, 200], [340, 240]);
   check('Starting a surface while armed draws it, and placing stops', !(await page.$('[data-act=stop-placing]')) && (await page.$$('.overlay .shape.surface')).length > 0 && (await images()).length === 2, `${(await images()).length} symbols`);
@@ -50,7 +51,7 @@ try {
   await page.mouse.move(...c0); await page.mouse.down(); await page.mouse.move(c0[0] + 40, c0[1] + 25, { steps: 5 }); await page.mouse.up(); await page.waitForTimeout(250);
   const after = (await images())[0];
   check('Dragging a symbol moves it', Math.abs(after.x - before.x - 40) < 3 && Math.abs(after.y - before.y - 25) < 3, `Δ ${(after.x - before.x).toFixed(0)}, ${(after.y - before.y).toFixed(0)}`);
-  check('Selecting it opens its card', !!(await page.$('#symbols [data-act=rot-up]')), 'rotate buttons shown');
+  check('Selecting a plant opens its card: Delete trash, no rotation', !!(await page.$('#symbols [data-card] [data-act=delete-symbol]')) && !(await page.$('#symbols [data-act=rot-up], #symbol-rotation')), 'plants do not rotate');
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(200);
   check('⌘Z puts it back', Math.abs((await images())[0].x - before.x) < 1, `x ${(await images())[0].x.toFixed(0)}`);
   await page.keyboard.press('Escape');

@@ -39,7 +39,7 @@ results.push(['Tap where they overlap', `selects ${await selectedName()}`]);
 await page.mouse.click(...await toScreen([432, 352])); await page.waitForTimeout(150);
 results.push(['Tap the porch\'s own part', `selects ${await selectedName()}`]);
 await page.screenshot({ path: `${outDir}/overlap.png` });
-await page.click('#outlines [data-act=up]'); await page.waitForTimeout(150);
+await page.keyboard.press('Escape'); await page.focus('#outlines [data-grip=f2]'); await page.keyboard.press('Alt+ArrowUp'); await page.waitForTimeout(150);
 results.push(['Porch ↑ Move up', `house ${await area('f1')} (expect 5600) · porch ${await area('f2')} (expect 2400) · order ${await page.$$eval('#outlines .layer-name, #outlines .layer-rename', e => e.map(x => x.value || x.textContent).join(' > '))}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
 results.push(['⌘Z', `house ${await area('f1')} · porch ${await area('f2')}`]);
