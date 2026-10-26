@@ -3,7 +3,7 @@
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
   edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
-  TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
+  TEX_SCALE, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
@@ -122,6 +122,8 @@ export class OutlineTool {
   /** Hidden layers (by id) and sections: saved with the plan, but not undoable (like the view). */
   hiddenLayers = new Set<string>();
   hiddenSections = new Set<Group>();
+  /** Preview (read-only Sheet view): unassigned surfaces are not painted (see omittedInPreview). */
+  previewing = false;
   /** Plants and objects dropped on the plan. */
   symbols = new SymbolLayer();
   /** The library symbol armed for placing (each tap drops one), or null. */
@@ -1339,7 +1341,7 @@ export class OutlineTool {
     let symbolsDone = false, top = ln.top;
     for (const o of paint) {
       if (!symbolsDone && o.kind !== 'surface') { svg += symbolsMarkup; symbolsDone = true; }
-      if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
+      if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing) || omittedInPreview(o, this.previewing)) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
       // Rectangle in progress: preview the whole rectangle from the first corner to the pointer.

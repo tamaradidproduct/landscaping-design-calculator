@@ -27,9 +27,12 @@ export interface Outline {
   base?: true;
 }
 
-/** Whether a surface counts in quantities, the plant list, the Sheet and Preview: a feature or boundary always does; a surface
- * needs a known material (one drawn without a material stays "Not counted yet" until one is assigned). */
+/** Whether an outline counts toward quantities and the plant list, and appears in the Sheet and Preview: a feature or boundary always
+ * does; a surface needs a known material (until then it is "Not counted yet": hatched in Edit, omitted from Sheet and Preview). */
 export const isAssigned = (o: Outline): boolean => o.kind !== 'surface' || (!!o.material && MATERIALS.some(m => m.id === o.material));
+
+/** Whether the canvas leaves `o` out: in Preview an unassigned surface is omitted (Edit still shows it hatched). */
+export const omittedInPreview = (o: Outline, previewing: boolean): boolean => previewing && !isAssigned(o);
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';

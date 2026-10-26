@@ -18,7 +18,7 @@ import { LinesSection } from './lines-ui';
 import { GROUPS, groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
 import { material } from './materials';
-import type { OutlineShape } from './outline';
+import { isAssigned, type Outline, type OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { planBounds } from './plan-bounds';
@@ -74,10 +74,10 @@ let zoneKey = '';
 /** Each zone's texture repeats at its real-world size: add or drop zone patterns, then resize them to the current zoom and scale. */
 // ftPerPt is per true-shape point, and toScreen applies the stretch correction first: fitScale × zoom is its screen scale.
 const rescalePatterns = () => {
-  const zones = Object.values(tool.outlines).filter(o => o.kind === 'surface' && o.material);
+  const zones = Object.values(tool.outlines).filter((o): o is Outline & { material: string } => o.kind === 'surface' && isAssigned(o));
   const key = zones.map(o => `${o.id}:${o.material}`).join();
-  if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material! }))); }
-  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, { tileFt: material(o.material!).tileFt, texScale: o.texScale ?? 1 }])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
+  if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material }))); }
+  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, { tileFt: material(o.material).tileFt, texScale: o.texScale ?? 1 }])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
 };
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
@@ -235,7 +235,7 @@ function setView(v: EditorView) {
   if (preview === previewing) return;
   previewing = preview; sheetOpen = preview; bar.view = v; updateBar();
   $('layers-edit').hidden = preview; $('layers-sheet').hidden = !preview;
-  applyPlanLook();
+  applyPlanLook(); tool.previewing = preview; tool.render();
   if (preview) { renderSheet($('layers-sheet'), tool); if (page) { editView = view; fitDrawing(); } }
   else { if (page && editView) { applyView(editView, false); renderSharpSoon(0); } editView = null; }
 }

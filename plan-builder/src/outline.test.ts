@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, isAssigned, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, isAssigned, omittedInPreview, type Outline } from './outline';
 import { edgeAt } from './fillet';
 import { MARK } from './overlay-tokens';
 
@@ -365,4 +365,13 @@ describe('isAssigned', () => {
     expect(isAssigned(o('surface', 'no-such-material'))).toBe(false);
   });
   test('features and the boundary are always assigned', () => { expect(isAssigned(o('feature'))).toBe(true); expect(isAssigned(o('boundary'))).toBe(true); });
+});
+
+describe('omittedInPreview', () => {
+  const s: Outline = { id: 's', kind: 'surface', name: 's', pts: [], closed: true };
+  test('an unassigned surface is omitted in Preview only', () => {
+    expect(omittedInPreview(s, true)).toBe(true); expect(omittedInPreview(s, false)).toBe(false);
+    expect(omittedInPreview({ ...s, material: 'sand' }, true)).toBe(false);
+    expect(omittedInPreview({ ...s, kind: 'feature' }, true)).toBe(false);
+  });
 });
