@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, isAssigned, type Outline } from './outline';
 import { edgeAt } from './fillet';
 import { MARK } from './overlay-tokens';
 
@@ -355,4 +355,14 @@ describe('the plot fill in layer order', () => {
     expect(sectionPosition(ids, all, 's1')).toEqual({ first: true, last: false });
     expect(sectionPosition(ids, all, 'fill')).toEqual({ first: true, last: true });
   });
+});
+
+describe('isAssigned', () => {
+  const o = (kind: Outline['kind'], material?: string): Outline => ({ id: 'x', kind, name: 'x', pts: [], closed: true, ...(material ? { material } : {}) });
+  test('a surface needs a known material', () => {
+    expect(isAssigned(o('surface', 'sand'))).toBe(true);
+    expect(isAssigned(o('surface'))).toBe(false);
+    expect(isAssigned(o('surface', 'no-such-material'))).toBe(false);
+  });
+  test('features and the boundary are always assigned', () => { expect(isAssigned(o('feature'))).toBe(true); expect(isAssigned(o('boundary'))).toBe(true); });
 });

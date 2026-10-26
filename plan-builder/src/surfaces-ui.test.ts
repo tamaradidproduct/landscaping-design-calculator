@@ -12,6 +12,12 @@ const tool = (radii: number[]) => ({
 const html = (radii: number[], open: boolean) => surfaceCard(tool(radii), zone, { open, changing: false });
 
 describe('surface card', () => {
+  test('a zone without a material says Not counted yet and shows the hatched swatch', () => {
+    const bare = { ...zone, material: undefined } as unknown as Outline;
+    const h = surfaceCard(tool([0, 0, 0, 0]), bare, { open: false, changing: false });
+    expect(h).toContain('Not counted yet'); expect(h).toContain('url(#unassigned-hatch)');
+    expect(html([0, 0, 0, 0], false)).not.toContain('Not counted yet');
+  });
   test('uniform radius shows its value; mixed shows a Mixed placeholder', () => {
     expect(html([2, 2, 2, 2], true)).toContain('value="2"');
     expect(html([2, 0, 2, 2], true)).toContain('placeholder="Mixed"');

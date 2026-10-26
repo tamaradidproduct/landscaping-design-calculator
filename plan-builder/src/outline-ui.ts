@@ -24,7 +24,7 @@ import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { boxSize, resizeBox, stretchEdge } from './stretch';
 import { DEFAULT_SHAPES, shapeGroup, type ShapePrefs } from './shape-pref';
 import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
-import { zoneFill } from './patterns';
+import { UNASSIGNED_FILL, zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
@@ -52,9 +52,9 @@ export interface ToolHost {
 }
 
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
-const colorOf = (o: Outline) => o.kind === 'surface' ? material(o.material!).edge : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
+const colorOf = (o: Outline) => o.kind === 'surface' ? (o.material ? material(o.material).edge : 'var(--color-feature-stroke)') : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's texture fill (its zone's own pattern), as an inline style addition. */
-const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${zoneFill(o.id)}` : '';
+const fillOf = (o: Outline) => o.kind === 'surface' ? `;fill:${o.material ? zoneFill(o.id) : UNASSIGNED_FILL}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =

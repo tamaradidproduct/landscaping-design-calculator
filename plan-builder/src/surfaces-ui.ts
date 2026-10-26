@@ -3,7 +3,7 @@
 // opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
 import { materialsByFamily, type MaterialId } from './materials';
 import { TEX_SCALE } from './outline';
-import { formatArea, formatFeet, parseFeet, parseRadius, stepTexScale, type Outline } from './outline';
+import { formatArea, formatFeet, parseFeet, parseRadius, stepTexScale, isAssigned, type Outline } from './outline';
 import { radiusDisplay, roundAllRequest } from './card-helpers';
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
@@ -33,7 +33,7 @@ export class SurfacesSection {
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     if (this.adjusting && (this.adjusting !== t.selected || t.drawing)) this.adjusting = null; // collapsed again when the selection changes
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
-      : layerRow(o.name, { swatch: { material: o.material! }, data: { zone: o.id }, grip: !o.base, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
+      : layerRow(o.name, { swatch: { material: o.material }, data: { zone: o.id }, grip: !o.base, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
     this.el.innerHTML = `
       ${rows.join('')}
       ${t.drawing || !t.boundaryClosed ? '' : this.picking
@@ -117,7 +117,7 @@ function texScale(o: Outline): string {
 /** The selected zone's card: the name with its area beneath, the Material button (its swatch; aria-label Change material),
  * Width × Depth, then the closed "Corners and texture" disclosure; Redraw and trash in the header. */
 export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; changing: boolean }): string {
-  const sw = { material: o.material! };
+  const sw = { material: o.material };
   if (o.id === t.drawing) return drawingCard(t, o, sw, o.name.toLowerCase());
   // The swatch lives in the Material button (that's where the material is swapped); the picker opens in its place.
   const change = button(`${swatch(sw)}<span>Material</span>`, { mods: ['compact', 'with-swatch'], ariaLabel: 'Change material', data: { act: 'change-material' } });
@@ -133,6 +133,6 @@ export function surfaceCard(t: OutlineTool, o: Outline, st: { open: boolean; cha
   const area = t.areaSqft(o);
   return layerCard({
     id: o.id, name: o.name, sub: area === null ? undefined : formatArea(area), rename: true, renameId: 'surface-rename',
-    actions: editActions(true), body: `${st.changing ? picker(o.material) : change}${sizeForm(t, o)}${adjust}`,
+    actions: editActions(true), body: `${st.changing ? picker(o.material) : change}${isAssigned(o) ? '' : hint('Not counted yet')}${sizeForm(t, o)}${adjust}`,
   });
 }

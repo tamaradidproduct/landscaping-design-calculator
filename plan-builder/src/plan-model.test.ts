@@ -222,3 +222,15 @@ describe('what the editor saves and loads', () => {
     expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'symbols']);
   });
 });
+
+describe('surfaces without a material', () => {
+  const bare = { id: 's2', kind: 'surface' as const, name: 'Surface', pts: [{ x: 1, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 5 }], closed: true };
+  test('validate and round-trip through toDoc / fromDoc unchanged', () => {
+    const doc = fromDoc(toDoc({ outlines: { s1: surface, s2: bare }, refs: state.refs }, meta));
+    expect(doc.outlines.s2).toEqual(bare); expect('material' in doc.outlines.s2!).toBe(false);
+    expect(doc.outlines.s1!.material).toBe('premium-sod');
+  });
+  test('an unknown material id is still invalid', () => {
+    const d = valid(); d.outlines.s1.material = 'nope'; expect(reasonOf(d)).toBe('invalid');
+  });
+});

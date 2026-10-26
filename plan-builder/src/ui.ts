@@ -2,7 +2,7 @@
 // rely on is written here, so templates elsewhere compose these instead of spelling out markup.
 import { LUCIDE, type LucideName } from './lucide-icons';
 import type { MaterialId } from './materials';
-import { swatchFill } from './patterns';
+import { swatchFill, UNASSIGNED_FILL } from './patterns';
 
 export type ButtonVariant = 'default' | 'primary' | 'danger';
 export interface ButtonOptions {
@@ -157,10 +157,10 @@ export function canvasNudgePad(): string {
 }
 
 /** A layer's swatch: the outline kind's look, or a surface's material (its texture). */
-export type Swatch = 'boundary' | 'feature' | { material: MaterialId } | { symbol: string };
+export type Swatch = 'boundary' | 'feature' | { material?: MaterialId } | { symbol: string };
 export const swatch = (s: Swatch) => typeof s === 'string' ? `<span class="swatch ${s}"></span>`
   : 'symbol' in s ? `<span class="swatch symbol"><img src="${esc(s.symbol)}" alt=""></span>`
-  : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${swatchFill(s.material)}"/></svg></span>`;
+  : `<span class="swatch material"><svg aria-hidden="true"><rect width="100%" height="100%" fill="${s.material ? swatchFill(s.material) : UNASSIGNED_FILL}"/></svg></span>`;
 
 /** Layer row: a swatch for the outline kind, the name, and an optional status (e.g. "Drawing…"). */
 export interface LayerRowOptions {

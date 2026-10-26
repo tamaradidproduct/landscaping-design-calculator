@@ -1,6 +1,6 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
-import type { MaterialId } from './materials';
+import { MATERIALS, type MaterialId } from './materials';
 import { cornerRound } from './shape-edit';
 import { edgeAt, edgeBetween } from './fillet';
 import { MARK } from './overlay-tokens';
@@ -26,6 +26,10 @@ export interface Outline {
   /** The plot fill: the one surface that covers the whole plot and follows the boundary's shape (see plot-fill.ts). */
   base?: true;
 }
+
+/** Whether a surface counts in quantities, the plant list, the Sheet and Preview: a feature or boundary always does; a surface
+ * needs a known material (one drawn without a material stays "Not counted yet" until one is assigned). */
+export const isAssigned = (o: Outline): boolean => o.kind !== 'surface' || (!!o.material && MATERIALS.some(m => m.id === o.material));
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';

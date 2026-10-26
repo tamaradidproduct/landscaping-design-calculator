@@ -1,6 +1,6 @@
 // What the plan contains, for the Plant list: the surfaces used, the lines drawn (length per item), and the plants, objects (stepping
 // stones among them) and utility markers placed with how many of each. Pure.
-import type { Outline } from './outline';
+import { isAssigned, type Outline } from './outline';
 import type { PlacedLine, PlacedSymbol } from './plan-model';
 import { MATERIALS, type Material } from './materials';
 import { LINE_ITEMS, lineItemById, type LineItem } from './line-items';
@@ -18,7 +18,7 @@ export interface PlantList {
 }
 
 export function plantList(symbols: Record<string, PlacedSymbol>, outlines: Record<string, Outline>, lines: Record<string, PlacedLine> = {}, ftPerPt: number | null = null, areas: ReadonlyMap<string, number> | null = null): PlantList {
-  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.closed && o.material).map(o => o.material));
+  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.closed && isAssigned(o)).map(o => o.material));
   const counts = new Map<string, number>();
   for (const s of Object.values(symbols)) if (symbolById(s.symbol)) counts.set(s.symbol, (counts.get(s.symbol) ?? 0) + 1);
   // Library order is family by family; within a family, by name (markers stay in library order: gas, electric, drainage).

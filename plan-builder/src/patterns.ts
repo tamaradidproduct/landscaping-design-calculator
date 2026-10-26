@@ -25,8 +25,17 @@ export function tileSizePx(tileFt: number, ftPerPt: number | null, pxPerPt: numb
 const pattern = (id: string, href: string, px: number) =>
   `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${px}" height="${px}"><image href="${href}" width="${px}" height="${px}" preserveAspectRatio="none"/></pattern>`;
 
-/** The fixed-size swatch <pattern>s for every material (place inside an <svg><defs>). */
-export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.thumb, SWATCH_TILE_PX)).join('');
+/** The one hatched pattern for surfaces with no material yet: neutral tokens only, a fixed size on screen (swatch, card and plan). */
+export const UNASSIGNED_HATCH_ID = 'unassigned-hatch';
+export const UNASSIGNED_FILL = `url(#${UNASSIGNED_HATCH_ID})`;
+const HATCH_PX = 8;
+const hatchPattern = () =>
+  `<pattern id="${UNASSIGNED_HATCH_ID}" patternUnits="userSpaceOnUse" width="${HATCH_PX}" height="${HATCH_PX}" patternTransform="rotate(45)">`
+  + `<rect width="${HATCH_PX}" height="${HATCH_PX}" style="fill:var(--color-feature-fill)"/>`
+  + `<line x1="0" y1="0" x2="0" y2="${HATCH_PX}" style="stroke:var(--color-feature-stroke);stroke-width:2"/></pattern>`;
+
+/** The fixed-size swatch <pattern>s for every material, plus the unassigned hatch (place inside an <svg><defs>). */
+export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.thumb, SWATCH_TILE_PX)).join('') + hatchPattern();
 
 /** One plan <pattern> per zone, at the fallback size until scalePatterns sizes it. */
 export const zonePatternDefs = (zones: { id: string; material: MaterialId }[]): string =>

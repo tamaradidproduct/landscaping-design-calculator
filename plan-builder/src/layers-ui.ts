@@ -96,5 +96,5 @@ export class OutlinesSection {
 }
 
 /** A row's swatch: the outline kind, or a surface's material. */
-const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material! } : o.kind;
+const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material } : o.kind;
 const areaText = (sqft: number | null) => sqft === null ? undefined : formatArea(sqft);
