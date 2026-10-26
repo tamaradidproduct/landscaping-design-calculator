@@ -26,7 +26,7 @@ const tile = id => page.$eval(`#zone-defs pattern#zone-${id}`, p => Number(p.get
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await page.mouse.click(...await toScreen([250, 560])); await page.waitForTimeout(450); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // the scale unlocks + Add
-  await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]'); await drag([280, 180], [520, 400]);
+  await addVia(page, 'surfaces', 'premium-sod'); await drag([280, 180], [520, 400]);
   // Before any scale is set, the texture scale still works (and follows zoom).
   if (await page.$('#surfaces [data-zone=s1]')) await page.click('#surfaces [data-zone=s1]'); // else its card is already open
   await openAdjust(page);
@@ -38,7 +38,7 @@ try {
   check('No scale yet: + still enlarges the texture', Math.abs(u1 / u0 - 1.25) < 0.001, `${u0.toFixed(1)} → ${u1.toFixed(1)}`);
   check('The texture follows zoom', u2 > u1 * 1.1, `${u1.toFixed(1)} → ${u2.toFixed(1)}`);
   await page.click('#surfaces [data-act=tex-reset]'); await page.click('#fit'); await page.keyboard.press('Escape'); await page.waitForTimeout(250);
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=deck-wood]'); await drag([300, 420], [480, 620]); await page.keyboard.press('Escape');
+  await addVia(page, 'surfaces', 'deck-wood'); await drag([300, 420], [480, 620]); await page.keyboard.press('Escape');
   await page.click('#outlines [data-feature=House]'); await drag([400, 200], [500, 300]); await page.keyboard.press('Escape');
 
   // Texture scale (zone s2 = the deck): select it and step.

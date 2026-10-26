@@ -1,10 +1,10 @@
-// The Layers panel's structure: only Outlines until the boundary is closed and the scale set; then + Add with its three pickers,
+// The Layers panel's structure: only Outlines (tool row dimmed) until the boundary is closed and the scale set; then the tool row,
 // sections appearing on their first item in the fixed order, the Edit | Preview switch in the top bar (Undo/Redo there too), and zoom/Fit in the canvas corner.
 // Usage: node scripts/check-panel.mjs <plot-plan.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
 import { setEdgeLength } from './lib/edge.mjs';
-import { addVia } from './lib/add.mjs';
+import { addVia, openTool } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -19,35 +19,35 @@ for (const width of [1180, 820]) {
   const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 792]; }, [x, y]);
   const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(450); };
   const shown = () => page.$$eval('.layer-group:not([hidden])', g => g.map(x => x.id.replace('section-', '')).join(','));
-  const addShown = () => page.evaluate(() => !document.getElementById('add').hidden);
+  const addShown = () => page.evaluate(() => [...document.querySelectorAll('#add .tool')].every(b => !b.classList.contains('dim') && b.getAttribute('aria-disabled') !== 'true'));
   const tag = `${width}px: `;
-  check(tag + 'empty plan shows Outlines only, no Add', (await shown()) === 'outlines' && !(await addShown()), `${await shown()} · add ${await addShown()}`);
+  check(tag + 'empty plan shows Outlines only, tools dimmed', (await shown()) === 'outlines' && !(await addShown()), `${await shown()} · add ${await addShown()}`);
   check(tag + 'hint is "Outline the plot boundary."', (await page.textContent('#outlines')).includes('Outline the plot boundary.'), '');
   check(tag + 'zoom/fit live on the canvas, undo/redo in the top bar, none in the sidebar', await page.evaluate(() => ['zoom-in', 'zoom-out', 'fit'].every(id => document.getElementById(id)?.closest('.canvas-controls') && !document.getElementById(id).closest('#sidebar')) && ['undo', 'redo'].every(id => document.getElementById(id)?.closest('#top-bar'))), '');
   await page.click('[data-start=boundary]');
   const a = await toScreen([250, 150]), b = await toScreen([550, 650]);
   await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(250); await page.keyboard.press('Escape');
-  check(tag + 'closed boundary, no scale: Outlines only, scale hint, no Add', (await shown()) === 'outlines' && !(await addShown()) && (await page.textContent('#outlines')).includes('printed length'), await shown());
+  check(tag + 'closed boundary, no scale: Outlines only, scale hint, tools dimmed', (await shown()) === 'outlines' && !(await addShown()) && (await page.textContent('#outlines')).includes('printed length'), await shown());
   await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape');
-  check(tag + 'scale set: Add appears, empty sections stay hidden', (await addShown()) && (await shown()) === 'outlines', `${await shown()} · add ${await addShown()}`);
-  await page.click('#add-button');
-  check(tag + 'menu lists the three types', (await page.$$eval('#add [data-add]', b => b.map(x => x.dataset.add).join())) === 'symbols,surfaces,lines', '');
-  await page.click('[data-act=cancel-add]');
-  await addVia(page, 'symbols'); check(tag + 'Plant or object opens its picker (section visible while open)', !!(await page.$('#symbol-search')) && (await shown()).startsWith('symbols'), await shown());
-  await page.click('[data-act=cancel-symbol-picker]');
-  check(tag + 'cancelling hides the empty section again', (await shown()) === 'outlines', await shown());
-  await addVia(page, 'lines'); check(tag + 'Edges & walls opens its picker', !!(await page.$('#line-search')), '');
-  await page.click('[data-act=cancel-line-picker]');
-  await addVia(page, 'surfaces'); check(tag + 'Surface opens the material list', !!(await page.$('#surfaces [data-material]')), '');
-  await page.click('[data-act=cancel-picker]');
-  await addVia(page, 'symbols'); await page.click('#symbol-results [data-symbol]'); await tap([350, 300]); await tap([380, 330]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
+  check(tag + 'scale set: tools active, empty sections stay hidden', (await addShown()) && (await shown()) === 'outlines', `${await shown()} · add ${await addShown()}`);
+  check(tag + 'tool row lists Add, Surface, Edge, Plant', (await page.$$eval('#add .tool', b => b.map(x => x.textContent.trim()).join())) === 'Add,Surface,Edge,Plant', '');
+  const popOpen = () => page.evaluate(() => !!document.querySelector('#add .tool-popover'));
+  await openTool(page, 'symbols'); check(tag + 'Plant opens its grid on Plants & objects (no section yet)', (await popOpen()) && (await page.textContent('#add .chip[aria-pressed=true]')) === 'Plants & objects' && (await shown()) === 'outlines', await shown());
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  check(tag + 'Esc closes the grid; empty sections stay hidden', !(await popOpen()) && (await shown()) === 'outlines', await shown());
+  await openTool(page, 'lines'); check(tag + 'Edge opens its grid on Edges & walls', (await page.textContent('#add .chip[aria-pressed=true]')) === 'Edges & walls', '');
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+  await openTool(page, 'surfaces'); check(tag + 'Surface opens the material grid and starts drawing (Surfaces section shown)', (await page.$$eval('#add [data-pick]', c => c.length)) > 0 && (await shown()).startsWith('surfaces'), await shown());
+  await page.keyboard.press('Escape'); await page.waitForTimeout(100); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  check(tag + 'Esc twice: grid closed, draft dropped, section hidden again', !(await popOpen()) && (await shown()) === 'outlines', await shown());
+  await addVia(page, 'symbols', 'blue-diamond-spruce'); await tap([350, 300]); await tap([380, 330]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
   check(tag + 'first plant: Plants & objects appears above Outlines', (await shown()) === 'symbols,outlines', await shown());
   await page.click('.group-head[data-group=symbols]');
   check(tag + 'collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'false', '');
-  await addVia(page, 'symbols');
-  check(tag + 'Add opens a collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'true' && await page.isVisible('#symbol-search'), '');
-  await page.click('[data-act=cancel-symbol-picker]');
-  await addVia(page, 'lines'); await page.click('#line-results [data-line-item]'); await tap([300, 200]); await tap([450, 200]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(200);
+  await addVia(page, 'symbols', 'hot-tub');
+  check(tag + 'picking a plant opens its collapsed section', (await page.getAttribute('.group-head[data-group=symbols]', 'aria-expanded')) === 'true', '');
+  await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
+  await addVia(page, 'lines', 'wood-privacy-fence'); await tap([300, 200]); await tap([450, 200]); await page.click('[data-act=finish-line]'); await page.waitForTimeout(200);
   check(tag + 'first edge: sections in fixed order', (await shown()) === 'symbols,lines,outlines', await shown());
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
   check(tag + '⌘Z undoes (edge gone)', (await shown()) === 'symbols,outlines', await shown());

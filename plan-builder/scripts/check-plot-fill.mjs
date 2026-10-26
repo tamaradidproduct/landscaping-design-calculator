@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
 import { addVia, onSheet } from './lib/add.mjs';
+import { setEdgeLength } from './lib/edge.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -18,23 +19,23 @@ const at = async (fx, fy) => { const r = await pageBox(); return [r[0] + r[2] * 
 const drag = async (a, b) => { await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(300); };
 const listText = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerText.replace(/\n+/g, ' | ')));
 const sqft = async name => { const m = new RegExp(`${name} \\| ([\\d,]+) sq ft`).exec(await listText()); return m ? Number(m[1].replace(/,/g, '')) : null; };
-const lotSqft = async () => Number((await page.$eval('#outlines .layer-sub', e => e.textContent)).replace(/[^\d]/g, ''));
+const lotSqft = async () => { if (!(await page.$('#outlines .layer-sub'))) { await page.click('#outlines [data-layer=boundary]'); await page.waitForTimeout(200); } return Number((await page.$eval('#outlines .layer-sub', e => e.textContent)).replace(/[^\d]/g, '')); };
 const fillPaths = () => page.$$eval('.overlay path[data-id=fill]', p => p.length);
-// The offer is "Fill with surface" on the plot boundary's card (needs the scale); selecting the boundary closes any other card.
+// The offer is "Fill the plot" on the plot boundary's card (needs the scale); selecting the boundary closes any other card.
 const selectBoundary = async () => { if (!(await page.$('#outlines [data-card=boundary]'))) { await page.click('#outlines [data-layer=boundary]'); await page.waitForTimeout(200); } };
 const offerShown = async () => { const sel = await page.$eval('#surfaces [data-card]', c => c.dataset.card).catch(() => null); await selectBoundary(); const shown = !!(await page.$('#outlines [data-act=fill-plot]')); if (sel) await page.click(`#surfaces [data-zone=${sel}]`); else await page.keyboard.press('Escape'); await page.waitForTimeout(150); return shown; };
-const pickFill = async material => { await selectBoundary(); await page.click('#outlines [data-act=fill-plot]'); await page.click(`#outlines [data-fill-material=${material}]`); await page.waitForTimeout(300); };
+const pickFill = async material => { await selectBoundary(); await page.click('#outlines [data-act=fill-plot]'); await page.click(`#outlines [data-pick=${material}]`); await page.waitForTimeout(300); };
 try {
   await page.click('[data-start=boundary]'); await drag(await at(0.3, 0.3), await at(0.8, 0.8)); await page.keyboard.press('Escape');
-  await selectBoundary(); check('Before the lot is scaled, the fill offer is not available', !(await page.$('[data-act=fill-plot]')), 'no Fill with surface yet');
+  await selectBoundary(); check('Before the lot is scaled, the fill offer is not available', !(await page.$('[data-act=fill-plot]')), 'no Fill the plot yet');
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await page.click('[data-layer=boundary]'); await page.waitForTimeout(200);
   const [ex, ey] = await at(0.3, 0.55); await page.mouse.click(ex, ey); await page.waitForTimeout(250);
-  if (await page.$('#edge-len')) { await page.$eval('#edge-len', e => { e.value = '100'; }); await page.click('.popover button[type=submit]'); }
+  await setEdgeLength(page, '100');
   await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   const lot0 = await lotSqft();
   check('The boundary has an area once scaled', lot0 > 1000, `${lot0} sq ft`);
-  check('Once scaled, the plot boundary card offers Fill with surface', await offerShown(), 'offer on the boundary card');
+  check('Once scaled, the plot boundary card offers Fill the plot', await offerShown(), 'offer on the boundary card');
   // Fill
   await pickFill('premium-sod');
   check('Fill the plot… creates one fill, drawn on the plan', (await fillPaths()) >= 1 && !!(await page.$('#surfaces [data-card=fill]')) && !(await offerShown()), `${await fillPaths()} path(s); offer gone`);
@@ -51,7 +52,7 @@ try {
   const lot1 = await lotSqft(), fill1 = await sqft('Premium sod');
   check('Dragging a boundary corner reshapes the fill, and its area follows the lot', lot1 !== lot0 && Math.abs(fill1 - lot1) <= 1 && (await page.$eval('.overlay path[data-id=fill]', p => p.getAttribute('d'))) !== dBefore, `lot ${lot0} → ${lot1}, fill ${fill1} sq ft`);
   // Something on top cuts it
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=deck-wood]');
+  await addVia(page, 'surfaces', 'deck-wood');
   await drag(await at(0.45, 0.4), await at(0.55, 0.5)); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   const deck = await sqft('Deck wood'), fill2 = await sqft('Premium sod');
   check('A zone on the fill is counted and cut out of it', deck > 0 && Math.abs((fill1 - fill2) - deck) <= 2, `deck ${deck}, fill ${fill1} → ${fill2} sq ft`);
@@ -82,7 +83,7 @@ try {
   check('A new fill is drawn even though an earlier one was hidden', (await fillPaths()) >= 1, `${await fillPaths()} path(s)`);
   await page.click('#surfaces [data-act=delete]'); await page.waitForTimeout(300);
   // (the section's eye only shows once a surface exists: draw a small zone so there is one to hide)
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=deck-wood]');
+  await addVia(page, 'surfaces', 'deck-wood');
   await drag(await at(0.45, 0.4), await at(0.5, 0.45)); await page.keyboard.press('Escape'); await page.waitForTimeout(300);
   await page.click('[data-eye-group=surfaces]'); await page.waitForTimeout(200);          // hide the whole Surfaces section
   await pickFill('premium-sod');

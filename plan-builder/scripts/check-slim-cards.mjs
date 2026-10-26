@@ -176,7 +176,7 @@ if (runs('main')) {
   await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
 
   // ---- Surface card ----
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces', 'pavers-classic');
   await drag([400, 200], [500, 300]);
   check('surface card: Width and Depth in the card; Corners and texture collapsed (no #round-all)', !!(await page.$('#surfaces [data-card]')) && !!(await page.$('#zone-width')) && !(await page.$('#round-all')) && (await page.getAttribute('[data-disclosure=adjust]', 'aria-expanded')) === 'false', '');
   check('surface card: no up/down, no Square corners button, no nudge in the card', !(await page.$('#surfaces [data-card] [data-act=up], #surfaces [data-card] [data-act=down], #surfaces [data-card] [data-act=square-all], #surfaces [data-card] .nudge, #surfaces [data-card] .layer-order')), '');
@@ -206,7 +206,7 @@ if (runs('main')) {
   await page.click('#fit'); await page.waitForTimeout(500);
   // Second zone, reorder Surfaces
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces', 'pavers-classic');
   await dragRect([400, 350], [500, 450]);
   const zorder = () => page.$$eval('#surfaces [data-grip]', g => g.map(x => x.dataset.grip).join(','));
   const zidList = (await zorder()).split(',');
@@ -266,7 +266,7 @@ if (runs('main')) {
 
   // ---- Plant and object cards ----
   const images = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, t: x.getAttribute('transform') })));
-  const arm = async id => { await addVia(page, 'symbols'); await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
+  const arm = async id => { await addVia(page, 'symbols', id); await page.waitForTimeout(150); };
   await arm('blue-diamond-spruce'); await tap([300, 520]); await tap([360, 520]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
   await tap([300, 520]);
   check('plant card: opens with prev/next and a Delete trash', !!(await page.$('#symbols [data-card] [data-act=next]')) && (await page.getAttribute('#symbols [data-card] [data-act=delete-symbol]', 'aria-label')) === 'Delete', '');
@@ -379,7 +379,7 @@ if (runs('followup')) {
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
 
     // Surface card: area under the name, swatch in the Material button, Width and Depth in the card
-    await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+    await addVia(page, 'surfaces', 'pavers-classic');
     await drag([400, 200], [500, 300]);
     const card = '#surfaces [data-card]';
     check(tag + 'surface header has no swatch', !!(await page.$(card)) && !(await page.$(`${card} .layer-head .swatch`)), '');
@@ -411,12 +411,12 @@ if (runs('followup')) {
     } else check(tag + "typing 15' on a zone edge resizes it", false, 'no chip on the zone side');
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
     // A second zone: the first one's collapsed row keeps its swatch
-    await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+    await addVia(page, 'surfaces', 'pavers-classic');
     await dragRect([400, 380], [500, 460]);
     check(tag + 'collapsed surface rows keep their swatch', await page.$$eval('#surfaces [data-zone]', rs => rs.length > 0 && rs.every(r => r.querySelector('.swatch.material'))), '');
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
     // Object rotation takes typing
-    await addVia(page, 'symbols'); await page.click('#symbol-results [data-symbol=hot-tub]'); await page.waitForTimeout(150);
+    await addVia(page, 'symbols', 'hot-tub'); await page.waitForTimeout(150);
     await tap([450, 560]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200); await tap([450, 560]);
     await page.click('#symbol-rotation'); await page.keyboard.press('Meta+a'); await page.keyboard.type('30'); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const tf = await page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => x.getAttribute('transform') ?? '').join('|'));

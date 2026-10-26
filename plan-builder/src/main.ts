@@ -163,12 +163,16 @@ function setGroupOpen(g: Group, open: boolean) {
   updateGroups();
 }
 let activeLine: string | null = null; // the line being drawn (its item) or selected — the Lines section opens when it changes
+let activePlacing: string | null = null; // the symbol armed for placing — Plants & objects opens when it changes (its Done is in there)
 function updateGroups() {
   const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
   activeLayer = next;
   const line = tool.lineDraft ? tool.lineDraft.item : tool.selectedLine, lineChanged = line !== null && line !== activeLine;
   activeLine = line;
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
+  const placingChanged = tool.placing !== null && tool.placing !== activePlacing;
+  activePlacing = tool.placing;
+  if (placingChanged && !groupsOpen.symbols) { setGroupOpen('symbols', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
   // Guided unlock: only Outlines until the boundary is closed and the scale set; empty sections stay hidden until their first item.
