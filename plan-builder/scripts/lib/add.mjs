@@ -25,7 +25,7 @@ export async function addVia(page, tool, name) {
   if (id) { await page.click(`#add .tool-popover [data-pick="${id}"]`); return; }
   const cells = await page.$$('#add .tool-popover [data-pick]');
   for (const c of cells) {
-    if ((await c.textContent()).trim().toLowerCase() === name.toLowerCase()) { await c.click(); return; }
+    if ((await c.$eval('span', s => s.textContent)).trim().toLowerCase() === name.toLowerCase()) { await c.click(); return; } // the name span, not the category label
   }
   if (!cells.length) throw new Error(`no match for "${name}"`);
   await cells[0].click();

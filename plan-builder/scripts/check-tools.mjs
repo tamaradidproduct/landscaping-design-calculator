@@ -97,8 +97,12 @@ try {
   // ---- Add: one search over every kind; a query ignores the tag; Recent ----
   await openTool(page, 'add');
   check('Add opens on All', (await pressedTag()) === 'All', await pressedTag());
+  const popH = await page.$eval('#add .tool-popover', e => Math.round(e.getBoundingClientRect().height));
+  check('The popover stays short (the grid scrolls inside it)', popH <= 700, `${popH} px`);
   await page.fill('#tool-search', 'sod'); await page.waitForTimeout(100);
   check('Add finds a material with one query ("sod")', (await picks()).includes('premium-sod'), (await picks()).join());
+  const label = await page.$eval('#add [data-pick=premium-sod] .cell-cat', e => e.textContent).catch(() => '(none)');
+  check('Query results say their category ("Surface")', label === 'Surface', label);
   await page.fill('#tool-search', 'spruce'); await page.waitForTimeout(100);
   check('Add finds a plant with one query ("spruce")', (await picks()).includes('blue-diamond-spruce'), (await picks()).join());
   await page.fill('#tool-search', ''); await page.click('#add .chip[data-tag="Edges & walls"]'); await page.waitForTimeout(100);

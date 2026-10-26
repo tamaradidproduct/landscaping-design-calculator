@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { browse, fillPlotCell, popoverHtml, startTag, toolRowHtml } from './tool-row';
+import { browse, fillPlotCell, popoverHtml, rowTakesEscape, startTag, toolRowHtml } from './tool-row';
 import { searchEntries, type SearchEntry } from './search-index';
 
 const entry = (name: string): SearchEntry => ({ id: name, category: 'surfaces', name, family: 'Lawn', thumb: 'x.png' });
@@ -73,5 +73,34 @@ describe('browse and startTag', () => {
   it('Recent shows a picked entry', () => {
     const id = searchEntries()[0].id;
     expect(browse('add', '', 'Recent', [id]).results.map(x => x.id)).toEqual([id]);
+  });
+});
+
+describe('category labels', () => {
+  const base = { tag: 'All', tags: ['All'] };
+  const mixed: SearchEntry[] = [entry('Sod'), { id: 'm', category: 'symbols', name: 'Maple', family: 'Trees', thumb: 'x.png' }, { id: 'f', category: 'lines', name: 'Fence', family: 'Lines', thumb: 'x.png' }];
+  it('labels each cell with its category when a query is typed', () => {
+    const html = popoverHtml({ ...base, query: 'e', results: mixed });
+    expect(count(html, 'class="text-hint cell-cat"')).toBe(3);
+    expect(html).toContain('>Surface<'); expect(html).toContain('>Plant or object<'); expect(html).toContain('>Edge or wall<');
+  });
+  it('shows no labels while browsing (no query, or only spaces)', () => {
+    expect(popoverHtml({ ...base, query: '', results: mixed })).not.toContain('cell-cat');
+    expect(popoverHtml({ ...base, query: '  ', results: mixed })).not.toContain('cell-cat');
+  });
+});
+
+describe('rowTakesEscape', () => {
+  const el = (sel: string | null) => ({ closest: (s: string) => (sel && s.split(', ').includes(sel) ? {} : null) }) as unknown as EventTarget;
+  const row = (inside: boolean) => ({ contains: () => inside });
+  it('takes Esc from the page and from its own search field', () => {
+    expect(rowTakesEscape({ defaultPrevented: false, target: el(null) }, row(false))).toBe(true);
+    expect(rowTakesEscape({ defaultPrevented: false, target: el('input') }, row(true))).toBe(true);
+  });
+  it('leaves Esc to fields, menus and card grids outside the row, and to handled events', () => {
+    expect(rowTakesEscape({ defaultPrevented: false, target: el('input') }, row(false))).toBe(false);
+    expect(rowTakesEscape({ defaultPrevented: false, target: el('[role=menu]') }, row(false))).toBe(false);
+    expect(rowTakesEscape({ defaultPrevented: false, target: el('.tool-popover') }, row(false))).toBe(false);
+    expect(rowTakesEscape({ defaultPrevented: true, target: el(null) }, row(true))).toBe(false);
   });
 });

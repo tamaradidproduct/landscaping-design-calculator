@@ -32,7 +32,7 @@ try {
   const k = await pxPerPt();
   // Edge tool
   await openTool(page, 'lines'); await page.fill('#tool-search', 'fence'); await page.waitForTimeout(150);
-  const found = await page.$$eval('#add [data-pick]', x => x.map(i => i.textContent.trim()));
+  const found = await page.$$eval('#add [data-pick] span:first-of-type', x => x.map(i => i.textContent.trim()));
   check('Search "fence" finds the privacy fence first', found.length >= 1 && found[0] === 'Wood privacy fence', found.join(', '));
   await page.click('#add [data-pick=wood-privacy-fence]'); await page.waitForTimeout(150);
   check('Picking one starts drawing', !!(await page.$('[data-act=finish-line]')), 'Done button shown');
