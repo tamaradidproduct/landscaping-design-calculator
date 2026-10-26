@@ -27,9 +27,13 @@ export function searchEntries(): SearchEntry[] {
 
 export function tagsFor(category: Category | 'all'): string[] {
   if (category === 'all') return ['All', 'Recent', ...CATEGORY_TAGS.map(t => t.tag)];
-  const families: string[] = [];
-  for (const e of searchEntries()) if (e.category === category && !families.includes(e.family)) families.push(e.family);
-  return ['All', 'Recent', ...families];
+  // Lines have one family, so their tags are the line items themselves.
+  const tags: string[] = [];
+  for (const e of searchEntries()) {
+    const t = category === 'lines' ? e.name : e.family;
+    if (e.category === category && !tags.includes(t)) tags.push(t);
+  }
+  return ['All', 'Recent', ...tags];
 }
 
 export function search(query: string, tag: string, entries: SearchEntry[], recent: string[]): SearchEntry[] {
@@ -40,10 +44,12 @@ export function search(query: string, tag: string, entries: SearchEntry[], recen
     return [...byName, ...byFamily];
   }
   if (tag === 'All') return [...entries];
-  if (tag === 'Recent') return recent.flatMap(id => entries.find(e => e.id === id) ?? []);
+  if (tag === 'Recent') return cleanRecent(recent).flatMap(id => entries.find(e => e.id === id) ?? []);
   const cat = CATEGORY_TAGS.find(t => t.tag === tag);
-  return cat ? entries.filter(e => e.category === cat.category) : entries.filter(e => e.family === tag);
+  return cat ? entries.filter(e => e.category === cat.category) : entries.filter(e => e.family === tag || (e.category === 'lines' && e.name === tag));
 }
+
+const cleanRecent = (r: string[], limit = 8): string[] => [...new Set(r)].slice(0, limit);
 
 export function pushRecent(recent: string[], id: string, limit = 8): string[] {
   return [id, ...recent.filter(x => x !== id)].slice(0, limit);
@@ -52,7 +58,7 @@ export function pushRecent(recent: string[], id: string, limit = 8): string[] {
 export function loadRecent(): string[] {
   try {
     const v: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    return Array.isArray(v) ? cleanRecent(v.filter((x): x is string => typeof x === 'string')) : [];
   } catch { return []; }
 }
 

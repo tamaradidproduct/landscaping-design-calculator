@@ -21,7 +21,38 @@ describe('tagsFor', () => {
   });
 });
 
+describe('tagsFor lines and symbols', () => {
+  it('lines: the line item names', () => {
+    const names = entries.filter(x => x.category === 'lines').map(x => x.name);
+    expect(names).toHaveLength(5);
+    expect(tagsFor('lines')).toEqual(['All', 'Recent', ...names]);
+  });
+  it('symbols: unique families', () => {
+    const t = tagsFor('symbols').slice(2);
+    expect(t.length).toBeGreaterThan(0);
+    expect(new Set(t).size).toBe(t.length);
+    expect(t.every(f => entries.some(x => x.category === 'symbols' && x.family === f))).toBe(true);
+  });
+});
+
 describe('search', () => {
+  it('a line-name tag returns just that line', () => {
+    const r = search('', 'Dry river', entries, []);
+    expect(r.map(x => x.name)).toEqual(['Dry river']);
+  });
+  it('Edges & walls returns every line', () => {
+    expect(search('', 'Edges & walls', entries, [])).toHaveLength(5);
+  });
+  it('a query matching a line or symbol ignores a category tag', () => {
+    expect(search('dry river', 'Surfaces', entries, []).map(x => x.name)).toContain('Dry river');
+    const sym = entries.find(x => x.category === 'symbols')!;
+    expect(search(sym.name, 'Surfaces', entries, []).map(x => x.id)).toContain(sym.id);
+  });
+  it('Recent de-duplicates and caps at 8', () => {
+    const list = Array.from({ length: 10 }, (_, i) => e(`i${i}`, 'symbols', `N${i}`, 'F'));
+    expect(search('', 'Recent', list, ['i0', 'i0', 'i1']).map(x => x.id)).toEqual(['i0', 'i1']);
+    expect(search('', 'Recent', list, list.map(x => x.id))).toHaveLength(8);
+  });
   it('a query ignores the tag', () => {
     const r = search('sod', 'Pavers & stone', entries, []);
     expect(r.map(x => x.name)).toContain('Premium sod');
@@ -70,6 +101,12 @@ describe('loadRecent / saveRecent', () => {
     saveRecent(['a', 'b']);
     expect(store['recent-picks']).toBe('["a","b"]');
     expect(loadRecent()).toEqual(['a', 'b']);
+  });
+  it('de-duplicates and caps a corrupt stored list', () => {
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(['a', 'a', 'b']), setItem() {} });
+    expect(loadRecent()).toEqual(['a', 'b']);
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify(Array.from({ length: 12 }, (_, i) => `x${i}`)), setItem() {} });
+    expect(loadRecent()).toHaveLength(8);
   });
   it('ignores junk', () => {
     vi.stubGlobal('localStorage', { getItem: () => '{"x":1}', setItem() {} });
