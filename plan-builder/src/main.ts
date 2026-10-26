@@ -194,7 +194,8 @@ document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => { 
 document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
   b.onclick = () => setGroupOpen(b.dataset.group as Group, !groupsOpen[b.dataset.group as Group]);
 });
-surfaces = new SurfacesSection($('surfaces'), tool);
+// Close shape on a zone without a material opens the grid in its card, so the tool row's popover steps aside.
+surfaces = new SurfacesSection($('surfaces'), tool, () => toolRow.close());
 surfaces.render();
 linesSection = new LinesSection($('lines'), tool);
 linesSection.render();

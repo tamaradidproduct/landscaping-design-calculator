@@ -296,6 +296,8 @@ button.tool.dim { opacity: var(--opacity-disabled); }
 button.grid-cell { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); min-height: var(--control-md); padding: var(--space-2); text-align: left; font-size: var(--text-sm); }
 button.grid-cell img { display: block; width: 100%; height: 84px; object-fit: cover; border-radius: var(--radius-sm); background: var(--color-bg); }
 button.grid-cell span { overflow-wrap: anywhere; }
+button.grid-cell[aria-current="true"] { border-color: var(--color-accent); }
+.fill-plot { display: flex; flex-direction: column; gap: var(--space-4); }
 /* Tags sit in one horizontally scrolling row so they never stack in the 280 px panel. */
 .tool-popover .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-2); }
 .tool-popover .chips button.chip { flex: none; min-height: var(--control-md); padding: 0 var(--space-5); white-space: nowrap; }

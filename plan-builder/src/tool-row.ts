@@ -26,12 +26,14 @@ export function toolRowHtml(o: { active: ToolId | null; ready: boolean }): strin
   return `<div class="tool-row" role="toolbar" aria-label="Add to the plan">${tools.join('')}</div>`;
 }
 
-export function popoverHtml(o: { query: string; tag: string; tags: string[]; results: SearchEntry[]; hint?: string }): string {
+/** The search field, tag chips and picture grid. `inputId` and `placeholder` let a second copy (a surface card's material
+ * grid) live beside the tool row's; `current` marks the entry already in use. */
+export function popoverHtml(o: { query: string; tag: string; tags: string[]; results: SearchEntry[]; hint?: string; inputId?: string; placeholder?: string; current?: string }): string {
   const chips = o.tags.map(t => `<button type="button" class="chip" data-tag="${esc(t)}" aria-pressed="${t === o.tag}">${esc(t)}</button>`).join('');
   const body = o.results.length
-    ? `<div class="tool-grid">${o.results.map(r => `<button type="button" class="grid-cell" data-pick="${esc(r.id)}"><img src="${esc(r.thumb)}" alt="" loading="lazy"><span>${esc(r.name)}</span></button>`).join('')}</div>`
+    ? `<div class="tool-grid">${o.results.map(r => `<button type="button" class="grid-cell" data-pick="${esc(r.id)}"${r.id === o.current ? ' aria-current="true"' : ''}><img src="${esc(r.thumb)}" alt="" loading="lazy"><span>${esc(r.name)}</span></button>`).join('')}</div>`
     : `<p class="text-hint">${esc(o.hint ?? 'No matches.')}</p>`;
-  return `<div class="tool-popover"><input id="tool-search" type="search" placeholder="Search surfaces, plants, edges" aria-label="Search" value="${esc(o.query)}" autocomplete="off"><div class="chips">${chips}</div>${body}</div>`;
+  return `<div class="tool-popover"><input id="${o.inputId ?? 'tool-search'}" type="search" placeholder="${esc(o.placeholder ?? 'Search surfaces, plants, edges')}" aria-label="Search" value="${esc(o.query)}" autocomplete="off"><div class="chips">${chips}</div>${body}</div>`;
 }
 
 export class ToolRow {

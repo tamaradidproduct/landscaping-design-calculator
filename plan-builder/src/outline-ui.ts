@@ -486,6 +486,7 @@ export class OutlineTool {
     this.update();
   }
   cancel() {
+    this.pendingMaterial = null; // a material armed for the next surface is dropped with the drawing
     if (!this.drawing) return;
     this.record();
     if (this.replaced) this.outlines[this.drawing] = this.replaced; else delete this.outlines[this.drawing];
