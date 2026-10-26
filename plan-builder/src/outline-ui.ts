@@ -3,7 +3,7 @@
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
   edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
-  TEX_SCALE, isAssigned, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
+  TEX_SCALE, isAssigned, duplicable, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
@@ -453,6 +453,27 @@ export class OutlineTool {
     this.selected = FILL_ID; this.selectedCorner = null; this.selectedEdge = null;
     this.host.toast('Plot fill added. It follows the plot boundary.');
     this.update();
+  }
+  /** Copy a custom outline's shape (points, bends, corner radii) into a new surface with no material, placed above the other
+   * surfaces and selected; the outline stays. One undo step. Null for the House, the boundary, a surface or an unknown id. */
+  duplicateAsSurface(id: string): string | null {
+    const o = this.outlines[id];
+    if (!o || !duplicable(o) || !this.boundaryClosed || this.drawing) return null;
+    this.record();
+    const sid = this.nextSurfaceId();
+    const copy: Outline = {
+      id: sid, kind: 'surface', name: `Surface ${sid.slice(1)}`, closed: true, pts: o.pts.map(p => ({ ...p })),
+      ...(o.bulges ? { bulges: [...o.bulges] } : {}), ...(o.radii ? { radii: [...o.radii] } : {}),
+    };
+    const keys = Object.keys(this.outlines), top = keys.findIndex(k => this.outlines[k]!.kind === 'surface');
+    keys.splice(top < 0 ? keys.length : top, 0, sid);
+    this.outlines = Object.fromEntries(keys.map(k => [k, k === sid ? copy : this.outlines[k]!]));
+    this.hiddenLayers.delete(sid); this.hiddenSections.delete('surfaces'); // a new zone is shown, as a drawn one is
+    this.placing = null; this.selectedSymbol = null; this.clearLines();
+    this.selected = sid; this.selectedCorner = null; this.selectedEdge = null;
+    this.host.toast(`${o.name} duplicated as a surface. Pick its material.`);
+    this.update();
+    return sid;
   }
   /** Change a surface's material; a zone still named after its old material takes the new name. */
   setMaterial(id: string, m: MaterialId) {

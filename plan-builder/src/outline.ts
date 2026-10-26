@@ -78,6 +78,10 @@ export function sectionPosition(ids: string[], outlines: Record<string, Outline>
 }
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The House: the feature named House (any case). It is not duplicated as a surface. */
+export const isHouse = (o: Outline): boolean => o.kind === 'feature' && sameName(o.name, 'House');
+/** A custom outline (a closed feature other than the House) can be duplicated as a surface. */
+export const duplicable = (o: Outline): boolean => o.kind === 'feature' && o.closed && !isHouse(o);
 /** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,
  * and quick-pick names not used yet. */
 export function outlineSuggestions(outlines: Outline[]): { boundary: boolean; features: string[]; picks: string[] } {

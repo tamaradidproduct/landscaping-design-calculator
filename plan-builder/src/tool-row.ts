@@ -26,12 +26,16 @@ export function toolRowHtml(o: { active: ToolId | null; ready: boolean }): strin
   return `<div class="tool-row" role="toolbar" aria-label="Add to the plan">${tools.join('')}</div>`;
 }
 
+/** The Surface grid's first cell once the plot can be filled: it opens the plot boundary's Fill the plot grid. */
+export const fillPlotCell = (): string =>
+  `<button type="button" class="grid-cell fill-cell" data-act="fill-plot">${lucideIcon('surface')}<span>Fill the plot</span></button>`;
+
 /** The search field, tag chips and picture grid. `inputId` and `placeholder` let a second copy (a surface card's material
- * grid) live beside the tool row's; `current` marks the entry already in use. */
-export function popoverHtml(o: { query: string; tag: string; tags: string[]; results: SearchEntry[]; hint?: string; inputId?: string; placeholder?: string; current?: string }): string {
+ * grid) live beside the tool row's; `current` marks the entry already in use; `lead` is a cell put first (Fill the plot). */
+export function popoverHtml(o: { query: string; tag: string; tags: string[]; results: SearchEntry[]; hint?: string; inputId?: string; placeholder?: string; current?: string; lead?: string }): string {
   const chips = o.tags.map(t => `<button type="button" class="chip" data-tag="${esc(t)}" aria-pressed="${t === o.tag}">${esc(t)}</button>`).join('');
-  const body = o.results.length
-    ? `<div class="tool-grid">${o.results.map(r => `<button type="button" class="grid-cell" data-pick="${esc(r.id)}"${r.id === o.current ? ' aria-current="true"' : ''}><img src="${esc(r.thumb)}" alt="" loading="lazy"><span>${esc(r.name)}</span></button>`).join('')}</div>`
+  const body = o.results.length || o.lead
+    ? `<div class="tool-grid">${o.lead ?? ''}${o.results.map(r => `<button type="button" class="grid-cell" data-pick="${esc(r.id)}"${r.id === o.current ? ' aria-current="true"' : ''}><img src="${esc(r.thumb)}" alt="" loading="lazy"><span>${esc(r.name)}</span></button>`).join('')}</div>`
     : `<p class="text-hint">${esc(o.hint ?? 'No matches.')}</p>`;
   return `<div class="tool-popover"><input id="${o.inputId ?? 'tool-search'}" type="search" placeholder="${esc(o.placeholder ?? 'Search surfaces, plants, edges')}" aria-label="Search" value="${esc(o.query)}" autocomplete="off"><div class="chips">${chips}</div>${body}</div>`;
 }
@@ -44,8 +48,10 @@ export class ToolRow {
   private hint = '';
   private recent: string[] = [];
 
-  /** `pick` gets the tapped cell's entry; `onOpen` runs when a tool opens (Surface starts drawing at once). */
-  constructor(private el: HTMLElement, private pick: (e: SearchEntry) => void, private onOpen?: (tool: ToolId) => void) {
+  /** `pick` gets the tapped cell's entry; `onOpen` runs when a tool opens (Surface starts drawing at once); `fill` puts
+   * Fill the plot first in the Surface grid while `available()` (no query typed) and runs `open` when it is tapped. */
+  constructor(private el: HTMLElement, private pick: (e: SearchEntry) => void, private onOpen?: (tool: ToolId) => void,
+    private fill?: { available: () => boolean; open: () => void }) {
   }
 
   /** Esc closes the popover from anywhere while a tool is active. */
@@ -88,7 +94,8 @@ export class ToolRow {
     if (this.active) {
       const { tags, results } = browse(this.active, this.query, this.tag, this.recent);
       const hint = this.tag === 'Recent' && !this.query.trim() ? 'Nothing picked yet. Your recent picks show here.' : 'No matches.';
-      pop = popoverHtml({ query: this.query, tag: this.tag, tags, results, hint });
+      const lead = this.active === 'surfaces' && !this.query.trim() && this.fill?.available() ? fillPlotCell() : undefined;
+      pop = popoverHtml({ query: this.query, tag: this.tag, tags, results, hint, lead });
     }
     this.el.innerHTML = toolRowHtml({ active: this.active, ready: this.ready }) + (this.hint ? `<p class="text-hint tool-hint" role="status">${esc(this.hint)}</p>` : '') + pop;
     this.el.querySelectorAll<HTMLButtonElement>('.tool').forEach(b => { b.onclick = () => (this.active === b.dataset.tool ? this.close() : this.open(b.dataset.tool as ToolId)); });
@@ -96,6 +103,8 @@ export class ToolRow {
     this.el.querySelectorAll<HTMLButtonElement>('[data-pick]').forEach(b => {
       b.onclick = () => { const e = searchEntries().find(x => x.id === b.dataset.pick); if (!e) return; this.close(); this.pick(e); };
     });
+    const fillCell = this.el.querySelector<HTMLButtonElement>('.tool-popover [data-act=fill-plot]');
+    if (fillCell) fillCell.onclick = () => { this.close(); this.fill?.open(); };
     const input = this.el.querySelector<HTMLInputElement>('#tool-search');
     if (input) {
       input.oninput = () => { this.query = input.value; this.render(); };

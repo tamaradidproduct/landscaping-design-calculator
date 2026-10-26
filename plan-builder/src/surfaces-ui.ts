@@ -52,6 +52,9 @@ export class SurfacesSection {
   constructor(private el: HTMLElement, private tool: OutlineTool, private onGridOpen?: () => void) {}
 
   private openGrid(id: string) { this.changing = id; this.grid = newGrid(); }
+  private pendingGrid: string | null = null; // a zone that opens its grid at the next render (Duplicate as surface)
+  /** Open the material grid in a new unassigned zone's card, as Close shape does (Duplicate as surface). */
+  openGridFor(id: string) { this.pendingGrid = id; this.render(); }
 
   render() {
     const t = this.tool;
@@ -60,7 +63,9 @@ export class SurfacesSection {
     const closed = this.lastDrawing && !t.drawing && t.selected === this.lastDrawing ? t.outlines[this.lastDrawing] : undefined;
     this.lastDrawing = t.drawing;
     let opened = false;
-    if (closed?.kind === 'surface' && closed.closed && !isAssigned(closed)) { this.openGrid(closed.id); opened = true; }
+    const fresh = closed ?? (this.pendingGrid && t.selected === this.pendingGrid && !t.drawing ? t.outlines[this.pendingGrid] : undefined);
+    this.pendingGrid = null;
+    if (fresh?.kind === 'surface' && fresh.closed && !isAssigned(fresh)) { this.openGrid(fresh.id); opened = true; }
     if (!t.boundaryClosed && !zones.length) { this.el.innerHTML = ''; return; }
     if (this.changing && (this.changing !== t.selected || t.drawing)) this.changing = null; // the grid closes with the card
     if (this.adjusting && (this.adjusting !== t.selected || t.drawing)) this.adjusting = null; // collapsed again when the selection changes

@@ -201,7 +201,7 @@ linesSection = new LinesSection($('lines'), tool);
 linesSection.render();
 symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
-outlines = new OutlinesSection($('outlines'), tool);
+outlines = new OutlinesSection($('outlines'), tool, id => surfaces?.openGridFor(id)); // Duplicate as surface opens the new zone's grid
 outlines.render();
 // Tool row + search popover. Surface starts drawing as soon as it is tapped; a pick is recorded as Recent and routed by its
 // category: a material goes to the surface being drawn (else arms the next one), a plant or object arms placing, a line item
@@ -211,7 +211,9 @@ const toolRow = new ToolRow($('add'), entry => {
   if (entry.category === 'surfaces') tool.pickMaterial(entry.id as MaterialId);
   else if (entry.category === 'symbols') tool.startPlacing(entry.id);
   else tool.startLine(entry.id);
-}, t => { if (t === 'surfaces') tool.startSurfaceDrawing(); });
+}, t => { if (t === 'surfaces') tool.startSurfaceDrawing(); },
+// Fill the plot leads the Surface grid while the plot can be filled; it opens the boundary card's grid (the draft is dropped).
+{ available: () => tool.fillable && !!tool.cal, open: () => outlines?.openFill() });
 // Edit | Preview (top bar): Preview is the read-only sheet view of the same data. It hides the plot plan for display only
 // (previewing, never planVisible), fits the drawn plan, and switches the drawing tools off until Edit returns.
 let sheetOpen = false;

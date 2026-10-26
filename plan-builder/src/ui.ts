@@ -128,9 +128,10 @@ export const emptyNote = (text: string) => `<p class="plans-empty">${esc(text)}<
 export const listRow = (id: string, children: string[], state?: 'editing' | 'confirming' | 'archived') =>
   `<div class="plan-row${state ? ` ${state}` : ''}" data-id="${esc(id)}">${children.join('')}</div>`;
 
-export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace';
+export type IconName = 'trash' | 'info' | 'more' | 'chevron-left' | 'chevron-right' | 'replace' | 'copy';
 const ICON_PATHS: Record<IconName, string> = {
   trash: '<path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.5 7v4M9.5 7v4" />',
+  copy: '<rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path d="M10.5 5.5V4A1.5 1.5 0 0 0 9 2.5H4A1.5 1.5 0 0 0 2.5 4v5A1.5 1.5 0 0 0 4 10.5h1.5" />',
   info: '<circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.1" />',
   more: '<circle cx="3.5" cy="8" r=".6" /><circle cx="8" cy="8" r=".6" /><circle cx="12.5" cy="8" r=".6" />',
   'chevron-left': '<path d="M10 3L5 8l5 5" />',

@@ -17,9 +17,11 @@ export function drawingCard(t: OutlineTool, o: Outline, swatch: Swatch, subject:
     button('Cancel', { mods: compact, data: { act: 'cancel' } }))}` });
 }
 
-/** A selected layer's header actions: a Redraw icon and (unless it's the plot boundary) a trash icon. (Square corners is a floating canvas button, not part of the card.) */
-export const editActions = (deletable: boolean) =>
+/** A selected layer's header actions: a Redraw icon, Duplicate as surface (a custom outline only) and (unless it's the plot
+ * boundary) a trash icon. (Square corners is a floating canvas button, not part of the card.) */
+export const editActions = (deletable: boolean, duplicable = false) =>
   iconButton('replace', { ariaLabel: 'Redraw', data: { act: 'redraw' } })
+  + (duplicable ? iconButton('copy', { ariaLabel: 'Duplicate as surface', data: { act: 'duplicate-surface' } }) : '')
   + (deletable ? iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete' } }) : '');
 
 /**

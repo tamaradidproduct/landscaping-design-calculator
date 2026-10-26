@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { browse, popoverHtml, startTag, toolRowHtml } from './tool-row';
+import { browse, fillPlotCell, popoverHtml, startTag, toolRowHtml } from './tool-row';
 import { searchEntries, type SearchEntry } from './search-index';
 
 const entry = (name: string): SearchEntry => ({ id: name, category: 'surfaces', name, family: 'Lawn', thumb: 'x.png' });
@@ -38,6 +38,13 @@ describe('popoverHtml', () => {
     const html = popoverHtml({ ...base, results: [entry('<b>')] });
     expect(html).not.toContain('<b>');
     expect(html).toContain('&lt;b&gt;');
+  });
+  it('puts a lead cell (Fill the plot) first in the grid, even with no results', () => {
+    const lead = fillPlotCell();
+    const html = popoverHtml({ ...base, results: [entry('Sod')], lead });
+    expect(html.indexOf('data-act="fill-plot"')).toBeLessThan(html.indexOf('data-pick="Sod"'));
+    expect(html).toContain('Fill the plot');
+    expect(popoverHtml({ ...base, results: [], lead })).toContain('data-act="fill-plot"');
   });
   it('shows the hint when there are no results', () => {
     const html = popoverHtml({ ...base, results: [], hint: 'Nothing here yet' });
