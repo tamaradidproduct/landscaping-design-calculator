@@ -105,13 +105,13 @@ if (runs('main')) {
   await selectRow('Driveway');
   const body = await page.$$eval('#outlines [data-card] .layer-body > *', e => e.map(x => x.className));
   const headActs = await page.$$eval('#outlines [data-card] .layer-head .layer-head-actions > button', e => e.map(x => x.getAttribute('aria-label')));
-  check('outline card: header carries Redraw and Delete, no body row', body.length === 0 && headActs.join() === 'Redraw,Delete', `${body.join()} | ${headActs.join()}`);
+  check('outline card: header carries Redraw, Duplicate as surface and Delete, no body row', body.length === 0 && headActs.join() === 'Redraw,Duplicate as surface,Delete', `${body.join()} | ${headActs.join()}`);
   check('outline card: no nudge arrows, no layer order, no nudge pad', !(await page.$('#outlines [data-card] .nudge, #outlines [data-card] .layer-order, #outlines [data-card] .nudge-pad, #outlines [data-card] [data-nudge]')), '');
   check('outline card: no up/down/square-all controls, no Square corners button', !(await page.$('#outlines [data-card] [data-act=up], #outlines [data-card] [data-act=down], #outlines [data-card] [data-act=square-all]')) && !(await page.$('#sidebar [aria-label="Square corners"]')), '');
   const redraw = await page.$('#outlines [data-card] [data-act=redraw]');
   check('outline card: Redraw is an icon button labelled Redraw', !!redraw && (await redraw.getAttribute('aria-label')) === 'Redraw' && (await redraw.innerText()).trim() === '', redraw ? await redraw.getAttribute('aria-label') : 'missing');
   check('outline card: the word "Redo" appears nowhere in the card', !/Redo/.test(await page.$eval('#outlines [data-card]', e => `${e.innerText} ${e.innerHTML}`)), '');
-  check('panel Undo/Redo ids unchanged on the canvas', await page.evaluate(() => ['undo', 'redo'].every(id => document.getElementById(id)?.closest('.canvas-controls'))), '');
+  check('Undo/Redo ids unchanged, in the top bar', await page.evaluate(() => ['undo', 'redo'].every(id => document.getElementById(id)?.closest('#top-bar'))), '');
   const trash = await page.$('#outlines [data-card] [data-act=delete]');
   check('feature card: trash labelled Delete', !!trash && (await trash.getAttribute('aria-label')) === 'Delete', '');
   await page.screenshot({ path: `${outDir}/slim-outline-card.png` });
@@ -435,7 +435,7 @@ if (runs('followup')) {
     check(tag + 'the handle follows the panel edge', Math.abs(((await rect(page, h)).l + (await rect(page, h)).w / 2) - (await rect(page, '#sidebar')).l) <= 1, '');
     await tap([250, 400]); await page.waitForTimeout(300);
     const sb = await rect(page, '#sidebar'), st = await rect(page, '#stage');
-    for (const id of ['#square-corners', '#zoom-in', '#fit', '#undo', '#redo']) {
+    for (const id of ['#square-corners', '#zoom-in', '#fit']) { // Undo/Redo live in the top bar now (check-top-bar)
       const r = await rect(page, id); if (r.hidden) continue;
       check(tag + `after widening, ${id} sits inside the stage, clear of the panel`, inside(r, st) && !overlap(r, sb), JSON.stringify(r));
     }
@@ -475,7 +475,7 @@ if (runs('followup')) {
     await page.click('[data-start=boundary]'); await dragRect([250, 150], [550, 650]);
     await tap([250, 400]); await page.waitForTimeout(300);
     const sb = await rect(page, '#sidebar'), st = await rect(page, '#stage');
-    for (const id of ['#square-corners', '#zoom-in', '#zoom-out', '#fit', '#undo', '#redo', '#plan-head']) {
+    for (const id of ['#square-corners', '#zoom-in', '#zoom-out', '#fit']) { // Undo/Redo and the plan name live in the top bar now
       const r = await rect(page, id); if (r.hidden) continue;
       check(tag + `${id} inside the stage, clear of the panel`, inside(r, st) && !overlap(r, sb), JSON.stringify(r));
     }
