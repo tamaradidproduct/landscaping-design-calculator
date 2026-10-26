@@ -18,7 +18,7 @@ import { panelState, visibleGroups } from './panel-state';
 import { LinesSection } from './lines-ui';
 import { GROUPS, groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
-import { material } from './materials';
+import { material, type MaterialId } from './materials';
 import { isAssigned, type Outline, type OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
@@ -174,7 +174,7 @@ function updateGroups() {
   // Guided unlock: only Outlines until the boundary is closed and the scale set; empty sections stay hidden until their first item.
   const state = panelState({ boundaryClosed: tool.boundaryClosed, scaleSet: !!tool.cal, placed: counts.symbols + counts.lines + counts.surfaces });
   const shown = new Set(visibleGroups(state, counts));
-  const busy: Record<Group, boolean> = { symbols: !!tool.placing || !!symbolsSection?.pickerOpen, lines: !!tool.lineDraft || !!linesSection?.pickerOpen, surfaces: !!surfaces?.pickerOpen || (!!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface'), outlines: true };
+  const busy: Record<Group, boolean> = { symbols: !!tool.placing, lines: !!tool.lineDraft, surfaces: !!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface', outlines: true };
   for (const g of GROUPS) $(`section-${g}`).hidden = !shown.has(g) && !busy[g];
   toolRow.setReady(state === 'ready');
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
@@ -202,8 +202,15 @@ symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
 outlines = new OutlinesSection($('outlines'), tool);
 outlines.render();
-// Tool row + search popover. Picks are only recorded as Recent for now (routing to the section pickers comes with the next task).
-const toolRow = new ToolRow($('add'), entry => { saveRecent(pushRecent(loadRecent(), entry.id)); });
+// Tool row + search popover. Surface starts drawing as soon as it is tapped; a pick is recorded as Recent and routed by its
+// category: a material goes to the surface being drawn (else arms the next one), a plant or object arms placing, a line item
+// starts that line. Each of these cancels a draft of another kind first.
+const toolRow = new ToolRow($('add'), entry => {
+  saveRecent(pushRecent(loadRecent(), entry.id));
+  if (entry.category === 'surfaces') tool.pickMaterial(entry.id as MaterialId);
+  else if (entry.category === 'symbols') tool.startPlacing(entry.id);
+  else tool.startLine(entry.id);
+}, t => { if (t === 'surfaces') tool.startSurfaceDrawing(); });
 // Edit | Preview (top bar): Preview is the read-only sheet view of the same data. It hides the plot plan for display only
 // (previewing, never planVisible), fits the drawn plan, and switches the drawing tools off until Edit returns.
 let sheetOpen = false;
@@ -238,7 +245,6 @@ window.addEventListener('keydown', e => {
   if (previewing && (history || !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar'))) e.stopImmediatePropagation();
 }, true);
 updateGroups();
-$('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
 // Dev only: size of the plan document as it would be saved (outlines + refs + small fixed metadata); scripts assert it stays small.
 if (import.meta.env.DEV) (window as unknown as { __planBytes: unknown }).__planBytes = () =>

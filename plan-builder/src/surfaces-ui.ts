@@ -1,6 +1,6 @@
 // The Layers panel's Surfaces section: the new work (hardscape and softscape zones), above Outlines. One row per
-// zone in layer order (a higher zone cuts the ones below; outlines cut every zone), then "Add surface…", which
-// opens a material picker; picking a material starts drawing. The zone being drawn or selected expands into a card.
+// zone in layer order (a higher zone cuts the ones below; outlines cut every zone). New zones start from the tool row's
+// Surface tool (tool-row.ts). The zone being drawn or selected expands into a card.
 import { materialsByFamily, type MaterialId } from './materials';
 import { TEX_SCALE } from './outline';
 import { formatArea, formatFeet, parseFeet, parseRadius, stepTexScale, isAssigned, type Outline } from './outline';
@@ -8,48 +8,34 @@ import { radiusDisplay, roundAllRequest } from './card-helpers';
 import { stepRadius } from './shape-edit';
 import type { OutlineTool } from './outline-ui';
 import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
-import { button, caption, disclosure, esc, field, formStack, hint, iconButton, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
+import { button, caption, disclosure, esc, field, formStack, hint, iconButton, input, layerCard, layerRow, row, swatch } from './ui';
 
-/** Every material as a list, grouped by family under a caption; `current` is marked. */
+/** Every material as a list, grouped by family under a caption; `current` is marked (the card's Change material, Fill the plot). */
 export const picker = (current?: MaterialId) => materialsByFamily().map(({ family, materials }) => `${caption(family)}<div class="layer-list material-list">${materials.map(m =>
   button(`${swatch({ material: m.id })}<span class="layer-name">${esc(m.name)}</span>`, { mods: ['layer-row', ...(m.id === current ? ['selected'] : [])], pressed: m.id === current, data: { material: m.id } })).join('')}</div>`).join('');
 
 export class SurfacesSection {
-  private picking = false; // the material picker for a new zone is open
   private changing: string | null = null; // the zone whose material picker is open in its card
   private adjusting: string | null = null; // the zone whose "Corners and texture" disclosure is open
 
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
 
-  get pickerOpen() { return this.picking; }
-  /** The global Add menu's "Surface": open the material picker (adding a zone closes the selected one's card). */
-  openPicker() { this.picking = true; if (this.tool.selected) this.tool.selectOutline(null); else this.render(); }
-
   render() {
     const t = this.tool;
     const zones = Object.values(t.outlines).filter(o => o.kind === 'surface');
-    if (!t.boundaryClosed && !zones.length) { this.picking = false; this.el.innerHTML = ''; return; }
-    if (t.drawing || !t.boundaryClosed) this.picking = false;
+    if (!t.boundaryClosed && !zones.length) { this.el.innerHTML = ''; return; }
     if (this.changing && this.changing !== t.selected) this.changing = null; // the picker closes with the card
     if (this.adjusting && (this.adjusting !== t.selected || t.drawing)) this.adjusting = null; // collapsed again when the selection changes
     const rows = zones.map(o => o.id === t.drawing || (!t.drawing && o.id === t.selected) ? this.card(o)
       : layerRow(o.name, { swatch: { material: o.material }, data: { zone: o.id }, grip: !o.base, eye: { id: o.id, hidden: t.isHidden(o.id) } }));
-    this.el.innerHTML = `
-      ${rows.join('')}
-      ${t.drawing || !t.boundaryClosed ? '' : this.picking
-        ? layerForm(`${picker()}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-picker' } })}`)
-        : ''}`;
+    this.el.innerHTML = rows.join('');
 
     this.el.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach(b => {
       b.onclick = () => { const id = b.dataset.zone!; t.selectOutline(id !== t.selected ? id : null); };
     });
-    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     this.el.querySelectorAll<HTMLButtonElement>('[data-eye]').forEach(b => { b.onclick = () => t.toggleLayer(b.dataset.eye!); });
     const card = this.el.querySelector<HTMLElement>('[data-card]');
-    // The picker's chips start a new zone; the card's chips change that zone's material.
-    this.el.querySelectorAll<HTMLButtonElement>('.layer-form [data-material]').forEach(b => {
-      b.onclick = () => t.startSurface(b.dataset.material as MaterialId);
-    });
+    // The card's chips change that zone's material.
     card?.querySelectorAll<HTMLButtonElement>('[data-material]').forEach(b => { b.onclick = () => { this.changing = null; t.setMaterial(card.dataset.card!, b.dataset.material as MaterialId); this.render(); }; });
     wireReorder(this.el, t);
     this.el.querySelector('form')?.addEventListener('submit', e => e.preventDefault());

@@ -42,7 +42,8 @@ export class ToolRow {
   private hint = '';
   private recent: string[] = [];
 
-  constructor(private el: HTMLElement, private pick: (e: SearchEntry) => void) {
+  /** `pick` gets the tapped cell's entry; `onOpen` runs when a tool opens (Surface starts drawing at once). */
+  constructor(private el: HTMLElement, private pick: (e: SearchEntry) => void, private onOpen?: (tool: ToolId) => void) {
   }
 
   /** Esc closes the popover from anywhere while a tool is active. */
@@ -66,6 +67,7 @@ export class ToolRow {
     this.recent = loadRecent();
     this.render();
     this.el.querySelector<HTMLInputElement>('#tool-search')?.focus();
+    this.onOpen?.(tool);
   }
 
   close() {

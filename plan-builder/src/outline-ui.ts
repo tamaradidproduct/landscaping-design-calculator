@@ -3,7 +3,7 @@
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
   edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
-  TEX_SCALE, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
+  TEX_SCALE, isAssigned, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
@@ -213,7 +213,7 @@ export class OutlineTool {
     this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
     this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
     this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id] || this.lines.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
-    this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
+    this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null; this.pendingMaterial = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
@@ -407,9 +407,38 @@ export class OutlineTool {
   /** Draw a new surface (zone) of a material; its name starts as the material's. */
   startSurface(m: MaterialId) {
     if (!this.boundaryClosed) return;
-    let n = 1;
-    while (this.outlines[`s${n}`]) n++;
-    this.begin(`s${n}`, 'surface', material(m).name, m);
+    this.begin(this.nextSurfaceId(), 'surface', material(m).name, m);
+  }
+  private nextSurfaceId() { let n = 1; while (this.outlines[`s${n}`]) n++; return `s${n}`; }
+  /** A material picked before any shape takes it: the next surface drawn (or closed without one) gets it. */
+  pendingMaterial: MaterialId | null = null;
+  /** The Surface tool: start drawing a new surface right away, before a material is chosen ("Surface N" until one is).
+   * A pending material is used (and consumed); a new surface already being drawn is kept rather than restarted. */
+  startSurfaceDrawing() {
+    if (!this.boundaryClosed) return;
+    const d = this.drawing ? this.outlines[this.drawing] : null;
+    if (d?.kind === 'surface' && !this.replaced) return;
+    const id = this.nextSurfaceId(), m = this.pendingMaterial;
+    this.pendingMaterial = null;
+    this.begin(id, 'surface', m ? material(m).name : `Surface ${id.slice(1)}`, m ?? undefined);
+  }
+  /** A material picked from the grid: it goes to the surface being drawn, else to a just-closed surface without one,
+   * else it is kept as pending and a new surface starts drawing with it. One undo step. */
+  pickMaterial(m: MaterialId) {
+    if (!material(m)) return;
+    const d = this.drawing ? this.outlines[this.drawing] : null;
+    if (d?.kind === 'surface') {
+      if (d.material === m) return;
+      this.record();
+      if (!d.material || d.name === material(d.material).name) d.name = material(m).name;
+      d.material = m;
+      this.update();
+      return;
+    }
+    const sel = this.selected ? this.outlines[this.selected] : null;
+    if (sel?.kind === 'surface' && sel.closed && !isAssigned(sel)) { this.setMaterial(sel.id, m); return; }
+    this.pendingMaterial = m;
+    this.startSurfaceDrawing();
   }
   /** True once the plot is outlined and not yet filled: Fill the plot… is offered. */
   get fillable() { return this.boundaryClosed && !this.hasFill; }
@@ -485,6 +514,8 @@ export class OutlineTool {
     // A redrawn outline's edges are new: lengths typed for the old ones no longer apply.
     const isNew = !this.replaced;
     if (this.replaced) this.refs = this.refs.filter(r => r.id !== o.id);
+    if (o.kind === 'surface' && !o.material && this.pendingMaterial) { o.material = this.pendingMaterial; o.name = material(o.material).name; }
+    if (o.kind === 'surface') this.pendingMaterial = null;
     o.closed = true; this.drawing = null; this.replaced = null; this.selected = o.id; // stays selected for adjusting
     o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
     // New layers go to the bottom (so higher ones cut them), except one drawn wholly inside another: it goes

@@ -1,33 +1,17 @@
-// The Layers panel's Plants & objects section: one row per kind of plant or object placed ("Blue Diamond Spruce × 3", with an eye), then
-// "Add…", which opens a picker (search, then the families as lists); picking one arms placing: each tap on the plan drops one until Done.
+// The Layers panel's Plants & objects section: one row per kind of plant or object placed ("Blue Diamond Spruce × 3", with an eye).
+// Picking one from the tool row's grid (tool-row.ts) arms placing: each tap on the plan drops one until Done.
 // The selected symbol's row opens into a card with its size, stepping and Delete (Rotate for objects).
-import { button, caption, esc, hint, iconButton, inlineHint, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
+import { button, esc, hint, iconButton, inlineHint, input, layerCard, layerRow, row } from './ui';
 import { instanceLabel } from './card-helpers';
 import type { OutlineTool } from './outline-ui';
 import { stepRotation } from './symbol-layer';
-import { searchSymbols, symbolById, symbolFamilies, type LibrarySymbol } from './symbols';
-
-const pickerRow = (s: LibrarySymbol) => button(`${swatch({ symbol: s.thumb })}<span class="layer-name">${esc(s.name)}</span>`, { mods: ['layer-row'], data: { symbol: s.id } });
-/** The picker's list for a query: families as captions with a row per symbol, or a note when nothing matches. */
-export function pickerList(query: string): string {
-  const found = new Set(searchSymbols(query).map(s => s.id));
-  const groups = symbolFamilies().map(g => ({ family: g.family, symbols: g.symbols.filter(s => found.has(s.id)) })).filter(g => g.symbols.length);
-  return groups.length ? groups.map(g => `${caption(esc(g.family))}<div class="layer-list symbol-list">${g.symbols.map(pickerRow).join('')}</div>`).join('') : hint('No plant or object matches.');
-}
+import { symbolById } from './symbols';
 
 export class SymbolsSection {
-  private picking = false;   // the picker for a new symbol is open
-  private query = '';
-
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
-
-  get pickerOpen() { return this.picking; }
-  /** The global Add menu's "Plant or object": open the picker. */
-  openPicker() { this.picking = true; this.query = ''; this.tool.deselect(); this.render(); this.el.querySelector<HTMLInputElement>('#symbol-search')?.focus(); }
 
   render() {
     const t = this.tool, sel = t.selectedSymbol ? t.symbols.placed[t.selectedSymbol] : null;
-    if (t.placing || sel) this.picking = false;
     const groups = t.symbols.groups();
     const rows = groups.map(g => {
       const lib = symbolById(g.symbol)!, hidden = g.ids.every(id => t.hiddenLayers.has(id)) || t.hiddenSections.has('symbols');
@@ -39,10 +23,7 @@ export class SymbolsSection {
     this.el.innerHTML = `
       ${placing ? layerCard({ id: placing.id, swatch: { symbol: placing.thumb }, name: placing.name,
         body: `${hint('Placing: tap the plan to drop one. Drag to move the plan. Done or Esc stops.')}${button('Done', { mods: ['compact'], data: { act: 'stop-placing' } })}` }) : ''}
-      ${rows.join('')}${card}
-      ${placing ? '' : this.picking
-        ? layerForm(`${input('symbol-search', { placeholder: 'Search plants and objects', ariaLabel: 'Search plants and objects', value: this.query })}<div id="symbol-results">${pickerList(this.query)}</div>${button('Cancel', { mods: ['compact'], data: { act: 'cancel-symbol-picker' } })}`)
-        : ''}`;
+      ${rows.join('')}${card}`;
     this.wire(sel?.id ?? null);
   }
 
@@ -76,13 +57,7 @@ export class SymbolsSection {
         t.selectSymbol(cur < 0 ? ids[0] : cur + 1 < ids.length ? ids[cur + 1] : null);
       };
     });
-    el.querySelector<HTMLButtonElement>('[data-act=cancel-symbol-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     el.querySelector<HTMLButtonElement>('[data-act=stop-placing]')?.addEventListener('click', () => t.stopPlacing());
-    const bindPicker = () => el.querySelectorAll<HTMLButtonElement>('#symbol-results [data-symbol]').forEach(b => { b.onclick = () => { this.picking = false; t.startPlacing(b.dataset.symbol!); }; });
-    bindPicker();
-    const search = el.querySelector<HTMLInputElement>('#symbol-search');
-    if (search) search.oninput = () => { this.query = search.value; el.querySelector('#symbol-results')!.innerHTML = pickerList(this.query); bindPicker(); };
-    el.querySelector('form.layer-form')?.addEventListener('submit', e => e.preventDefault());
     const card = el.querySelector<HTMLElement>('[data-card]');
     // Tapping the head (not its buttons) closes the card, like tapping the row again.
     card?.querySelector<HTMLElement>('.layer-head')?.addEventListener('click', e => {
