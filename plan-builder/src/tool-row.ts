@@ -11,6 +11,14 @@ const TOOLS: readonly { id: ToolId; label: string; icon: LucideName; category: C
   { id: 'lines', label: 'Edge', icon: 'edge', category: 'lines' },
   { id: 'symbols', label: 'Plant', icon: 'plant', category: 'symbols' },
 ];
+/** The tag a tool opens on: Add browses everything, the others their own category tag. */
+export const startTag = (tool: ToolId): string => TOOLS.find(t => t.id === tool)!.category === 'all' ? 'All' : tagsFor(TOOLS.find(t => t.id === tool)!.category)[2];
+
+/** What the popover shows. A typed query searches every entry (whatever the tool); with none, the tag narrows the browse. */
+export function browse(tool: ToolId, query: string, tag: string, recent: string[]): { tags: string[]; results: SearchEntry[] } {
+  return { tags: tagsFor(TOOLS.find(t => t.id === tool)!.category), results: search(query, tag, searchEntries(), recent) };
+}
+
 const DIM_HINT = 'Outline the plot and set the scale first, then add items.';
 
 export function toolRowHtml(o: { active: ToolId | null; ready: boolean }): string {
@@ -35,37 +43,48 @@ export class ToolRow {
   private recent: string[] = [];
 
   constructor(private el: HTMLElement, private pick: (e: SearchEntry) => void) {
-    el.addEventListener('keydown', e => { if (e.key === 'Escape' && this.active) { e.stopPropagation(); this.close(); } });
   }
+
+  /** Esc closes the popover from anywhere while a tool is active. */
+  private onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); this.close(); } };
 
   setReady(ready: boolean) {
     if (ready === this.ready && this.el.childElementCount) return;
     this.ready = ready;
-    if (!ready) this.active = null;
+    if (!ready) this.dismiss();
     this.hint = '';
     this.render();
   }
 
   open(tool: ToolId) {
-    if (!this.ready) { this.active = null; this.hint = DIM_HINT; this.render(); return; }
-    const t = TOOLS.find(x => x.id === tool)!;
-    this.active = tool; this.hint = ''; this.query = ''; this.tag = 'All'; // a category tool browses only its own category, so its All is the category tag the brief names this.recent = loadRecent();
+    if (!this.ready) { this.dismiss(); this.hint = DIM_HINT; this.render(); return; }
+    if (!this.active) document.addEventListener('keydown', this.onKey, true);
+    this.active = tool;
+    this.hint = '';
+    this.query = '';
+    this.tag = startTag(tool);
+    this.recent = loadRecent();
     this.render();
     this.el.querySelector<HTMLInputElement>('#tool-search')?.focus();
   }
 
-  close() { this.active = null; this.hint = ''; this.render(); this.el.querySelector<HTMLButtonElement>('.tool[data-tool]')?.blur(); }
+  close() {
+    const was = this.active;
+    this.dismiss();
+    this.render();
+    if (was) this.el.querySelector<HTMLButtonElement>(`.tool[data-tool=${was}]`)?.focus();
+  }
+
+  private dismiss() { this.active = null; this.hint = ''; document.removeEventListener('keydown', this.onKey, true); }
 
   private render() {
     const inputFocused = document.activeElement?.id === 'tool-search';
     const pos = (document.activeElement as HTMLInputElement | null)?.selectionStart ?? null;
-    const t = TOOLS.find(x => x.id === this.active);
     let pop = '';
-    if (t) {
-      const entries = searchEntries().filter(e => t.category === 'all' || e.category === t.category);
-      const results = search(this.query, this.tag, entries, this.recent);
+    if (this.active) {
+      const { tags, results } = browse(this.active, this.query, this.tag, this.recent);
       const hint = this.tag === 'Recent' && !this.query.trim() ? 'Nothing picked yet. Your recent picks show here.' : 'No matches.';
-      pop = popoverHtml({ query: this.query, tag: this.tag, tags: tagsFor(t.category), results, hint });
+      pop = popoverHtml({ query: this.query, tag: this.tag, tags, results, hint });
     }
     this.el.innerHTML = toolRowHtml({ active: this.active, ready: this.ready }) + (this.hint ? `<p class="text-hint tool-hint" role="status">${esc(this.hint)}</p>` : '') + pop;
     this.el.querySelectorAll<HTMLButtonElement>('.tool').forEach(b => { b.onclick = () => (this.active === b.dataset.tool ? this.close() : this.open(b.dataset.tool as ToolId)); });

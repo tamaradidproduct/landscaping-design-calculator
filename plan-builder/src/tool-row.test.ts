@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { popoverHtml, toolRowHtml } from './tool-row';
-import type { SearchEntry } from './search-index';
+import { browse, popoverHtml, startTag, toolRowHtml } from './tool-row';
+import { searchEntries, type SearchEntry } from './search-index';
 
 const entry = (name: string): SearchEntry => ({ id: name, category: 'surfaces', name, family: 'Lawn', thumb: 'x.png' });
 const count = (html: string, s: string) => html.split(s).length - 1;
@@ -43,5 +43,28 @@ describe('popoverHtml', () => {
     const html = popoverHtml({ ...base, results: [], hint: 'Nothing here yet' });
     expect(html).toContain('Nothing here yet');
     expect(html).not.toContain('grid-cell');
+  });
+});
+
+describe('browse and startTag', () => {
+  const cats = (r: SearchEntry[]) => new Set(r.map(x => x.category));
+  it('Surface opens on the Surfaces tag and shows only surfaces on an empty query', () => {
+    expect(startTag('surfaces')).toBe('Surfaces');
+    const { results, tags } = browse('surfaces', '', startTag('surfaces'), []);
+    expect(tags.slice(0, 3)).toEqual(['All', 'Recent', 'Surfaces']);
+    expect([...cats(results)]).toEqual(['surfaces']);
+  });
+  it('Plant and Edge open on their category tags; Add on All', () => {
+    expect(startTag('symbols')).toBe('Plants & objects');
+    expect(startTag('lines')).toBe('Edges & walls');
+    expect(startTag('add')).toBe('All');
+  });
+  it('a typed query searches every category even from a category tool', () => {
+    const { results } = browse('surfaces', 'pine', 'Surfaces', []);
+    expect(cats(results).has('symbols')).toBe(true);
+  });
+  it('Recent shows a picked entry', () => {
+    const id = searchEntries()[0].id;
+    expect(browse('add', '', 'Recent', [id]).results.map(x => x.id)).toEqual([id]);
   });
 });

@@ -33,7 +33,7 @@ export function tagsFor(category: Category | 'all'): string[] {
     const t = category === 'lines' ? e.name : e.family;
     if (e.category === category && !tags.includes(t)) tags.push(t);
   }
-  return ['All', 'Recent', ...tags];
+  return ['All', 'Recent', CATEGORY_TAGS.find(t => t.category === category)!.tag, ...tags];
 }
 
 export function search(query: string, tag: string, entries: SearchEntry[], recent: string[]): SearchEntry[] {

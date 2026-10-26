@@ -16,8 +16,8 @@ describe('searchEntries', () => {
 describe('tagsFor', () => {
   it('all', () => expect(tagsFor('all')).toEqual(['All', 'Recent', 'Surfaces', 'Plants & objects', 'Edges & walls']));
   it('surfaces ends with the six material families', () => {
-    expect(tagsFor('surfaces').slice(0, 2)).toEqual(['All', 'Recent']);
-    expect(tagsFor('surfaces').slice(2)).toEqual(['Turf & seed', 'Mulch & soil', 'Rock & gravel', 'Pavers & stone', 'Concrete', 'Decking']);
+    expect(tagsFor('surfaces').slice(0, 3)).toEqual(['All', 'Recent', 'Surfaces']);
+    expect(tagsFor('surfaces').slice(3)).toEqual(['Turf & seed', 'Mulch & soil', 'Rock & gravel', 'Pavers & stone', 'Concrete', 'Decking']);
   });
 });
 
@@ -25,13 +25,22 @@ describe('tagsFor lines and symbols', () => {
   it('lines: the line item names', () => {
     const names = entries.filter(x => x.category === 'lines').map(x => x.name);
     expect(names).toHaveLength(5);
-    expect(tagsFor('lines')).toEqual(['All', 'Recent', ...names]);
+    expect(tagsFor('lines')).toEqual(['All', 'Recent', 'Edges & walls', ...names]);
   });
   it('symbols: unique families', () => {
-    const t = tagsFor('symbols').slice(2);
+    const t = tagsFor('symbols').slice(3);
     expect(t.length).toBeGreaterThan(0);
     expect(new Set(t).size).toBe(t.length);
     expect(t.every(f => entries.some(x => x.category === 'symbols' && x.family === f))).toBe(true);
+  });
+});
+
+describe('category tag', () => {
+  it('each category list carries its category tag third, and that tag returns the whole category', () => {
+    for (const [c, tag] of [['surfaces', 'Surfaces'], ['symbols', 'Plants & objects'], ['lines', 'Edges & walls']] as const) {
+      expect(tagsFor(c)[2]).toBe(tag);
+      expect(search('', tag, entries, []).every(x => x.category === c)).toBe(true);
+    }
   });
 });
 
