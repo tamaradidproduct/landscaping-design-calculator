@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { MATERIALS, material } from './materials';
-import { MIN_TILE_PX, SWATCH_TILE_PX, UNSCALED_TILE_PT, patternDefs, scalePatterns, swatchFill, tileSizePx, zoneFill, zonePatternDefs } from './patterns';
+import { MIN_TILE_PX, SWATCH_TILE_PX, UNASSIGNED_FILL, UNASSIGNED_HATCH_ID, UNSCALED_TILE_PT, patternDefs, scalePatterns, swatchFill, tileSizePx, zoneFill, zonePatternDefs } from './patterns';
 
 describe('tileSizePx', () => {
   test('tile feet × texture scale ÷ feet per point × screen px per point', () => {
@@ -14,6 +14,15 @@ describe('tileSizePx', () => {
       expect(tileSizePx(10, ft, 2, 3)).toBe(UNSCALED_TILE_PT * 2 * 3);
       expect(tileSizePx(10, ft, 4)).toBe(UNSCALED_TILE_PT * 4);
     }
+  });
+});
+
+describe('unassigned hatch', () => {
+  test('is one static pattern in the swatch defs, coloured by tokens only', () => {
+    const defs = patternDefs();
+    expect(defs).toContain(`id="${UNASSIGNED_HATCH_ID}"`); expect(defs).toContain('var(--color-');
+    expect(defs).not.toMatch(/#[0-9a-fA-F]{3,6}/);
+    expect(UNASSIGNED_FILL).toBe(`url(#${UNASSIGNED_HATCH_ID})`);
   });
 });
 

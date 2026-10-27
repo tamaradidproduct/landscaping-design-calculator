@@ -12,13 +12,14 @@ import { canvasNudgePad } from './ui';
 import { nudgePadVisible } from './card-helpers';
 import { wireSidebarResize } from './sidebar-resize';
 import { renderSheet } from './sheet-ui';
-import { AddMenu, type AddType } from './add-menu';
+import { ToolRow } from './tool-row';
+import { loadRecent, pushRecent, saveRecent } from './search-index';
 import { panelState, visibleGroups } from './panel-state';
 import { LinesSection } from './lines-ui';
 import { GROUPS, groupCounts, groupToOpen, readOpen, type Group } from './sections';
 import { patternDefs, scalePatterns, zonePatternDefs } from './patterns';
-import { material } from './materials';
-import type { OutlineShape } from './outline';
+import { material, type MaterialId } from './materials';
+import { isAssigned, type Outline, type OutlineShape } from './outline';
 import { loadShapes, shapeGroup, shapeKey } from './shape-pref';
 import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './scale';
 import { planBounds } from './plan-bounds';
@@ -85,10 +86,10 @@ let zoneKey = '';
 /** Each zone's texture repeats at its real-world size: add or drop zone patterns, then resize them to the current zoom and scale. */
 // ftPerPt is per true-shape point, and toScreen applies the stretch correction first: fitScale × zoom is its screen scale.
 const rescalePatterns = () => {
-  const zones = Object.values(tool.outlines).filter(o => o.kind === 'surface' && o.material);
+  const zones = Object.values(tool.outlines).filter((o): o is Outline & { material: string } => o.kind === 'surface' && isAssigned(o));
   const key = zones.map(o => `${o.id}:${o.material}`).join();
-  if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material! }))); }
-  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, { tileFt: material(o.material!).tileFt, texScale: o.texScale ?? 1 }])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
+  if (key !== zoneKey) { zoneKey = key; zoneDefs.innerHTML = zonePatternDefs(zones.map(o => ({ id: o.id, material: o.material }))); }
+  scalePatterns(zoneDefs, new Map(zones.map(o => [o.id, { tileFt: material(o.material).tileFt, texScale: o.texScale ?? 1 }])), tool.cal?.ftPerPt ?? null, fitScale * view.scale, { x: view.x, y: view.y });
 };
 const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
@@ -173,20 +174,24 @@ function setGroupOpen(g: Group, open: boolean) {
   updateGroups();
 }
 let activeLine: string | null = null; // the line being drawn (its item) or selected — the Lines section opens when it changes
+let activePlacing: string | null = null; // the symbol armed for placing — Plants & objects opens when it changes (its Done is in there)
 function updateGroups() {
   const next = tool.drawing ?? tool.selected, open = groupToOpen(activeLayer, next, tool.outlines);
   activeLayer = next;
   const line = tool.lineDraft ? tool.lineDraft.item : tool.selectedLine, lineChanged = line !== null && line !== activeLine;
   activeLine = line;
   if (lineChanged && !groupsOpen.lines) { setGroupOpen('lines', true); return; }
+  const placingChanged = tool.placing !== null && tool.placing !== activePlacing;
+  activePlacing = tool.placing;
+  if (placingChanged && !groupsOpen.symbols) { setGroupOpen('symbols', true); return; }
   if (open && !groupsOpen[open]) { setGroupOpen(open, true); return; }
   const counts = groupCounts(Object.values(tool.outlines), Object.keys(tool.symbols.placed).length, Object.keys(tool.lines.placed).length);
   // Guided unlock: only Outlines until the boundary is closed and the scale set; empty sections stay hidden until their first item.
   const state = panelState({ boundaryClosed: tool.boundaryClosed, scaleSet: !!tool.cal, placed: counts.symbols + counts.lines + counts.surfaces });
   const shown = new Set(visibleGroups(state, counts));
-  const busy: Record<Group, boolean> = { symbols: !!tool.placing || !!symbolsSection?.pickerOpen, lines: !!tool.lineDraft || !!linesSection?.pickerOpen, surfaces: !!surfaces?.pickerOpen || (!!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface'), outlines: true };
+  const busy: Record<Group, boolean> = { symbols: !!tool.placing, lines: !!tool.lineDraft, surfaces: !!tool.drawing && tool.outlines[tool.drawing]?.kind === 'surface', outlines: true };
   for (const g of GROUPS) $(`section-${g}`).hidden = !shown.has(g) && !busy[g];
-  addMenu.render(state === 'ready');
+  toolRow.setReady(state === 'ready');
   document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
     const g = b.dataset.group as Group, isOpen = groupsOpen[g], count = b.querySelector<HTMLElement>('.group-count')!;
     b.setAttribute('aria-expanded', String(isOpen));
@@ -204,26 +209,26 @@ document.querySelectorAll<HTMLButtonElement>('[data-eye-group]').forEach(b => { 
 document.querySelectorAll<HTMLButtonElement>('.group-head').forEach(b => {
   b.onclick = () => setGroupOpen(b.dataset.group as Group, !groupsOpen[b.dataset.group as Group]);
 });
-surfaces = new SurfacesSection($('surfaces'), tool);
+// Close shape on a zone without a material opens the grid in its card, so the tool row's popover steps aside.
+surfaces = new SurfacesSection($('surfaces'), tool, () => toolRow.close());
 surfaces.render();
 linesSection = new LinesSection($('lines'), tool);
 linesSection.render();
 symbolsSection = new SymbolsSection($('symbols'), tool);
 symbolsSection.render();
-outlines = new OutlinesSection($('outlines'), tool);
+outlines = new OutlinesSection($('outlines'), tool, id => surfaces?.openGridFor(id)); // Duplicate as surface opens the new zone's grid
 outlines.render();
-// Global + Add: opens the chosen section (even if it was collapsed) and its picker (the section shows itself while its picker is open).
-const addMenu = new AddMenu($('add'), (type: AddType) => {
-  groupsOpen[type] = true;
-  try {
-    localStorage.setItem(GROUPS_KEY, JSON.stringify(groupsOpen));
-  } catch {
-    /* not remembered */
-  }
-  const section = { symbols: symbolsSection, lines: linesSection, surfaces }[type];
-  section?.openPicker();
-  updateGroups();
-});
+// Tool row + search popover. Surface starts drawing as soon as it is tapped; a pick is recorded as Recent and routed by its
+// category: a material goes to the surface being drawn (else arms the next one), a plant or object arms placing, a line item
+// starts that line. Each of these cancels a draft of another kind first.
+const toolRow = new ToolRow($('add'), entry => {
+  saveRecent(pushRecent(loadRecent(), entry.id));
+  if (entry.category === 'surfaces') tool.pickMaterial(entry.id as MaterialId);
+  else if (entry.category === 'symbols') tool.startPlacing(entry.id);
+  else tool.startLine(entry.id);
+}, t => { if (t === 'surfaces') tool.startSurfaceDrawing(); },
+// Fill the plot leads the Surface grid while the plot can be filled; it opens the boundary card's grid (the draft is dropped).
+{ available: () => tool.fillable && !!tool.cal, open: () => outlines?.openFill() });
 // Edit | Preview (top bar): Preview is the read-only sheet view of the same data. It hides the plot plan for display only
 // (previewing, never planVisible), fits the drawn plan, and switches the drawing tools off until Edit returns.
 let sheetOpen = false;
@@ -247,7 +252,7 @@ function setView(v: EditorView) {
   previewing = preview; sheetOpen = preview; bar.view = v; updateBar();
   tool.previewing = preview; tool.render(); // no plant size handle in Preview
   $('layers-edit').hidden = preview; $('layers-sheet').hidden = !preview;
-  applyPlanLook();
+  applyPlanLook(); tool.previewing = preview; tool.render();
   if (preview) { renderSheet($('layers-sheet'), tool); if (page) { editView = view; fitDrawing(); } }
   else { if (page && editView) { applyView(editView, false); renderSharpSoon(0); } editView = null; }
 }
@@ -259,7 +264,6 @@ window.addEventListener('keydown', e => {
   if (previewing && (history || !(e.target as HTMLElement).closest('input, textarea, #top-bar, #sidebar'))) e.stopImmediatePropagation();
 }, true);
 updateGroups();
-$('sidebar').addEventListener('click', () => queueMicrotask(updateGroups)); // a picker's Cancel closes it without a plan change: re-check which sections show
 
 // Dev only: size of the plan document as it would be saved (outlines + refs + small fixed metadata); scripts assert it stays small.
 if (import.meta.env.DEV) (window as unknown as { __planBytes: unknown }).__planBytes = () =>

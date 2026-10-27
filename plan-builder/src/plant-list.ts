@@ -1,6 +1,6 @@
 // What the plan contains, for the Plant list: the surfaces used, the lines drawn (length per item), and the plants, objects (stepping
 // stones among them) and utility markers placed with how many of each. Pure.
-import type { Outline } from './outline';
+import { isAssigned, type Outline } from './outline';
 import type { PlacedLine, PlacedSymbol } from './plan-model';
 import { MATERIALS, type Material } from './materials';
 import { LINE_ITEMS, lineItemById, type LineItem } from './line-items';
@@ -20,7 +20,7 @@ export interface PlantList {
 }
 
 export function plantList(symbols: Record<string, PlacedSymbol>, outlines: Record<string, Outline>, lines: Record<string, PlacedLine> = {}, ftPerPt: number | null = null, areas: ReadonlyMap<string, number> | null = null, view: PlantSizeView = 'mature'): PlantList {
-  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.closed && o.material).map(o => o.material));
+  const used = new Set(Object.values(outlines).filter(o => o.kind === 'surface' && o.closed && isAssigned(o)).map(o => o.material));
   // One row per species and, for plants, per size label (key symbol + label); diameter is kept to order sizes within a species.
   const counts = new Map<string, { symbol: LibrarySymbol; quantity: number; size?: string; d: number }>();
   for (const s of Object.values(symbols)) {

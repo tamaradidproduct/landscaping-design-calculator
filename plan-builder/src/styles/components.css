@@ -216,8 +216,6 @@ input[type="range"] { flex: 1; min-height: var(--control-sm); padding: 0; border
 .loading { position: absolute; inset: 0; display: grid; place-content: center; font-size: var(--text-xl); color: var(--color-muted); }
 /* Pattern definitions for surfaces (no layout of their own). */
 svg.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
-/* Material picker: one row per material (swatch + name), tighter than a layer row; the zone's current one is marked. */
-.material-list { gap: 0; }
 button.chip[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
 .swatch.material { overflow: hidden; border: var(--border-width) solid var(--color-line); }
 .swatch.material svg { display: block; width: 100%; height: 100%; }
@@ -288,3 +286,26 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .top-bar .label-short { display: none; }
 @media (max-width: 900px) { .top-bar .label-short { display: inline; } .top-bar .label-full { display: none; } }
 @media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar button.bar-action { min-width: var(--control-sm); padding: 0; } }
+/* ---------- Tool row and search popover (Layers panel) ---------- */
+.tools { display: flex; flex-direction: column; gap: var(--space-4); }
+.tool-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-2); }
+button.tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); min-height: var(--control-xl); padding: var(--space-2); font-size: var(--text-sm); }
+button.tool[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-accent); }
+button.tool.dim { opacity: var(--opacity-disabled); }
+.tool-hint { margin: 0; }
+.tool-popover { display: flex; flex-direction: column; gap: var(--space-4); }
+.tool-popover input[type="search"] { min-height: var(--control-md); width: 100%; box-sizing: border-box; }
+.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+/* The grid scrolls inside itself so the popover never pushes the sections far down. */
+.tool-popover .tool-grid { max-height: calc(8 * var(--control-xl)); grid-auto-rows: max-content; overflow-y: auto; overscroll-behavior: contain; padding-right: var(--space-2); }
+button.grid-cell { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-2); min-height: var(--control-md); padding: var(--space-2); text-align: left; font-size: var(--text-sm); }
+button.grid-cell img { display: block; flex: none; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-sm); background: var(--color-bg); }
+button.grid-cell span { overflow-wrap: anywhere; }
+button.grid-cell .cell-cat { font-size: var(--text-xs); }
+button.grid-cell[aria-current="true"] { border-color: var(--color-accent); }
+/* Fill the plot: an icon in the picture slot (it is an action, not a material). */
+button.grid-cell.fill-cell .cell-pic { display: grid; flex: none; place-items: center; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-sm); background: var(--color-bg); }
+.fill-plot { display: flex; flex-direction: column; gap: var(--space-4); }
+/* Tags sit in one horizontally scrolling row so they never stack in the 280 px panel. */
+.tool-popover .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-2); mask-image: linear-gradient(to right, black calc(100% - var(--space-11)), transparent); }
+.tool-popover .chips button.chip { flex: none; min-height: var(--control-md); padding: 0 var(--space-5); white-space: nowrap; }

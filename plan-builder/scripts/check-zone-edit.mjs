@@ -39,7 +39,7 @@ try {
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await setEdgeLength(page, '100'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces', 'pavers-classic');
   results.push(['Snap while drawing a surface', await snapLabel()]);
   await drag([300, 250], [360, 350]); // 12′ × 20′, stays selected
   results.push(['Rename field', `wrap ${!!await page.$('#surfaces .layer-rename-wrap')} · pencil ${!!await page.$('#surfaces .layer-rename-wrap svg')} · ${await page.$eval('#surfaces .layer-rename-wrap', e => getComputedStyle(e).borderBottomStyle)} underline`]);
@@ -56,11 +56,11 @@ try {
   results.push(['Hover near the bottom-right corner (not selected)', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
   await page.mouse.move(...await toScreen([330, 300])); await page.waitForTimeout(150);
   results.push(['Pointer back in the middle', `round handle shown ${!!await page.$('.overlay .round-handle')}`]);
-  results.push(['Material in the card', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Material in the card', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · cells shown ${await page.$$eval('#surfaces [data-card] [data-pick]', e => e.length)}`]);
   await page.click('#surfaces [data-act=change-material]');
-  results.push(['Change', `chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
-  await page.click('#surfaces [data-card] [data-material=red-flagstone]'); await page.waitForTimeout(150);
-  results.push(['Pick Flagstone', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · chips shown ${await page.$$eval('#surfaces [data-card] [data-material]', e => e.length)}`]);
+  results.push(['Change', `cells shown ${await page.$$eval('#surfaces [data-card] [data-pick]', e => e.length)}`]);
+  await page.click('#surfaces [data-card] [data-pick=red-flagstone]'); await page.waitForTimeout(150);
+  results.push(['Pick Flagstone', `material fill ${await page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'))} · cells shown ${await page.$$eval('#surfaces [data-card] [data-pick]', e => e.length)}`]);
 
   const before = await shape('s1');
   await drag([330, 320], [345, 330]);

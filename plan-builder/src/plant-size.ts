@@ -6,7 +6,8 @@ export interface SizeChoice { container?: string; customInstall?: number }
 type Container = { container: string; d: number };
 
 const NONE: readonly Container[] = [];
-const fmt = (n: number): string => String(Math.round(n * 100) / 100);
+/** One decimal place: the precision the plant card and the Sheet/label text share. */
+export const fmt = (n: number): string => String(Math.round(n * 10) / 10);
 const mature = (id: string): number => symbolById(id)?.size.w ?? 0;
 
 export function containersFor(symbolId: string): readonly Container[] {

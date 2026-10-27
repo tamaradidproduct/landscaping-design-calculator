@@ -37,7 +37,7 @@ try {
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await setEdgeLength(page, '100'); // 0.2 ft/pt
   await page.keyboard.press('Escape');
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces', 'pavers-classic');
   await drag([300, 250], [360, 350]); // 12′ × 20′ (60 × 100 pt), stays selected
   await openAdjust(page); // harmless: Width and Depth are in the card itself
   const sizes = () => page.evaluate(() => [document.querySelector('#zone-width').value, document.querySelector('#zone-depth').value]);

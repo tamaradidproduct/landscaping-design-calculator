@@ -3,7 +3,7 @@
 import {
   areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
   edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
-  TEX_SCALE, type Outline, type OutlineKind, type OutlineShape,
+  TEX_SCALE, isAssigned, duplicable, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
 import { History } from './history';
 import { committedOutlines } from './editor-state';
@@ -25,7 +25,7 @@ import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
 import { boxSize, resizeBox, stretchEdge } from './stretch';
 import { DEFAULT_SHAPES, shapeGroup, type ShapePrefs } from './shape-pref';
 import { cornerArc, cornerBisector, distToCorner, distToSide, pushSide, radiusFromHandle, resizeCursor, roundHandleDistance, stepRadius, translate } from './shape-edit';
-import { zoneFill } from './patterns';
+import { UNASSIGNED_FILL, zoneFill } from './patterns';
 import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
@@ -53,9 +53,9 @@ export interface ToolHost {
 }
 
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
-const colorOf = (o: Outline) => o.kind === 'surface' ? material(o.material!).edge : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
+const colorOf = (o: Outline) => o.kind === 'surface' ? (o.material ? material(o.material).edge : 'var(--color-feature-stroke)') : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's texture fill (its zone's own pattern), as an inline style addition. */
-const fillOf = (o: Outline) => o.kind === 'surface' && o.material ? `;fill:${zoneFill(o.id)}` : '';
+const fillOf = (o: Outline) => o.kind === 'surface' ? `;fill:${o.material ? zoneFill(o.id) : UNASSIGNED_FILL}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…
 
 type Drag =
@@ -125,6 +125,8 @@ export class OutlineTool {
   /** Hidden layers (by id) and sections: saved with the plan, but not undoable (like the view). */
   hiddenLayers = new Set<string>();
   hiddenSections = new Set<Group>();
+  /** Preview (read-only Sheet view): unassigned surfaces are not painted (see omittedInPreview). */
+  previewing = false;
   /** Plants and objects dropped on the plan. */
   symbols = new SymbolLayer();
   /** The library symbol armed for placing (each tap drops one), or null. */
@@ -137,8 +139,6 @@ export class OutlineTool {
   /** Any placed library plant, with containers or not (corn counts): decides the default view and lets the first plant store Install.
    *  Whether the toggle, the first-open prompt and the sheet footnote show is a narrower test (showPlantToggle: a plant with containers). */
   private hasPlants(): boolean { return Object.values(this.symbols.placed).some(s => symbolById(s.symbol)?.kind === 'plant'); }
-  /** The editor is in Preview (set by main): no size handle is offered. */
-  previewing = false;
   /** Stores the view without an undo step (the answer to the first-open prompt); the revision bump makes the plan save. */
   setPlantViewSilently(v: PlantSizeView) { this.plantSizeView = v; this.revision++; this.update(); }
   /** Switch the plants between install and mature size: one undo step; nothing happens if it is already so. */
@@ -237,7 +237,7 @@ export class OutlineTool {
     this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
     this.plantSizeView = state.plantSizeView; this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
     this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id] || this.lines.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
-    this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
+    this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null; this.pendingMaterial = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
     this.selectedEdge = null; this.lastTap = null; this.lastNudge = null;
     this.magnifier.hidden = true;
@@ -324,15 +324,16 @@ export class OutlineTool {
   applyToSpecies(id: string): number {
     const src = this.symbols.placed[id]; if (!src) return 0;
     const others = Object.values(this.symbols.placed).filter(p => p.id !== id && p.symbol === src.symbol);
-    if (!others.length) return 0;
+    const changed = others.filter(p => p.container !== src.container || p.customInstall !== src.customInstall);
+    if (!changed.length) return 0;
     this.record();
-    for (const p of others) {
+    for (const p of changed) {
       delete p.container; delete p.customInstall;
       if (src.customInstall !== undefined) p.customInstall = src.customInstall;
       else if (src.container !== undefined) p.container = src.container;
     }
     this.update();
-    return others.length;
+    return changed.length;
   }
   removeSymbol(id: string) {
     if (!this.symbols.placed[id]) return;
@@ -476,9 +477,39 @@ export class OutlineTool {
   /** Draw a new surface (zone) of a material; its name starts as the material's. */
   startSurface(m: MaterialId) {
     if (!this.boundaryClosed) return;
-    let n = 1;
-    while (this.outlines[`s${n}`]) n++;
-    this.begin(`s${n}`, 'surface', material(m).name, m);
+    this.begin(this.nextSurfaceId(), 'surface', material(m).name, m);
+  }
+  private nextSurfaceId() { let n = 1; while (this.outlines[`s${n}`]) n++; return `s${n}`; }
+  /** A material picked before any shape takes it: the next surface drawn (or closed without one) gets it. */
+  pendingMaterial: MaterialId | null = null;
+  /** The Surface tool: start drawing a new surface right away, before a material is chosen ("Surface N" until one is).
+   * A pending material is used (and consumed); a new surface already being drawn is kept rather than restarted. */
+  startSurfaceDrawing() {
+    if (!this.boundaryClosed) return;
+    const d = this.drawing ? this.outlines[this.drawing] : null;
+    if (d?.kind === 'surface' && !this.replaced) return;
+    const id = this.nextSurfaceId(), m = this.pendingMaterial;
+    this.pendingMaterial = null;
+    this.begin(id, 'surface', m ? material(m).name : `Surface ${id.slice(1)}`, m ?? undefined);
+  }
+  /** A material picked from the grid: it goes to the surface being drawn, else to a just-closed surface without one,
+   * else it is kept as pending and a new surface starts drawing with it. One undo step. */
+  pickMaterial(m: MaterialId) {
+    if (!material(m)) return;
+    const d = this.drawing ? this.outlines[this.drawing] : null;
+    if (d?.kind === 'surface') {
+      if (d.material === m) return;
+      this.record();
+      const oldMat = d.material ? material(d.material) : undefined;
+      if (!oldMat || d.name === oldMat.name) d.name = material(m).name;
+      d.material = m;
+      this.update();
+      return;
+    }
+    const sel = this.selected ? this.outlines[this.selected] : null;
+    if (sel?.kind === 'surface' && sel.closed && !isAssigned(sel)) { this.setMaterial(sel.id, m); return; }
+    this.pendingMaterial = m;
+    this.startSurfaceDrawing();
   }
   /** True once the plot is outlined and not yet filled: Fill the plot… is offered. */
   get fillable() { return this.boundaryClosed && !this.hasFill; }
@@ -493,6 +524,27 @@ export class OutlineTool {
     this.selected = FILL_ID; this.selectedCorner = null; this.selectedEdge = null;
     this.host.toast('Plot fill added. It follows the plot boundary.');
     this.update();
+  }
+  /** Copy a custom outline's shape (points, bends, corner radii) into a new surface with no material, placed above the other
+   * surfaces and selected; the outline stays. One undo step. Null for the House, the boundary, a surface or an unknown id. */
+  duplicateAsSurface(id: string): string | null {
+    const o = this.outlines[id];
+    if (!o || !duplicable(o) || !this.boundaryClosed || this.drawing) return null;
+    this.record();
+    const sid = this.nextSurfaceId();
+    const copy: Outline = {
+      id: sid, kind: 'surface', name: `Surface ${sid.slice(1)}`, closed: true, pts: o.pts.map(p => ({ ...p })),
+      ...(o.bulges ? { bulges: [...o.bulges] } : {}), ...(o.radii ? { radii: [...o.radii] } : {}),
+    };
+    const keys = Object.keys(this.outlines), top = keys.findIndex(k => this.outlines[k]!.kind === 'surface');
+    keys.splice(top < 0 ? keys.length : top, 0, sid);
+    this.outlines = Object.fromEntries(keys.map(k => [k, k === sid ? copy : this.outlines[k]!]));
+    this.hiddenLayers.delete(sid); this.hiddenSections.delete('surfaces'); // a new zone is shown, as a drawn one is
+    this.placing = null; this.selectedSymbol = null; this.clearLines();
+    this.selected = sid; this.selectedCorner = null; this.selectedEdge = null;
+    this.host.toast(`${o.name} duplicated as a surface. Pick its material.`);
+    this.update();
+    return sid;
   }
   /** Change a surface's material; a zone still named after its old material takes the new name. */
   setMaterial(id: string, m: MaterialId) {
@@ -526,6 +578,7 @@ export class OutlineTool {
     this.update();
   }
   cancel() {
+    this.pendingMaterial = null; // a material armed for the next surface is dropped with the drawing
     if (!this.drawing) return;
     this.record();
     if (this.replaced) this.outlines[this.drawing] = this.replaced; else delete this.outlines[this.drawing];
@@ -554,6 +607,8 @@ export class OutlineTool {
     // A redrawn outline's edges are new: lengths typed for the old ones no longer apply.
     const isNew = !this.replaced;
     if (this.replaced) this.refs = this.refs.filter(r => r.id !== o.id);
+    if (o.kind === 'surface' && !o.material && this.pendingMaterial) { o.material = this.pendingMaterial; o.name = material(o.material).name; }
+    if (o.kind === 'surface') this.pendingMaterial = null;
     o.closed = true; this.drawing = null; this.replaced = null; this.selected = o.id; // stays selected for adjusting
     o.bulges = o.pts.map((_, i) => o.bulges?.[i] ?? 0);
     // New layers go to the bottom (so higher ones cut them), except one drawn wholly inside another: it goes
@@ -1433,7 +1488,7 @@ export class OutlineTool {
     let symbolsDone = false, top = ln.top;
     for (const o of paint) {
       if (!symbolsDone && o.kind !== 'surface') { svg += symbolsMarkup; symbolsDone = true; }
-      if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing)) continue;
+      if (!o || !o.pts.length || (this.isHidden(o.id) && o.id !== this.drawing) || omittedInPreview(o, this.previewing)) continue;
       const pts = o.pts.map(p => h.toScreen(p));
       const drawingThis = this.drawing === o.id, cursor = drawingThis ? this.dragAt ?? (this.drag ? null : this.hoverPlaced) : null;
       // Rectangle in progress: preview the whole rectangle from the first corner to the pointer.

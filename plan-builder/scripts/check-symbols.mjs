@@ -1,11 +1,11 @@
-// Plants and objects on Riesberg (memory store): the picker finds and arms a symbol, each tap drops one at its researched size, a
+// Plants and objects on Riesberg (memory store): the Plant tool finds and arms a symbol, each tap drops one at its researched size, a
 // placed symbol moves, turns and deletes (each undoable), the Sheet counts them, an eye hides a kind or the whole section,
 // and placements and hidden state survive closing and reopening the plan.
 // Usage: node scripts/check-symbols.mjs <riesberg.pdf> [url] [outDir]
 import { chromium } from 'playwright-core';
 import { openPlan } from './lib/open-plan.mjs';
 import { setEdgeLength } from './lib/edge.mjs';
-import { addVia, onSheet } from './lib/add.mjs';
+import { addVia, onSheet, openTool } from './lib/add.mjs';
 
 const [pdf, url = 'http://localhost:5180/?store=memory', outDir = '.'] = process.argv.slice(2);
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -21,15 +21,15 @@ const drag = async (p, q) => { const a = await toScreen(p), b = await toScreen(q
 const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(250); };
 const images = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, x: +x.getAttribute('x'), y: +x.getAttribute('y'), w: +x.getAttribute('width'), t: x.getAttribute('transform') })));
 const counts = () => onSheet(page, p => p.$$eval('#layers-sheet .plant-count', c => c.map(x => x.textContent.trim())));
-const arm = async (id, query = '') => { await addVia(page, 'symbols'); if (query) { await page.fill('#symbol-search', query); await page.waitForTimeout(150); } await page.click(`#symbol-results [data-symbol=${id}]`); await page.waitForTimeout(150); };
+const arm = async id => { await addVia(page, 'symbols', id); await page.waitForTimeout(150); };
 try {
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
-  // Picker
-  await addVia(page, 'symbols'); await page.fill('#symbol-search', 'spruce'); await page.waitForTimeout(150);
-  const found = await page.$$eval('#symbol-results [data-symbol]', b => b.map(x => x.textContent.trim()));
+  // Plant tool
+  await openTool(page, 'symbols'); await page.fill('#tool-search', 'spruce'); await page.waitForTimeout(150);
+  const found = await page.$$eval('#add [data-pick] span:first-of-type', b => b.map(x => x.textContent.trim()));
   check('Search "spruce" finds the two spruces', found.length === 2 && found.every(n => /Spruce/.test(n)), found.join(', '));
-  await page.click('#symbol-results [data-symbol=blue-diamond-spruce]'); await page.waitForTimeout(150);
+  await page.click('#add [data-pick=blue-diamond-spruce]'); await page.waitForTimeout(150);
   check('Picking one arms placing', !!(await page.$('[data-act=stop-placing]')), 'Done button shown');
   await tap([300, 300]); await tap([420, 300]);
   const two = await images();
@@ -42,7 +42,7 @@ try {
   // Disarming: the card's ×; and starting a surface while armed
   await arm('hot-tub'); await page.click('#symbols [data-act=stop-placing]'); await page.waitForTimeout(150);
   check('Done on the placing card stops placing', !(await page.$('[data-act=stop-placing]')), 'Done button gone');
-  await arm('hot-tub'); await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]'); await page.waitForTimeout(150);
+  await arm('hot-tub'); await addVia(page, 'surfaces', 'premium-sod'); await page.waitForTimeout(150);
   await drag([300, 200], [340, 240]);
   check('Starting a surface while armed draws it, and placing stops', !(await page.$('[data-act=stop-placing]')) && (await page.$$('.overlay .shape.surface')).length > 0 && (await images()).length === 2, `${(await images()).length} symbols`);
   await page.keyboard.press('Escape');

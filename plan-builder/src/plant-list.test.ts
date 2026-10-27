@@ -33,6 +33,10 @@ describe('plantList', () => {
     const drawing = { ...out('s2', 'surface', 'deck-wood'), closed: false };
     expect(plantList({}, { s1: out('s1', 'surface', 'sand'), s2: drawing }, {}, 0.1, new Map([['sand', 10]])).surfaces.map(r => r.material.id)).toEqual(['sand']);
   });
+  test('a zone without a material (or with an unknown one) is absent from surfaces even when closed', () => {
+    const l = plantList({}, { s1: out('s1', 'surface'), s2: out('s2', 'surface', 'nope'), s3: out('s3', 'surface', 'sand') }, {}, 0.1, new Map([['sand', 5]]));
+    expect(l.surfaces.map(r => r.material.id)).toEqual(['sand']);
+  });
   test('surfaces: the distinct materials the zones use, in library order; boundary, features and material-less zones are ignored', () => {
     const l = plantList({}, { b: out('b', 'boundary'), f1: out('f1', 'feature'), s1: out('s1', 'surface', 'deck-wood'), s2: out('s2', 'surface', 'sand'), s3: out('s3', 'surface', 'sand'), s4: out('s4', 'surface') });
     expect(l.surfaces.map(s => s.material.id)).toEqual(['sand', 'deck-wood']);

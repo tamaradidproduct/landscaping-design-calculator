@@ -1,35 +1,20 @@
-// The Layers panel's Lines section: one row per kind of line drawn ("Wood privacy fence × 3", with an eye), then "Add line…", which opens
-// a picker (search, then rows); picking one starts drawing: each tap on the plan adds a point until Done. The selected line's row opens
+// The Layers panel's Lines section: one row per kind of line drawn ("Wood privacy fence × 3", with an eye). Picking a line item from
+// the tool row's grid (tool-row.ts) starts drawing: each tap on the plan adds a point until Done. The selected line's row opens
 // into a card with its length, Width, Delete point and Delete line.
-import { stepLineWidth, lineItemById, searchLineItems, type LineItem } from './line-items';
+import { stepLineWidth, lineItemById } from './line-items';
 import { lineLengthFt } from './line-layer';
 import { parseFeet } from './outline';
 import type { OutlineTool } from './outline-ui';
-import { button, esc, hint, input, layerCard, layerForm, layerRow, row, swatch } from './ui';
-
-const pickerRow = (i: LineItem) => button(`${swatch({ symbol: i.thumb })}<span class="layer-name">${esc(i.name)}</span>`, { mods: ['layer-row'], data: { 'line-item': i.id } });
-/** The picker's list for a query: a row per item, or a note when nothing matches. */
-export function linePickerList(query: string): string {
-  const found = searchLineItems(query);
-  return found.length ? `<div class="layer-list symbol-list">${found.map(pickerRow).join('')}</div>` : hint('No line matches.');
-}
+import { button, hint, input, layerCard, layerRow, row } from './ui';
 
 /** A run's length for the card and the list: feet to one decimal, or "no scale" until the plan has one. */
 export const lengthText = (ft: number | null): string => ft === null ? 'no scale' : `${Math.round(ft * 10) / 10} ft`;
 
 export class LinesSection {
-  private picking = false;   // the picker for a new line is open
-  private query = '';
-
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
-
-  get pickerOpen() { return this.picking; }
-  /** The global Add menu's "Edges & walls": open the picker. */
-  openPicker() { this.picking = true; this.query = ''; this.tool.deselect(); this.render(); this.el.querySelector<HTMLInputElement>('#line-search')?.focus(); }
 
   render() {
     const t = this.tool, sel = t.selectedLine ? t.lines.placed[t.selectedLine] : null, draft = t.lineDraft;
-    if (draft || sel) this.picking = false;
     const groups = t.lines.groups();
     const rows = groups.map(g => {
       const lib = lineItemById(g.item)!, hidden = g.ids.every(id => t.hiddenLayers.has(id)) || t.hiddenSections.has('lines');
@@ -40,10 +25,7 @@ export class LinesSection {
       ${drafting ? layerCard({ id: draft!.item, swatch: { symbol: drafting.thumb }, name: drafting.name, done: true,
         body: `${hint(`Drawing: tap a point for each corner of the run. Drag to move the plan. ${draft!.points.length} so far.`)}${row(
           button('Done', { mods: ['compact'], data: { act: 'finish-line' } }), button('Cancel', { mods: ['compact'], data: { act: 'cancel-line' } }))}` }) : ''}
-      ${rows.join('')}${sel ? this.card(sel.id) : ''}
-      ${drafting ? '' : this.picking
-        ? layerForm(`${input('line-search', { placeholder: 'Search lines', ariaLabel: 'Search lines', value: this.query })}<div id="line-results">${linePickerList(this.query)}</div>${button('Cancel', { mods: ['compact'], data: { act: 'cancel-line-picker' } })}`)
-        : ''}`;
+      ${rows.join('')}${sel ? this.card(sel.id) : ''}`;
     this.wire(sel?.id ?? null);
   }
 
@@ -74,14 +56,8 @@ export class LinesSection {
         t.selectLine(cur < 0 ? ids[0] : cur + 1 < ids.length ? ids[cur + 1] : null);
       };
     });
-    el.querySelector<HTMLButtonElement>('[data-act=cancel-line-picker]')?.addEventListener('click', () => { this.picking = false; this.render(); });
     el.querySelector<HTMLButtonElement>('[data-act=finish-line]')?.addEventListener('click', () => t.finishLine());
     el.querySelector<HTMLButtonElement>('[data-act=cancel-line]')?.addEventListener('click', () => t.cancelLine());
-    const bindPicker = () => el.querySelectorAll<HTMLButtonElement>('#line-results [data-line-item]').forEach(b => { b.onclick = () => { this.picking = false; t.startLine(b.dataset.lineItem!); }; });
-    bindPicker();
-    const search = el.querySelector<HTMLInputElement>('#line-search');
-    if (search) search.oninput = () => { this.query = search.value; el.querySelector('#line-results')!.innerHTML = linePickerList(this.query); bindPicker(); };
-    el.querySelector('form.layer-form')?.addEventListener('submit', e => e.preventDefault());
     const card = el.querySelector<HTMLElement>('[data-card]');
     card?.querySelector<HTMLButtonElement>('[data-act=collapse]')?.addEventListener('click', () => { if (t.lineDraft) t.cancelLine(); else t.selectLine(null); });
     if (!card || !selId) return;

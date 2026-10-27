@@ -81,12 +81,13 @@ export function startShell(ed: Editor): Shell {
       lastSavedRevision = tool.saveRevision;
       current = { id, address: meta.address, archived: meta.archived };
       head.show(current);
+      const openPromise = ed.openBytes(bytes, meta.address);
       if (needsPlantSizePrompt(state)) {
         const answer = await askPlantSize();
         if (seq !== openSeq) return; // another plan was opened (or the editor closed) while the question was up
         tool.setPlantViewSilently(answer); // update() tells the shell, which autosaves
       }
-      if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
+      if ((await openPromise) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it
         toast("This plan's PDF couldn't be opened. Delete it and start a new plan with a working PDF.");
       }
