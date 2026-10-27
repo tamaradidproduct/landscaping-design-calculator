@@ -7,9 +7,9 @@ export interface TopBarState { name: string; view: EditorView; canUndo: boolean;
 export const EXPORT_NOTE = 'Export is coming soon';
 
 /** The left cluster: ← Plans, the plan's name, gear. PlanHead renders it too (and adds the menu card beneath). */
-export const planBarHtml = (name: string) => `<div class="plan-bar">${button('←', { mods: ['icon', 'small'], id: 'back-to-plans', ariaLabel: 'Back to Plans' })}`
+export const planBarHtml = (name: string) => `<div class="plan-bar">${button('←', { mods: ['icon'], id: 'back-to-plans', ariaLabel: 'Back to Plans' })}`
   + `<h1 class="plan-title" id="plan-title" title="${esc(name)}">${esc(name)}</h1>`
-  + `${button(lucideIcon('settings'), { mods: ['icon', 'small'], id: 'plan-more', ariaLabel: 'Plan actions', expanded: false })}</div>`;
+  + `${button(lucideIcon('settings'), { mods: ['icon'], id: 'plan-more', ariaLabel: 'Plan actions', expanded: false })}</div>`;
 
 const both = (full: string, short: string) => `<span class="label-full">${full}</span><span class="label-short">${short}</span>`;
 /** Install | Mature (short labels Now | Grown when narrow); empty when there is nothing to toggle. */

@@ -12,6 +12,9 @@ const tool = (radii: number[]) => ({
 const html = (radii: number[], open: boolean) => surfaceCard(tool(radii), zone, { open, changing: false });
 
 describe('surface card', () => {
+  test('aspect lock uses a full-size icon toggle tap target', () => {
+    expect(html([0], false)).toMatch(/<button[^>]*class="icon toggle"[^>]*data-act="aspect-lock"[^>]*aria-label="Lock aspect ratio"/);
+  });
   test('a zone without a material says Not counted yet and shows the hatched swatch', () => {
     const bare = { ...zone, material: undefined } as unknown as Outline;
     const h = surfaceCard(tool([0, 0, 0, 0]), bare, { open: false, changing: false });
