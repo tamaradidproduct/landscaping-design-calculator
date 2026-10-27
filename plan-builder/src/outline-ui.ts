@@ -581,7 +581,7 @@ export class OutlineTool {
         if (this.rawAt) this.applyDrag();
       }, GESTURE.holdMs);
     }
-    // The selected plant's size handle sits on its halo, partly over the plant: it goes before moving the plant.
+    // The selected plant's size handle (clear of the plant's own hit area) goes before moving a plant.
     const size = this.sizeHandleAt(p);
     if (size) {
       const s = this.symbols.placed[size.id];
@@ -919,6 +919,13 @@ export class OutlineTool {
       if ((d.moved || (d.type === 'line-point' && d.inserted)) && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       else if (d.type === 'line-point') this.selectedLinePoint = this.selectedLinePoint === d.i ? null : d.i; // a tap selects (or drops) the point
       this.dragBefore = null; this.update(); return;
+    }
+    if (d.type === 'size' && !d.moved) {
+      // A plain tap on the handle acts as a tap there did before the handle: another plant under it is selected, else it is an ordinary tap.
+      this.dragBefore = null;
+      const other = this.symbolAt(d.start);
+      if (other && other !== d.id) this.selectSymbol(other); else if (other !== d.id) this.tap(d.start); else this.update();
+      return;
     }
     if (d.type === 'symbol' || d.type === 'size') {
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }

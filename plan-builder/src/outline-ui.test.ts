@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { OutlineTool } from './outline-ui';
-import { GESTURE } from './overlay-tokens';
+import { GESTURE, HIT } from './overlay-tokens';
 import { History } from './history';
 import { SymbolLayer } from './symbol-layer';
 import { LineLayer } from './line-layer';
@@ -163,7 +163,9 @@ describe('plant container choice', () => {
 describe('plant size handle', () => {
   // 1 screen px = 1 page pt = 0.1 ft. The spruce sits at (100, 100); its default install size is the last container.
   const FT_PER_PT = 0.1;
-  function tool(view: 'install' | 'mature' = 'install'): { t: OutlineTool; id: string; handle: { x: number; y: number } } {
+  // The handle's hit area clears the plant's own (its radius, at least 14 px): its centre is that far out plus the 22 px hit radius.
+  const handleAt = (dFt: number) => ({ x: 100 + Math.max(dFt / FT_PER_PT / 2, 14) + HIT.sizeHandle, y: 100 });
+  function tool(view: 'install' | 'mature' = 'install', symbol = 'blue-diamond-spruce'): { t: OutlineTool; id: string; handle: { x: number; y: number } } {
     const t = Object.create(OutlineTool.prototype) as OutlineTool;
     const id_ = (p: { x: number; y: number }) => ({ x: p.x, y: p.y });
     Object.assign(t, {
@@ -172,10 +174,9 @@ describe('plant size handle', () => {
       placing: null, lineDraft: null, drawing: null, selected: null, selectedCorner: null, selectedEdge: null, selectedLine: null, selectedLinePoint: null,
       hoverCorner: null, drag: null, cal: { ftPerPt: FT_PER_PT }, plantSizeView: view, visible: new Map(), symbolShown: () => true, lineShown: () => true,
     });
-    const id = t.symbols.place('blue-diamond-spruce', { x: 100, y: 100 });
+    const id = t.symbols.place(symbol, { x: 100, y: 100 });
     t.selectedSymbol = id;
-    const r = plantDiameter('blue-diamond-spruce', {}, view) / FT_PER_PT / 2 + 3; // the halo's radius (px)
-    return { t, id, handle: { x: 100 + r, y: 100 } };
+    return { t, id, handle: handleAt(plantDiameter(symbol, {}, view)) };
   }
   const drag = (t: OutlineTool, from: { x: number; y: number }, to: { x: number; y: number }) => {
     const took = t.pointerDown(from, 'mouse'); t.pointerMove(to); t.pointerUp(); return took;
@@ -185,7 +186,7 @@ describe('plant size handle', () => {
   test('dragging the handle out by 1 ft grows the plant by 2 ft as a custom size; one undo restores the container', () => {
     const { t, id } = tool();
     t.setContainer(id, '5 gal'); (t as unknown as { history: History<unknown> }).history.clear();
-    const handle = { x: 100 + plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install') / FT_PER_PT / 2 + 3, y: 100 }; // on the 5 gal halo
+    const handle = handleAt(plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install')); // the 5 gal plant's handle
     const to = { x: handle.x + 1 / FT_PER_PT, y: handle.y };
     expect(drag(t, handle, to)).toBe(true);
     expect(t.symbols.placed[id].customInstall).toBeCloseTo(plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install') + 2); // grows by 2 ft, no jump from where the handle was grabbed
@@ -215,6 +216,34 @@ describe('plant size handle', () => {
     const { t, id, handle } = tool();
     drag(t, handle, handle);
     expect(t.symbols.placed[id].customInstall).toBeUndefined(); expect(canUndo(t)).toBe(false);
+  });
+  test('a small plant (1 ft, 10 px across) dragged from its centre moves, not resizes; its handle still resizes', () => {
+    const { t, id } = tool('install', 'lilacs');
+    t.setContainer(id, '1 gal'); (t as unknown as { history: History<unknown> }).history.clear();
+    expect(drag(t, { x: 100, y: 100 }, { x: 130, y: 100 })).toBe(true);
+    expect(t.symbols.placed[id]).toMatchObject({ x: 130, y: 100, container: '1 gal' });
+    expect(t.symbols.placed[id].customInstall).toBeUndefined();
+    t.undo(); expect(t.symbols.placed[id]).toMatchObject({ x: 100, y: 100 });
+    const h = handleAt(1);
+    drag(t, h, { x: h.x + 1 / FT_PER_PT, y: h.y });
+    expect(t.symbols.placed[id].customInstall).toBeCloseTo(3); // 1 ft out: 1 + 2 ft
+    expect(t.symbols.placed[id]).toMatchObject({ x: 100, y: 100 });
+  });
+  test('a plain tap on the handle off the plant still deselects, as a tap there did before', () => {
+    const { t, handle } = tool();
+    Object.assign(t, { featureAt: () => null });
+    expect(t.pointerDown(handle, 'mouse')).toBe(true); t.pointerUp();
+    expect(t.selectedSymbol).toBeNull();
+  });
+  test('a plain tap on the handle over another plant selects that plant', () => {
+    const { t, id, handle } = tool();
+    const other = t.symbols.place('lavender', handle);
+    t.pointerDown(handle, 'mouse'); t.pointerUp();
+    expect(t.selectedSymbol).toBe(other); expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('no handle in Preview', () => {
+    const { t, id, handle } = tool(); t.previewing = true;
+    expect(drag(t, handle, { x: handle.x + 10, y: handle.y })).toBe(false); expect(t.symbols.placed[id].customInstall).toBeUndefined();
   });
   test('no handle in the Mature view: the same drag does not set a size', () => {
     const { t, id, handle } = tool('mature');

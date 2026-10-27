@@ -7,7 +7,7 @@ import type { Point } from './view';
 /** Page points per foot while the plan has no scale yet (24 pt for 10 ft, about 1″ = 30′ on a letter sheet). */
 export const UNSCALED_FT_PT = 2.4;
 const MIN_SIZE_PX = 6;
-const MIN_HIT_PX = 14;
+export const MIN_HIT_PX = 14;
 
 export const normalizeDeg = (d: number): number => ((d % 360) + 360) % 360;
 

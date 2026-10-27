@@ -24,7 +24,7 @@ export const MARK = {
   roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
   insertHandle: 7,      // "+" mark that inserts a new corner on an edge
   insertOffset: 22,     // …its distance off the edge (screen px): clear of the bend-handle square sitting on the edge itself
-  sizeHandle: 8,        // plants (Install view): the dot on the selected plant's halo that drags its install size
+  sizeHandle: 8,        // plants (Install view): the dot right of the selected plant that drags its install size
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;

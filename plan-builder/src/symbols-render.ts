@@ -2,8 +2,8 @@
 // see-through ghost of the armed symbol at the pointer. Pure string building, used by OutlineTool.render.
 import type { PlacedSymbol } from './plan-model';
 import { containersFor } from './plant-size';
-import { MARK } from './overlay-tokens';
-import { symbolSizePx } from './symbol-layer';
+import { HIT, MARK } from './overlay-tokens';
+import { MIN_HIT_PX, symbolSizePx } from './symbol-layer';
 import { symbolById } from './symbols';
 import type { Point } from './view';
 
@@ -28,12 +28,14 @@ export interface SymbolsSvgOptions {
   handle?: boolean;
 }
 
-/** Where the size handle of a placed plant sits (screen): on its halo's right edge. Null for an object or marker, or a plant without containers. */
+/** Where the size handle of a placed plant sits (screen): right of the plant, far enough out that its hit area never overlaps the plant's own
+ * (the plant's radius, at least the 14 px minimum hit), so a small plant can still be pressed and moved. Null for an object or marker, or a plant
+ * without containers. The one source for drawing the handle and hit-testing it. */
 export function sizeHandlePos(placed: PlacedSymbol, o: Pick<SymbolsSvgOptions, 'toScreen' | 'ftPerPt' | 'pxPerPt' | 'sizeOf'>): Point | null {
   const lib = symbolById(placed.symbol);
   if (lib?.kind !== 'plant' || !containersFor(placed.symbol).length) return null;
   const fp = symbolSizePx(o.sizeOf ? o.sizeOf(placed) : lib.size, o.ftPerPt, o.pxPerPt, lib.minPx), at = o.toScreen({ x: placed.x, y: placed.y });
-  return { x: at.x + fp.w / 2 + HALO_PAD, y: at.y };
+  return { x: at.x + Math.max(fp.w / 2, MIN_HIT_PX) + HIT.sizeHandle, y: at.y };
 }
 
 function one(placed: PlacedSymbol, at: Point, rot: number, o: SymbolsSvgOptions, extra: string, cls: string): { image: string; halo: string } | null {
