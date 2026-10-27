@@ -27,9 +27,9 @@ try {
   await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape'); // 500 pt = 100 ft
   // Plant tool
   await openTool(page, 'symbols'); await page.fill('#tool-search', 'spruce'); await page.waitForTimeout(150);
-  const found = await page.$$eval('#add [data-pick] span:first-of-type', b => b.map(x => x.textContent.trim()));
+  const found = await page.$$eval('#tools [data-pick] span:first-of-type', b => b.map(x => x.textContent.trim()));
   check('Search "spruce" finds the two spruces', found.length === 2 && found.every(n => /Spruce/.test(n)), found.join(', '));
-  await page.click('#add [data-pick=blue-diamond-spruce]'); await page.waitForTimeout(150);
+  await page.click('#tools [data-pick=blue-diamond-spruce]'); await page.waitForTimeout(150);
   check('Picking one arms placing', !!(await page.$('[data-act=stop-placing]')), 'Done button shown');
   await tap([300, 300]); await tap([420, 300]);
   const two = await images();

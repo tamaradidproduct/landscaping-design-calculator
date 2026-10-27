@@ -19,7 +19,7 @@ for (const width of [1180, 820]) {
   const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getElementById('page').getBoundingClientRect(); return [r.left + x * r.width / 612, r.top + y * r.height / 792]; }, [x, y]);
   const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(450); };
   const shown = () => page.$$eval('.layer-group:not([hidden])', g => g.map(x => x.id.replace('section-', '')).join(','));
-  const addShown = () => page.evaluate(() => [...document.querySelectorAll('#add .tool')].every(b => !b.classList.contains('dim') && b.getAttribute('aria-disabled') !== 'true'));
+  const addShown = () => page.evaluate(() => [...document.querySelectorAll('#tools .tool')].every(b => !b.classList.contains('dim') && b.getAttribute('aria-disabled') !== 'true'));
   const tag = `${width}px: `;
   check(tag + 'empty plan shows Outlines only, tools dimmed', (await shown()) === 'outlines' && !(await addShown()), `${await shown()} · add ${await addShown()}`);
   check(tag + 'hint is "Outline the plot boundary."', (await page.textContent('#outlines')).includes('Outline the plot boundary.'), '');
@@ -30,14 +30,14 @@ for (const width of [1180, 820]) {
   check(tag + 'closed boundary, no scale: Outlines only, scale hint, tools dimmed', (await shown()) === 'outlines' && !(await addShown()) && (await page.textContent('#outlines')).includes('printed length'), await shown());
   await tap([250, 560]); await setEdgeLength(page, '100'); await page.keyboard.press('Escape');
   check(tag + 'scale set: tools active, empty sections stay hidden', (await addShown()) && (await shown()) === 'outlines', `${await shown()} · add ${await addShown()}`);
-  check(tag + 'tool row lists Add, Surface, Edge, Plant', (await page.$$eval('#add .tool', b => b.map(x => x.textContent.trim()).join())) === 'Add,Surface,Edge,Plant', '');
-  const popOpen = () => page.evaluate(() => !!document.querySelector('#add .tool-popover'));
-  await openTool(page, 'symbols'); check(tag + 'Plant opens its grid on Plants & objects (no section yet)', (await popOpen()) && (await page.textContent('#add .chip[aria-pressed=true]')) === 'Plants & objects' && (await shown()) === 'outlines', await shown());
+  check(tag + 'tool row lists Add, Surface, Edge, Plant', (await page.$$eval('#tools .tool', b => b.map(x => x.textContent.trim()).join())) === 'Add,Surface,Edge,Plant', '');
+  const popOpen = () => page.evaluate(() => !!document.querySelector('#tools .tool-popover'));
+  await openTool(page, 'symbols'); check(tag + 'Plant opens its grid on Plants & objects (no section yet)', (await popOpen()) && (await page.textContent('#tools .chip[aria-pressed=true]')) === 'Plants & objects' && (await shown()) === 'outlines', await shown());
   await page.keyboard.press('Escape'); await page.waitForTimeout(100);
   check(tag + 'Esc closes the grid; empty sections stay hidden', !(await popOpen()) && (await shown()) === 'outlines', await shown());
-  await openTool(page, 'lines'); check(tag + 'Edge opens its grid on Edges & walls', (await page.textContent('#add .chip[aria-pressed=true]')) === 'Edges & walls', '');
+  await openTool(page, 'lines'); check(tag + 'Edge opens its grid on Edges & walls', (await page.textContent('#tools .chip[aria-pressed=true]')) === 'Edges & walls', '');
   await page.keyboard.press('Escape'); await page.waitForTimeout(100);
-  await openTool(page, 'surfaces'); check(tag + 'Surface opens the material grid and starts drawing (Surfaces section shown)', (await page.$$eval('#add [data-pick]', c => c.length)) > 0 && (await shown()).startsWith('surfaces'), await shown());
+  await openTool(page, 'surfaces'); check(tag + 'Surface opens the material grid and starts drawing (Surfaces section shown)', (await page.$$eval('#tools [data-pick]', c => c.length)) > 0 && (await shown()).startsWith('surfaces'), await shown());
   await page.keyboard.press('Escape'); await page.waitForTimeout(100); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   check(tag + 'Esc twice: grid closed, draft dropped, section hidden again', !(await popOpen()) && (await shown()) === 'outlines', await shown());
   await addVia(page, 'symbols', 'blue-diamond-spruce'); await tap([350, 300]); await tap([380, 330]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(200);
