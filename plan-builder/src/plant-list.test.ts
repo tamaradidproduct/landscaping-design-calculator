@@ -66,4 +66,20 @@ describe('plantList lines', () => {
   test('an unknown line item is skipped', () => {
     expect(plantList({}, {}, lines(run('l1', 'nope', 10)), 0.1).lines).toEqual([]);
   });
+  describe('sizes', () => {
+    const spruces = { ...placed(['a', 'blue-diamond-spruce'], ['b', 'blue-diamond-spruce']), c: { id: 'c', symbol: 'blue-diamond-spruce', x: 0, y: 0, customInstall: 6 } as PlacedSymbol };
+    test('Install: one entry per species and size label', () => {
+      const l = plantList(spruces, {}, {}, null, null, 'install');
+      expect(l.plants.map(p => [p.quantity, p.size])).toEqual([[2, '6 ft B&B (4.5 ft)'], [1, 'Custom 6 ft']]);
+    });
+    test('Mature: one entry for the species', () => {
+      const l = plantList(spruces, {}, {}, null, null, 'mature');
+      expect(l.plants.map(p => [p.quantity, p.size])).toEqual([[3, '10 ft']]);
+    });
+    test('a lone corn is 1 ft in both views; objects have no size', () => {
+      for (const v of ['install', 'mature'] as const) expect(plantList(placed(['a', 'corn']), {}, {}, null, null, v).plants[0].size).toBe('1 ft');
+      const l = plantList(placed(['a', 'hot-tub']), {});
+      expect(l.objects[0].size).toBeUndefined();
+    });
+  });
 });

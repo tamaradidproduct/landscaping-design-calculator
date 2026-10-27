@@ -36,4 +36,11 @@ describe('sheetHtml', () => {
     expect(sheetHtml(list, { symbol: plant.id })).toContain('plant-card selected');
     expect(sheetHtml(list, none)).not.toContain('selected');
   });
+  test('the plants block ends with the footnote for the active view; none without plants', () => {
+    const l = (v: 'install' | 'mature') => plantList(Object.fromEntries([put('a', plant.id)]), {}, {}, null, null, v);
+    expect(sheetHtml(l('install'), none, 'install')).toContain('Sizes shown at install. Switch to Mature to see grown sizes.');
+    expect(sheetHtml(l('mature'), none, 'mature')).toContain('Sizes shown at mature. Switch to Install to see nursery sizes.');
+    const o = sheetHtml(plantList(Object.fromEntries([put('a', object.id)]), {}), none, 'install');
+    expect(o).not.toContain('Sizes shown');
+  });
 });
