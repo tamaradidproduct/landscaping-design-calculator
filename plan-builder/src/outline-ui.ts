@@ -266,9 +266,12 @@ export class OutlineTool {
     this.record(); this.symbols.place(this.placing, this.host.toPage(screen)); this.update();
   }
   selectSymbol(id: string | null) {
-    this.dropArmedSurface();
+    const dropped = this.dropArmedSurface();
     const s = id ? this.symbols.placed[id] : null;
-    if (this.drawing || (id && (!s || !this.symbolShown(s)))) return;
+    if (this.drawing || (id && (!s || !this.symbolShown(s)))) {
+      if (dropped) this.update();
+      return;
+    }
     this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = id; this.clearLines();
     this.update();
   }
@@ -342,9 +345,12 @@ export class OutlineTool {
   /** Back out the last point of the line being drawn. */
   private popDraftPoint() { if (this.lineDraft?.points.length) { this.lineDraft.points.pop(); this.lastLineTap = null; this.update(); } }
   selectLine(id: string | null) {
-    this.dropArmedSurface();
+    const dropped = this.dropArmedSurface();
     const l = id ? this.lines.placed[id] : null;
-    if (this.drawing || (id && (!l || !this.lineShown(l)))) return;
+    if (this.drawing || (id && (!l || !this.lineShown(l)))) {
+      if (dropped) this.update();
+      return;
+    }
     this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.lineDraft = null;
     this.selectedLine = id; this.selectedLinePoint = null; this.update();
   }
@@ -1027,8 +1033,11 @@ export class OutlineTool {
   }
   /** Select an outline from the Layers panel (null: drop the selection). */
   selectOutline(id: string | null) {
-    this.dropArmedSurface();
-    if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) return;
+    const dropped = this.dropArmedSurface();
+    if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) {
+      if (dropped) this.update();
+      return;
+    }
     if (id !== this.selected) this.aspectLock = false;
     this.placing = null; this.selectedSymbol = null; this.clearLines();
     this.selectedEdge = null; this.selectedCorner = null; this.selected = id; this.update();
