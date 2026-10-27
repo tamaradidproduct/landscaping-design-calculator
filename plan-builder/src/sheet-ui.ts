@@ -13,7 +13,7 @@ export interface SheetSelection { symbol?: string; size?: string; line?: string;
 
 const card = (s: LibrarySymbol, quantity: number, selected: boolean, size?: string) =>
   `<button type="button" class="plant-card${selected ? ' selected' : ''}" data-sheet-symbol="${esc(s.id)}"${size ? ` data-sheet-size="${esc(size)}"` : ''}${selected ? ' aria-pressed="true"' : ''}><img class="plant-art" src="${esc(s.art)}" alt="">`
-  + `<span class="plant-text"><span class="plant-name">${esc(s.name)}</span>${size ? `<span class="plant-category">${esc(size)}</span>` : ''}${s.category ? `<span class="plant-category">${esc(s.category)}</span>` : ''}</span>`
+  + `<span class="plant-text"><span class="plant-name">${esc(s.name)}</span>${size ? `<span class="plant-size">${esc(size)}</span>` : ''}${s.category ? `<span class="plant-category">${esc(s.category)}</span>` : ''}</span>`
   + `<span class="plant-qty" title="Quantity" aria-label="Quantity ${quantity}"><span class="plant-count">${quantity}</span></span>`
   + `${s.photo ? `<img class="plant-photo" src="${esc(s.photo)}" alt="">` : ''}</button>`;
 

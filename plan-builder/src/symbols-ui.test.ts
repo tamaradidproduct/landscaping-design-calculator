@@ -21,7 +21,8 @@ describe('plant card', () => {
     expect(h).toContain('>Custom</button>');
     expect(h.match(/aria-pressed="true"/g)).toHaveLength(1);
     expect(h).toMatch(/aria-pressed="true"[^>]*>6 ft B&amp;B|aria-pressed="true"[^>]*>6 ft B&B/);
-    expect(h).toContain('Apply to all Blue Diamond Spruces (3)');
+    expect(h).toContain('Apply to all Blue Diamond Spruce (3)');
+    expect(h).not.toContain('Spruces');
     expect(h).toContain('data-act="delete-symbol"');
     expect(h).toContain('Install 4.5 ft across · mature 10 ft');
     expect(h).toContain('Drag the handle on the plan to set a custom size.');

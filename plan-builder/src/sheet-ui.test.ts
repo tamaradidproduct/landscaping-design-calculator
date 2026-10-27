@@ -43,4 +43,10 @@ describe('sheetHtml', () => {
     const o = sheetHtml(plantList(Object.fromEntries([put('a', object.id)]), {}), none, 'install');
     expect(o).not.toContain('Sizes shown');
   });
+  test('a plant row\'s size line has its own class, apart from the category line', () => {
+    const html = sheetHtml(plantList(Object.fromEntries([put('a', plant.id)]), {}, {}, null, null, 'install'), none, 'install');
+    expect(html).toMatch(/<span class="plant-size">[^<]+<\/span>/);
+    if (plant.category) expect(html).toContain(`<span class="plant-category">${plant.category}</span>`);
+    expect(html.match(/class="plant-category"/g)?.length ?? 0).toBe(plant.category ? 1 : 0);
+  });
 });

@@ -83,7 +83,8 @@ export function startShell(ed: Editor): Shell {
       head.show(current);
       if (needsPlantSizePrompt(state)) {
         const answer = await askPlantSize();
-        if (seq === openSeq) { tool.setPlantViewSilently(answer); } // update() tells the shell, which autosaves
+        if (seq !== openSeq) return; // another plan was opened (or the editor closed) while the question was up
+        tool.setPlantViewSilently(answer); // update() tells the shell, which autosaves
       }
       if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it

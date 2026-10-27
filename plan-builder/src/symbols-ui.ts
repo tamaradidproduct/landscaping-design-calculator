@@ -36,7 +36,7 @@ export function symbolCard(t: OutlineTool, id: string): string {
     const chip = (label: string, data: Record<string, string>) => button(esc(label), { mods: ['chip'], pressed: label === current, disabled: off, data });
     chips = `<div class="chips">${containers.map(c => chip(c.container, { container: c.container })).join('')}${chip('Custom', { act: 'custom-size' })}</div>`
       + hint(off ? 'Switch to Install to change the container' : 'Drag the handle on the plan to set a custom size.')
-      + (group.length > 1 ? button(esc(`Apply to all ${lib.name}s (${group.length})`), { data: { act: 'apply-species' } }) : '');
+      + (group.length > 1 ? button(esc(`Apply to all ${lib.name} (${group.length})`), { data: { act: 'apply-species' } }) : '');
   }
   const sizeText = `${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`;
   return layerCard({

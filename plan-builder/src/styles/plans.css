@@ -73,6 +73,6 @@ button.menu-item:hover { background: var(--color-bg); }
 .replace-confirm { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
 .replace-text { margin: 0; font-size: var(--text-base); line-height: var(--leading-body); }
 
-.modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-5); background: rgb(0 0 0 / 0.4); }
+.modal-backdrop { position: fixed; inset: 0; z-index: calc(var(--z-chip) + 1); display: grid; place-items: center; padding: var(--space-5); background: color-mix(in srgb, var(--color-shadow) 40%, transparent); } /* above every chip and the toast */
 .modal { display: flex; flex-direction: column; gap: var(--space-4); max-width: 28em; padding: var(--space-5); background: var(--color-bg); border: var(--border-width) solid var(--color-accent); border-radius: var(--radius-md); }
 .modal-title { margin: 0; font-size: var(--text-lg); }
