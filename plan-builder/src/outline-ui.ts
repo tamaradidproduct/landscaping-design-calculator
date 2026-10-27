@@ -411,11 +411,6 @@ export class OutlineTool {
   }
   /** True once the plot boundary is closed: surfaces need the lot to clip to. */
   get boundaryClosed() { return !!this.outlines[BOUNDARY]?.closed && this.drawing !== BOUNDARY; }
-  /** Draw a new surface (zone) of a material; its name starts as the material's. */
-  startSurface(m: MaterialId) {
-    if (!this.boundaryClosed) return;
-    this.begin(this.nextSurfaceId(), 'surface', material(m).name, m);
-  }
   private nextSurfaceId() { let n = 1; while (this.outlines[`s${n}`]) n++; return `s${n}`; }
   /** A material picked before any shape takes it: the next surface drawn (or closed without one) gets it. */
   pendingMaterial: MaterialId | null = null;

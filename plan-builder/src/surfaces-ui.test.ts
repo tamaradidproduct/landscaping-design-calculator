@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { materialsByFamily } from './materials';
+import { MATERIALS } from './materials';
 import { surfaceCard } from './surfaces-ui';
 import type { OutlineTool } from './outline-ui';
 import type { Outline } from './outline';
 
-const zone = { id: 'z1', kind: 'surface', name: 'Patio', material: materialsByFamily()[0]!.materials[0]!.id, closed: true, pts: [], texScale: 1 } as unknown as Outline;
+const zone = { id: 'z1', kind: 'surface', name: 'Patio', material: MATERIALS[0]!.id, closed: true, pts: [], texScale: 1 } as unknown as Outline;
 const tool = (radii: number[]) => ({
   drawing: null, cal: { ftPerPt: 1 }, aspectLock: false,
   zoneBox: () => ({ w: 10, h: 8 }), areaSqft: () => 80, cornerRadiiFt: () => radii,

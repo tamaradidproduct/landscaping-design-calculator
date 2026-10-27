@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { LINE_ITEMS, LINE_WIDTH_FT, clampLineWidth, lineItemById, searchLineItems, stepLineWidth } from './line-items';
+import { LINE_ITEMS, LINE_WIDTH_FT, clampLineWidth, lineItemById, stepLineWidth } from './line-items';
 
 describe('line items', () => {
   test('five items in picker order', () => {
@@ -15,10 +15,8 @@ describe('line items', () => {
       expect(i.roundCaps, i.id).toBe(i.id !== 'dry-river');
     }
   });
-  test('lineItemById and searchLineItems', () => {
+  test('lineItemById', () => {
     expect(lineItemById('dry-river')?.name).toBe('Dry river'); expect(lineItemById('nope')).toBeUndefined();
-    expect(searchLineItems('FENCE').map(i => i.id)).toEqual(['wood-privacy-fence']);
-    expect(searchLineItems('')).toHaveLength(5); expect(searchLineItems('zzz')).toEqual([]);
   });
   test('clampLineWidth keeps a width within 0.25–12 ft and otherwise leaves it as typed (to the cent)', () => {
     expect(LINE_WIDTH_FT).toEqual({ min: 0.25, max: 12, step: 0.25 });

@@ -45,20 +45,3 @@ export const SYMBOLS: readonly LibrarySymbol[] = SYMBOL_SOURCES.map(s => {
 });
 
 export const symbolById = (id: string): LibrarySymbol | undefined => SYMBOLS.find(s => s.id === id);
-
-/** The symbols grouped by family, in library order (all of them, or only plants, objects or markers). */
-export function symbolFamilies(kind?: LibrarySymbol['kind']): { family: string; symbols: LibrarySymbol[] }[] {
-  const groups: { family: string; symbols: LibrarySymbol[] }[] = [];
-  for (const s of SYMBOLS) {
-    if (kind && s.kind !== kind) continue;
-    const g = groups.find(x => x.family === s.family);
-    if (g) g.symbols.push(s); else groups.push({ family: s.family, symbols: [s] });
-  }
-  return groups;
-}
-
-/** Symbols whose name, category or family contains the query (case-insensitive); an empty query returns all. */
-export function searchSymbols(query: string): LibrarySymbol[] {
-  const q = query.trim().toLowerCase();
-  return q ? SYMBOLS.filter(s => `${s.name} ${s.category} ${s.family}`.toLowerCase().includes(q)) : [...SYMBOLS];
-}

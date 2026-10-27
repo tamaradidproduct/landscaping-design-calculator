@@ -49,9 +49,3 @@ export const LINE_ITEMS: readonly LineItem[] = LINE_SOURCES.map(s => {
 });
 
 export const lineItemById = (id: string): LineItem | undefined => LINE_ITEMS.find(i => i.id === id);
-
-/** Line items whose name contains the query (case-insensitive); an empty query returns all. */
-export function searchLineItems(query: string): LineItem[] {
-  const q = query.trim().toLowerCase();
-  return q ? LINE_ITEMS.filter(i => i.name.toLowerCase().includes(q)) : [...LINE_ITEMS];
-}

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
-import { LEGACY_MATERIAL_IDS, MATERIALS, materialsByFamily, normalizeMaterialId } from './materials';
+import { LEGACY_MATERIAL_IDS, MATERIALS, normalizeMaterialId } from './materials';
 
 const tokens = JSON.parse(readFileSync(new URL('../design-system/tokens.json', import.meta.url), 'utf8'));
 const token = (name: string) => Object.values(tokens).flatMap((g: any) => g?.tokens ?? []).find((t: any) => t.name === name);
@@ -11,11 +11,9 @@ describe('materials', () => {
     expect(new Set(MATERIALS.map(m => m.id)).size).toBe(29);
     expect(new Set(MATERIALS.map(m => m.name)).size).toBe(29);
   });
-  test('grouped by family, in picker order', () => {
-    const groups = materialsByFamily();
-    expect(groups.map(g => g.family)).toEqual(['Turf & seed', 'Mulch & soil', 'Rock & gravel', 'Pavers & stone', 'Concrete', 'Decking']);
-    groups.forEach(g => expect(g.materials.length).toBeGreaterThan(0));
-    expect(groups.flatMap(g => g.materials)).toHaveLength(29);
+  test('listed family by family, in picker order', () => {
+    const runs = MATERIALS.map(m => m.family).filter((f, i, all) => f !== all[i - 1]);
+    expect(runs).toEqual(['Turf & seed', 'Mulch & soil', 'Rock & gravel', 'Pavers & stone', 'Concrete', 'Decking']);
   });
   test('every material has a tile, a thumbnail, a 10 ft repeat and an edge colour', () => {
     for (const m of MATERIALS) {
