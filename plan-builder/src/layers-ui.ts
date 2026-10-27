@@ -2,19 +2,32 @@
 // House, or a custom feature named from quick picks or typed). Tapping a row selects that outline; the row of
 // the outline being drawn or edited expands into a card with its step and actions (there is no
 // panel over the plan).
-import { formatArea, outlineSuggestions, type Outline } from './outline';
+import { duplicable, formatArea, outlineSuggestions, type Outline } from './outline';
 import { outlinesHints, panelState } from './panel-state';
 import type { OutlineTool } from './outline-ui';
-import { picker } from './surfaces-ui';
-import type { MaterialId } from './materials';
+import { materialGrid, newGrid, wireMaterialGrid } from './surfaces-ui';
 import { drawingCard, editActions, wireLayerCard, wireReorder } from './layer-card';
 import { button, caption, chips, esc, hint, input, label, layerActions, layerCard, layerForm, layerRow, splitRow, suggestRow, type Swatch } from './ui';
 
 export class OutlinesSection {
   private naming = false; // the custom-feature name form is open
-  private filling = false; // the boundary card's material picker for the plot fill is open
+  private filling = false; // the boundary card's material grid for the plot fill is open
+  private grid = newGrid();
 
-  constructor(private el: HTMLElement, private tool: OutlineTool) {}
+  /** `onDuplicated` gets the new zone's id after Duplicate as surface (main opens its material grid). */
+  constructor(private el: HTMLElement, private tool: OutlineTool, private onDuplicated?: (id: string) => void) {}
+
+  /** Select the plot boundary and open its Fill the plot grid (the Surface grid's Fill the plot cell). */
+  openFill() {
+    const t = this.tool;
+    if (t.drawing) t.cancel();
+    if (!t.fillable || !t.cal) return;
+    t.selectOutline('boundary');
+    if (t.selected !== 'boundary') return;
+    this.filling = true; this.grid = newGrid(); this.render();
+    this.el.querySelector<HTMLElement>('[data-card]')?.scrollIntoView({ block: 'nearest' });
+    this.el.querySelector<HTMLInputElement>('#fill-search')?.focus();
+  }
 
   render() {
     const t = this.tool, all = Object.values(t.outlines);
@@ -54,9 +67,13 @@ export class OutlinesSection {
     });
     this.wireCard();
     wireReorder(this.el, t);
-    this.el.querySelector<HTMLButtonElement>('[data-act=fill-plot]')?.addEventListener('click', () => { this.filling = true; this.render(); });
-    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-fill]')?.addEventListener('click', () => { this.filling = false; this.render(); });
-    this.el.querySelectorAll<HTMLButtonElement>('[data-fill-material]').forEach(b => { b.onclick = () => { this.filling = false; t.fillPlot(b.dataset.fillMaterial as MaterialId); }; });
+    this.el.querySelector<HTMLButtonElement>('[data-act=fill-plot]')?.addEventListener('click', () => {
+      this.filling = true; this.grid = newGrid(); this.render(); this.el.querySelector<HTMLInputElement>('#fill-search')?.focus();
+    });
+    const dismissFill = () => { this.filling = false; this.render(); };
+    this.el.querySelector<HTMLButtonElement>('[data-act=cancel-fill]')?.addEventListener('click', dismissFill);
+    const pop = this.el.querySelector<HTMLElement>('.fill-plot .tool-popover');
+    if (pop) wireMaterialGrid(pop, this.grid, { pick: m => { this.filling = false; t.fillPlot(m); }, dismiss: dismissFill, rerender: () => this.render() });
     this.el.querySelector<HTMLButtonElement>('[data-start=boundary]')?.addEventListener('click', () => t.startBoundary());
     this.el.querySelectorAll<HTMLButtonElement>('[data-feature]').forEach(b => { b.onclick = () => t.startFeature(b.dataset.feature!); });
     this.el.querySelector<HTMLButtonElement>('[data-act=name]')?.addEventListener('click', () => {
@@ -79,22 +96,25 @@ export class OutlinesSection {
     return layerCard({
       id: o.id, swatch: swatchOf(o), name: o.name, rename: feature,
       sub: o.kind === 'boundary' ? areaText(t.areaSqft(o)) : undefined,
-      actions: editActions(feature), body: o.kind === 'boundary' ? this.fillOffer() : '',
+      actions: editActions(feature, duplicable(o) && t.boundaryClosed), body: o.kind === 'boundary' ? this.fillOffer() : '',
     });
   }
-  /** The plot boundary card's "Fill with surface": one surface over the whole lot (once scaled, and only if there is no fill yet). */
+  /** The plot boundary card's "Fill the plot" (in the slot a custom outline's Duplicate as surface has): one surface over the
+   * whole lot (once scaled, and only if there is no fill yet). */
   private fillOffer(): string {
     const t = this.tool;
     if (!t.fillable || !t.cal) return '';
-    if (!this.filling) return layerActions(button('Fill with surface', { mods: ['compact'], data: { act: 'fill-plot' } }));
-    return layerForm(`${hint('Pick the surface to cover the whole plot. It follows the plot boundary.')}${picker().replace(/data-material=/g, 'data-fill-material=')}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-fill' } })}`);
+    if (!this.filling) return layerActions(button('Fill the plot', { mods: ['compact'], data: { act: 'fill-plot' } }));
+    return `<div class="fill-plot">${hint('Pick the surface to cover the whole plot. It follows the plot boundary.')}${materialGrid(this.grid, undefined, 'fill-search')}${button('Cancel', { mods: ['compact'], data: { act: 'cancel-fill' } })}</div>`;
   }
   private wireCard() {
     const card = this.el.querySelector<HTMLElement>('[data-card]');
-    if (card) wireLayerCard(card, this.tool);
+    if (card) wireLayerCard(card, this.tool, {
+      'duplicate-surface': () => { const id = this.tool.duplicateAsSurface(card.dataset.card!); if (id) this.onDuplicated?.(id); },
+    });
   }
 }
 
 /** A row's swatch: the outline kind, or a surface's material. */
-const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material! } : o.kind;
+const swatchOf = (o: Outline): Swatch => o.kind === 'surface' ? { material: o.material } : o.kind;
 const areaText = (sqft: number | null) => sqft === null ? undefined : formatArea(sqft);

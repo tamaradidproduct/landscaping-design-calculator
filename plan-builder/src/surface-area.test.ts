@@ -12,6 +12,10 @@ const zone = (id: string, pts: Outline['pts'], material: Outline['material']): O
 const areas = (...os: Outline[]) => surfaceAreasPt2(os, visibleShapes(os));
 
 describe('surface areas by visible part', () => {
+  test('a surface without a material counts toward nothing', () => {
+    const m = areas(boundary, zone('s1', rect(10, 10, 20, 20), undefined), fillOutline(boundary, 'premium-sod'));
+    expect([...m.keys()]).toEqual(['premium-sod']); expect(m.get('premium-sod')).toBeCloseTo(10000 - 100, 3);
+  });
   test('a fill with nothing on it is the lot', () => {
     expect(areas(boundary, fillOutline(boundary, 'premium-sod')).get('premium-sod')).toBeCloseTo(10000, 3);
   });

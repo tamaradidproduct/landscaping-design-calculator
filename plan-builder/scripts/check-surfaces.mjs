@@ -30,9 +30,10 @@ const shape = id => page.evaluate(id => {
 const zones = () => page.$$eval('#surfaces .layer-row .layer-name, #surfaces .layer-rename', e => e.map(x => x.value || x.textContent).join(' > '));
 const fillOpacity = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => getComputedStyle(e).fillOpacity);
 const toast = () => page.textContent('#toast');
+const toolsReady = () => page.evaluate(() => !document.querySelector('#add .tool[data-tool=surfaces]').classList.contains('dim'));
 
 try {
-results.push(['Before the plot boundary', `${await page.textContent('#surfaces')} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`.trim()]);
+results.push(['Before the plot boundary', `${await page.textContent('#surfaces')} · Surface tool ready: ${await toolsReady()}`.trim()]);
 
 // Lot 250..550 × 150..650 (rect tool).
 await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]);
@@ -45,8 +46,8 @@ await setEdgeLength(page, '100');
 results.push(['Scale set on the boundary', await toast()]);
 await page.keyboard.press('Escape');
 
-// Sod, drawn once the scale is set (Add stays hidden until then).
-await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=premium-sod]');
+// Sod, drawn once the scale is set (the tools stay dimmed until then).
+await addVia(page, 'surfaces', 'premium-sod');
 await drag([280, 180], [520, 400]);
 await page.keyboard.press('Escape');
 
@@ -57,16 +58,16 @@ const sod = await shape('s1');
 results.push(['House (drawn later) cuts the sod', `sod rings ${sod?.rings} (2 = with a hole)`]);
 
 // Pavers 12′ × 20′ (60 × 100 pt), inside the sod → placed above it.
-await addVia(page, 'surfaces'); await page.click('#surfaces [data-material=pavers-classic]');
+await addVia(page, 'surfaces', 'pavers-classic');
 await drag([300, 250], [360, 350]);
 results.push(['Pavers drawn inside the sod', `order ${await zones()} · sod rings now ${(await shape('s1'))?.rings}`]);
 results.push(['Plan look', `boundary fill ${await page.$eval('.overlay .shape.boundary.closed', e => getComputedStyle(e).fill)} (expect none) · surface labels ${await page.$$eval('.overlay .label.surface', e => e.length)} (expect 0)`]);
 results.push(['Selected zone stays solid (expect 1 · 1)', `pavers ${await fillOpacity('s2')} · sod ${await fillOpacity('s1')}`]);
 await page.screenshot({ path: `${outDir}/surfaces.png` });
 
-// With the pavers still selected, Add surface… starts a new zone (it must not re-material the pavers).
-await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=wood-mulch]');
-results.push(['Add surface… while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
+// With the pavers still selected, the Surface tool starts a new zone (it must not re-material the pavers).
+await addVia(page, 'surfaces', 'wood-mulch');
+results.push(['Surface tool while a zone is selected', `${await zones()} · ${(await page.textContent('#surfaces .layer-meta').catch(() => 'no drawing card')) ?? ''}`]);
 await drag([250, 150], [330, 190]); // its top edge lies on the lot line
 await tap([290, 150]);
 results.push(['Tap the mulch edge on the lot line', `chip "${(await page.textContent('.edge-chip-mount').catch(() => '?')).trim().replace(/\s+/g, ' ')}"`]);
@@ -86,10 +87,10 @@ results.push(['⌘Z', `x ${back.x0}..${back.x1} (expect 300..360)`]);
 await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(150);
 
 // Material and name.
-await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=red-flagstone]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-pick=red-flagstone]'); await page.waitForTimeout(100);
 results.push(['Pavers → Flagstone', await zones()]);
 await page.fill('#surface-rename', 'Back patio'); await page.press('#surface-rename', 'Enter'); await page.waitForTimeout(100);
-await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-material=clear-mountain-granite]'); await page.waitForTimeout(100);
+await page.click('#surfaces [data-card] [data-act=change-material]'); await page.click('#surfaces [data-card] [data-pick=clear-mountain-granite]'); await page.waitForTimeout(100);
 const mat = () => page.$eval('#surfaces [data-card] [data-act=change-material] .swatch rect', e => e.getAttribute('fill'));
 results.push(['Renamed, then → Gravel', `${await zones()} · ${await mat()}`]);
 await page.keyboard.press('Meta+z'); await page.waitForTimeout(150);
@@ -101,12 +102,12 @@ await page.keyboard.press('Escape'); await page.focus('#surfaces [data-grip=s2]'
 results.push(['Back patio ↓', `${await zones()} · patio visible rings ${(await shape('s2'))?.rings ?? 0} (0 = under the sod) · outlines rows ${outlinesBefore} → ${await page.$$eval('#outlines .layer-name, #outlines .layer-rename', e => e.length)}`]);
 await page.focus('#surfaces [data-grip=s2]'); await page.keyboard.press('Alt+ArrowUp'); await page.waitForTimeout(150);
 
-// Redraw the boundary: zones stay; Add surface hidden until it closes; Cancel restores.
+// Redraw the boundary: zones stay; the tools dim until it closes; Cancel restores.
 await page.keyboard.press('Escape');
 await page.click('#outlines [data-layer=boundary]'); await page.click('#outlines [data-card=boundary] [data-act=redraw]');
-results.push(['Redrawing the boundary', `${await zones()} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`]);
+results.push(['Redrawing the boundary', `${await zones()} · Surface tool ready: ${await toolsReady()}`]);
 await page.click('#outlines [data-act=cancel]'); await page.waitForTimeout(150);
-results.push(['Cancel', `${await zones()} · Add surface shown: ${!!await page.$('[data-act=add-surface]')}`]);
+results.push(['Cancel', `${await zones()} · Surface tool ready: ${await toolsReady()}`]);
 
 // The boundary's left edge still reads 100′ (no zone changed the scale).
 await page.click('#fit'); await page.waitForTimeout(400);

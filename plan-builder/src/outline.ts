@@ -1,6 +1,6 @@
 // Pure geometry and parsing for outlines. Coordinates are PDF points (1/72 in) on the plan page.
 import type { Point } from './view';
-import type { MaterialId } from './materials';
+import { MATERIALS, type MaterialId } from './materials';
 import { cornerRound } from './shape-edit';
 import { edgeAt, edgeBetween } from './fillet';
 import { MARK } from './overlay-tokens';
@@ -26,6 +26,13 @@ export interface Outline {
   /** The plot fill: the one surface that covers the whole plot and follows the boundary's shape (see plot-fill.ts). */
   base?: true;
 }
+
+/** Whether an outline counts toward quantities and the plant list, and appears in the Sheet and Preview: a feature or boundary always
+ * does; a surface needs a known material (until then it is "Not counted yet": hatched in Edit, omitted from Sheet and Preview). */
+export const isAssigned = (o: Outline): boolean => o.kind !== 'surface' || (!!o.material && MATERIALS.some(m => m.id === o.material));
+
+/** Whether the canvas leaves `o` out: in Preview an unassigned surface is omitted (Edit still shows it hatched). */
+export const omittedInPreview = (o: Outline, previewing: boolean): boolean => previewing && !isAssigned(o);
 
 /** Layers sections: the lot (the plot boundary), Outlines (existing features) and Surfaces (new work). */
 export type Section = 'lot' | 'outlines' | 'surfaces';
@@ -71,6 +78,10 @@ export function sectionPosition(ids: string[], outlines: Record<string, Outline>
 }
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** The House: the feature named House (any case). It is not duplicated as a surface. */
+export const isHouse = (o: Outline): boolean => o.kind === 'feature' && sameName(o.name, 'House');
+/** A custom outline (a closed feature other than the House) can be duplicated as a surface. */
+export const duplicable = (o: Outline): boolean => o.kind === 'feature' && o.closed && !isHouse(o);
 /** What the Layers panel offers to outline next: the boundary until there is one, House until a feature has that name,
  * and quick-pick names not used yet. */
 export function outlineSuggestions(outlines: Outline[]): { boundary: boolean; features: string[]; picks: string[] } {

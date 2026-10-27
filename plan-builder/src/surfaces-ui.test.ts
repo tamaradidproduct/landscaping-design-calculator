@@ -12,6 +12,27 @@ const tool = (radii: number[]) => ({
 const html = (radii: number[], open: boolean) => surfaceCard(tool(radii), zone, { open, changing: false });
 
 describe('surface card', () => {
+  test('a zone without a material says Not counted yet and shows the hatched swatch', () => {
+    const bare = { ...zone, material: undefined } as unknown as Outline;
+    const h = surfaceCard(tool([0, 0, 0, 0]), bare, { open: false, changing: false });
+    expect(h).toContain('Not counted yet'); expect(h).toContain('url(#unassigned-hatch)');
+    expect(html([0, 0, 0, 0], false)).not.toContain('Not counted yet');
+  });
+  test('an unassigned zone has an Assign material button; an assigned zone does not', () => {
+    const bare = { ...zone, material: undefined } as unknown as Outline;
+    const h = surfaceCard(tool([0]), bare, { open: false, changing: false });
+    expect(h).toContain('Not counted yet'); expect(h).toMatch(/<button[^>]*data-act="assign-material"[^>]*>.*<span>Assign material<\/span><\/button>/);
+    expect(html([0], false)).not.toContain('Assign material');
+  });
+  test('Change material and Assign material open the shared grid in the card, on the Surfaces tag, the current one marked', () => {
+    const grid = { query: '', tag: 'Surfaces', recent: [] };
+    const h = surfaceCard(tool([0]), zone, { open: false, changing: true, grid });
+    expect(h).toContain('class="tool-popover'); expect(h).toContain('data-pick="'); expect(h).toMatch(/data-tag="Surfaces" aria-pressed="true"/);
+    expect(h).toContain(`data-pick="${zone.material}" aria-current="true"`);
+    expect(h).not.toContain('data-symbol'); expect(h).not.toContain('material-list');
+    const bare = surfaceCard(tool([0]), { ...zone, material: undefined } as unknown as Outline, { open: false, changing: true, grid });
+    expect(bare).toContain('Assign material'); expect(bare).toContain('class="tool-popover');
+  });
   test('uniform radius shows its value; mixed shows a Mixed placeholder', () => {
     expect(html([2, 2, 2, 2], true)).toContain('value="2"');
     expect(html([2, 0, 2, 2], true)).toContain('placeholder="Mixed"');

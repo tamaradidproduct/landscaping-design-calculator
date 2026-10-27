@@ -39,12 +39,12 @@ try {
   await drag([250, 150], [550, 650]); await page.keyboard.press('Escape');
   await tap([250, 560]); await setEdgeLength(page, '100');
   await page.keyboard.press('Escape');
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=pavers-classic]');
+  await addVia(page, 'surfaces', 'pavers-classic');
   results.push(['First surface starts as', await pressed()]);
   await page.keyboard.press('x');
   results.push(['X on the surface', await pressed()]);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
-  await addVia(page, 'surfaces'); await page.click('#surfaces .layer-form [data-material=premium-sod]');
+  await addVia(page, 'surfaces', 'premium-sod');
   results.push(['Next surface remembers', await pressed()]);
   await page.keyboard.press('Escape'); await page.waitForTimeout(150);
   await page.click('#outlines [data-layer=boundary]'); await page.click('#outlines [data-card=boundary] [data-act=redraw]');
