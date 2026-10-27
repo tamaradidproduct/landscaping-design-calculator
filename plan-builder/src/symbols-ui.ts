@@ -4,8 +4,39 @@
 import { button, esc, hint, iconButton, inlineHint, input, layerCard, layerRow, row } from './ui';
 import { instanceLabel } from './card-helpers';
 import type { OutlineTool } from './outline-ui';
+import { containersFor, defaultContainer, fmt, normalizeChoice, plantDiameter } from './plant-size';
 import { stepRotation } from './symbol-layer';
 import { symbolById } from './symbols';
+
+/** The selected symbol's card: its size in the sub-line, `1 of N` with ‹ › to step through the placed copies, a trash icon; objects and markers also Rotate; plants with containers also get the container chips and Apply to all. */
+export function symbolCard(t: OutlineTool, id: string): string {
+  const s = t.symbols.placed[id], lib = symbolById(s.symbol)!, deg = Math.round((s.rot ?? 0) * 10) / 10;
+  const mature = fmt(lib.size.w), containers = lib.kind === 'plant' ? containersFor(s.symbol) : [];
+  const view = t.plantView, choice = normalizeChoice(s.symbol, s);
+  let size = lib.kind === 'plant' ? `${mature} ft wide` : `${fmt(lib.size.w)} × ${fmt(lib.size.d)} ft`;
+  if (containers.length && view === 'install') size = `${choice.customInstall !== undefined ? 'Custom' : 'Install'} ${fmt(plantDiameter(s.symbol, choice, 'install'))} ft across · mature ${mature} ft`;
+  const group = t.symbols.groups().find(g => g.symbol === s.symbol)?.ids ?? [];
+  const which = instanceLabel(id, group);
+  const step = which ? `${inlineHint(esc(which))}${iconButton('chevron-left', { ariaLabel: 'Previous', data: { act: 'prev' } })}${iconButton('chevron-right', { ariaLabel: 'Next', data: { act: 'next' } })}` : '';
+  const rotate = lib.kind === 'plant' ? '' : row(
+    button('−', { mods: ['icon'], ariaLabel: 'Turn 15° left', data: { act: 'rot-down' } }),
+    input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: 'Rotation in degrees' }),
+    button('+', { mods: ['icon'], ariaLabel: 'Turn 15° right', data: { act: 'rot-up' } }));
+  let chips = '';
+  if (containers.length) {
+    const off = view !== 'install', current = choice.customInstall !== undefined ? 'Custom' : (choice.container ?? defaultContainer(s.symbol)!.container);
+    const chip = (label: string, data: Record<string, string>) => button(esc(label), { mods: ['chip'], pressed: label === current, disabled: off, data });
+    chips = `<div class="chips">${containers.map(c => chip(c.container, { container: c.container })).join('')}${chip('Custom', { act: 'custom-size' })}</div>`
+      + hint(off ? 'Switch to Install to change the container' : 'Drag the handle on the plan to set a custom size.')
+      + (group.length > 1 ? button(esc(`Apply to all ${lib.name} (${group.length})`), { data: { act: 'apply-species' } }) : '');
+  }
+  const sizeText = `${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`;
+  return layerCard({
+    id, swatch: { symbol: lib.thumb }, name: lib.name, sub: [lib.category, sizeText].filter(Boolean).join(' · '),
+    actions: iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } }),
+    body: `${step ? `<div class="layer-actions">${step}</div>` : ''}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}${chips}`,
+  });
+}
 
 export class SymbolsSection {
   constructor(private el: HTMLElement, private tool: OutlineTool) {}
@@ -27,23 +58,7 @@ export class SymbolsSection {
     this.wire(sel?.id ?? null);
   }
 
-  /** The selected symbol's card: its size in the sub-line, `1 of N` with ‹ › to step through the placed copies, a trash icon; objects and markers also Rotate. */
-  private card(id: string): string {
-    const t = this.tool, s = t.symbols.placed[id], lib = symbolById(s.symbol)!, deg = Math.round((s.rot ?? 0) * 10) / 10;
-    const size = lib.kind === 'plant' ? `${fmt(lib.size.w)} ft wide` : `${fmt(lib.size.w)} × ${fmt(lib.size.d)} ft`;
-    const which = instanceLabel(id, t.symbols.groups().find(g => g.symbol === s.symbol)?.ids ?? []);
-    const step = which ? `${inlineHint(esc(which))}${iconButton('chevron-left', { ariaLabel: 'Previous', data: { act: 'prev' } })}${iconButton('chevron-right', { ariaLabel: 'Next', data: { act: 'next' } })}` : '';
-    const rotate = lib.kind === 'plant' ? '' : row(
-      button('−', { mods: ['icon'], ariaLabel: 'Turn 15° left', data: { act: 'rot-down' } }),
-      input('symbol-rotation', { inputmode: 'decimal', value: String(deg), ariaLabel: 'Rotation in degrees' }),
-      button('+', { mods: ['icon'], ariaLabel: 'Turn 15° right', data: { act: 'rot-up' } }));
-    const sizeText = `${size}${lib.sizeSource.approximate ? ' (approximate)' : ''}`;
-    return layerCard({
-      id, swatch: { symbol: lib.thumb }, name: lib.name, sub: [lib.category, sizeText].filter(Boolean).join(' · '),
-      actions: iconButton('trash', { ariaLabel: 'Delete', variant: 'danger', data: { act: 'delete-symbol' } }),
-      body: `${step ? `<div class="layer-actions">${step}</div>` : ''}${lib.kind === 'marker' ? hint('Direction: the arrow points along the run (0° = up). Turn it to match.') : ''}${rotate}`,
-    });
-  }
+  private card(id: string): string { return symbolCard(this.tool, id); }
 
   private wire(selId: string | null) {
     const t = this.tool, el = this.el;
@@ -71,6 +86,9 @@ export class SymbolsSection {
     const cur = () => t.symbols.placed[selId]?.rot ?? 0;
     card.querySelector<HTMLButtonElement>('[data-act=rot-down]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), -1)));
     card.querySelector<HTMLButtonElement>('[data-act=rot-up]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), 1)));
+    card.querySelectorAll<HTMLButtonElement>('button.chip[data-container]').forEach(b => { b.onclick = () => t.setContainer(selId, b.dataset.container!); });
+    card.querySelector<HTMLButtonElement>('[data-act=custom-size]')?.addEventListener('click', () => t.useCustomSize(selId));
+    card.querySelector<HTMLButtonElement>('[data-act=apply-species]')?.addEventListener('click', () => t.applyToSpecies(selId));
     card.querySelector<HTMLButtonElement>('[data-act=delete-symbol]')?.addEventListener('click', () => t.removeSymbol(selId));
     const rot = card.querySelector<HTMLInputElement>('#symbol-rotation');
     if (rot) {
@@ -79,5 +97,3 @@ export class SymbolsSection {
     }
   }
 }
-
-const fmt = (n: number) => String(Math.round(n * 10) / 10);

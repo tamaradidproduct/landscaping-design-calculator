@@ -25,7 +25,8 @@ import { applyCorrection, IDENTITY, invertCorrection, type Correction } from './
 import { planBounds } from './plan-bounds';
 import { fitPage, fitRect, MAX_ZOOM, MIN_ZOOM, panBy, zoomAt, type Point, type Size, type View } from './view';
 import { docBytes, toDoc } from './plan-model';
-import { topBarHtml, EXPORT_NOTE, type EditorView } from './top-bar';
+import { showPlantToggle } from './plant-size';
+import { topBarHtml, plantToggleHtml, EXPORT_NOTE, type EditorView } from './top-bar';
 import { startShell, type OpenResult, type Shell } from './app-shell';
 
 registerSW({ immediate: true });
@@ -56,7 +57,17 @@ function updateBar() {
   ($('redo') as HTMLButtonElement).disabled = !bar.canRedo;
   document.querySelectorAll<HTMLButtonElement>('#view-switch [data-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === bar.view)));
   $('top-bar').classList.toggle('previewing', bar.view === 'preview');
+  // Install | Mature: shown only while the plan has a plant with containers; patched in place like the rest of the bar.
+  const pv = showPlantToggle(Object.values(tool.symbols.placed).map(s => s.symbol)) ? tool.plantView : undefined;
+  const sw = document.getElementById('plant-view-switch');
+  if (pv === undefined) sw?.remove();
+  else if (!sw) $('view-switch').insertAdjacentHTML('afterend', plantToggleHtml(pv));
+  else sw.querySelectorAll<HTMLButtonElement>('[data-plantview]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.plantview === pv)));
 }
+$('top-bar').addEventListener('click', e => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>('#plant-view-switch [data-plantview]');
+  if (b) tool.setPlantView(b.dataset.plantview === 'mature' ? 'mature' : 'install'); // works in Edit and Preview; update() re-renders bar, canvas and sheet
+});
 
 let correction: Correction = IDENTITY;   // page points → true-shape points (a stretched plan, once corrected)
 /** The page in true-shape points (only stretches for now, so the sheet's corner stays at the origin). */
@@ -239,6 +250,7 @@ function setView(v: EditorView) {
   const preview = v === 'preview';
   if (preview === previewing) return;
   previewing = preview; sheetOpen = preview; bar.view = v; updateBar();
+  tool.previewing = preview; tool.render(); // no plant size handle in Preview
   $('layers-edit').hidden = preview; $('layers-sheet').hidden = !preview;
   applyPlanLook(); tool.previewing = preview; tool.render();
   if (preview) { renderSheet($('layers-sheet'), tool); if (page) { editView = view; fitDrawing(); } }

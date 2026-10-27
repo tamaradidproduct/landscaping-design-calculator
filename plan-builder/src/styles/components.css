@@ -254,6 +254,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .plant-qty { align-items: flex-end; }
 .plant-name { font-weight: var(--weight-strong); font-size: var(--text-base); }
 .plant-category { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted); }
+.plant-size { font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-ink); } /* a sheet row's install or mature size, above the category */
 .plant-count { font-size: var(--text-lg); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
 .plant-measure { font-size: var(--text-sm); color: var(--color-muted); } /* a line's length and runs */
 .plant-surface { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-2) 0; }
@@ -268,6 +269,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .top-bar[hidden] { display: none; }
 .top-bar-inner { height: var(--control-md); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-4); }
 .top-bar-left { position: relative; display: flex; align-items: center; min-width: 0; }
+.top-bar-centre { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .top-bar button { min-height: var(--control-md); }
 .top-bar button.icon { border-color: transparent; background: transparent; color: var(--color-ink); }
@@ -280,6 +282,9 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .top-bar.previewing button.quiet { opacity: var(--opacity-layer-off); }
 
 /* Narrow screens: the name truncates first, then Export shows its icon only */
+#plant-view-switch > button { min-height: 44px; }
+.top-bar .label-short { display: none; }
+@media (max-width: 900px) { .top-bar .label-short { display: inline; } .top-bar .label-full { display: none; } }
 @media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar button.bar-action { min-width: var(--control-sm); padding: 0; } }
 /* ---------- Tool row and search popover (Layers panel) ---------- */
 .tools { display: flex; flex-direction: column; gap: var(--space-4); }

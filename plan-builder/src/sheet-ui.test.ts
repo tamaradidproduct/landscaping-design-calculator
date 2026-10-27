@@ -36,4 +36,23 @@ describe('sheetHtml', () => {
     expect(sheetHtml(list, { symbol: plant.id })).toContain('plant-card selected');
     expect(sheetHtml(list, none)).not.toContain('selected');
   });
+  test('the plants block ends with the footnote for the active view; none without plants', () => {
+    const l = (v: 'install' | 'mature') => plantList(Object.fromEntries([put('a', plant.id)]), {}, {}, null, null, v);
+    expect(sheetHtml(l('install'), none, 'install')).toContain('Sizes shown at install. Switch to Mature to see grown sizes.');
+    expect(sheetHtml(l('mature'), none, 'mature')).toContain('Sizes shown at mature. Switch to Install to see nursery sizes.');
+    const o = sheetHtml(plantList(Object.fromEntries([put('a', object.id)]), {}), none, 'install');
+    expect(o).not.toContain('Sizes shown');
+  });
+  test('a plant row\'s size line has its own class, apart from the category line', () => {
+    const html = sheetHtml(plantList(Object.fromEntries([put('a', plant.id)]), {}, {}, null, null, 'install'), none, 'install');
+    expect(html).toMatch(/<span class="plant-size">[^<]+<\/span>/);
+    if (plant.category) expect(html).toContain(`<span class="plant-category">${plant.category}</span>`);
+    expect(html.match(/class="plant-category"/g)?.length ?? 0).toBe(plant.category ? 1 : 0);
+  });
+  test('no footnote when no plant row has containers (corn, vegetables); a footnote with an oak', () => {
+    const only = plantList(Object.fromEntries([put('a', 'corn'), put('b', 'vegetable-plants')]), {}, {}, null, null, 'mature');
+    expect(sheetHtml(only, none, 'mature')).not.toContain('Sizes shown');
+    const oak = plantList(Object.fromEntries([put('a', 'corn'), put('b', 'oak')]), {}, {}, null, null, 'install');
+    expect(sheetHtml(oak, none, 'install')).toContain('Sizes shown at install.');
+  });
 });

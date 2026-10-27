@@ -24,6 +24,7 @@ export const MARK = {
   roundHandleMin: 34,   // …and its least distance from the corner (screen px): clear of the corner dot's hit area, so each is easy to reach
   insertHandle: 7,      // "+" mark that inserts a new corner on an edge
   insertOffset: 22,     // …its distance off the edge (screen px): clear of the bend-handle square sitting on the edge itself
+  sizeHandle: 8,        // plants (Install view): the dot right of the selected plant that drags its install size
 } as const;
 
 export const MAGNIFIER = { size: 132, zoom: 3, gap: 40, crosshair: 14, crosshairWidth: 1.5 } as const;
@@ -41,6 +42,7 @@ export const HIT = {
   zoneSide: 10,         // the drawn straight part of a selected surface's side (push it)
   roundHandle: 18,      // the round handle on a sharp corner (finger-sized; it floats clear of the corner dot and the sides)
   roundHandleOnArc: 13, // …once the corner is rounded and the handle sits on the arc (smaller, so the sides next to it stay easy to grab)
+  sizeHandle: 22,       // the plant size handle: a 44 px finger target around its dot
   roundReveal: 52,      // from the drawn line at a selected surface's corner (its arc, once rounded): shows the round handle, out to the handle itself
 } as const;
 

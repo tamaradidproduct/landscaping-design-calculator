@@ -71,6 +71,15 @@ export function runPlanStoreContract(make: () => PlanStore) {
       expect(meta.id).toBe(id);
     });
 
+    it('save then load round-trips plantSizeView and a per-plant customInstall', async () => {
+      const s = fresh();
+      const id = await s.create('x', pdfFile());
+      const st: PlanState = { ...state(), plantSizeView: 'mature', symbols: { y1: { id: 'y1', symbol: 'blue-diamond-spruce', x: 1, y: 2, customInstall: 4 } } };
+      s.save(id, st);
+      await s.flushUploads();
+      expect((await s.load(id)).state).toEqual(st);
+    });
+
     it('save of an unreadable state (NaN point) keeps the last good one and reports it', async () => {
       const s = fresh();
       const errors: Error[] = [];
