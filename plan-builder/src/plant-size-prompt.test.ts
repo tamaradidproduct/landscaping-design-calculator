@@ -14,6 +14,10 @@ describe('needsPlantSizePrompt', () => {
     expect(needsPlantSizePrompt({ plantSizeView: 'install', symbols: placed(plant) })).toBe(false);
   });
   it('is false for an objects-only plan', () => expect(needsPlantSizePrompt({ symbols: placed(object) })).toBe(false));
+  it('is false for a plan whose only plants have one size (corn, vegetables): there is nothing to choose', () => {
+    expect(needsPlantSizePrompt({ symbols: placed('corn', 'vegetable-plants') })).toBe(false);
+    expect(needsPlantSizePrompt({ symbols: placed('oak') })).toBe(true);
+  });
   it('is true for plants and no field', () => {
     expect(needsPlantSizePrompt({ symbols: placed(plant) })).toBe(true);
     expect(needsPlantSizePrompt({ symbols: placed(object, plant) })).toBe(true);

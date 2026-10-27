@@ -134,6 +134,8 @@ export class OutlineTool {
   plantSizeView: PlantSizeView | undefined = undefined;
   /** The view in effect: an unset one is Mature for a plan that already has a plant, else Install. */
   get plantView(): PlantSizeView { return effectiveView(this.plantSizeView, this.hasPlants()); }
+  /** Any placed library plant, with containers or not (corn counts): decides the default view and lets the first plant store Install.
+   *  Whether the toggle, the first-open prompt and the sheet footnote show is a narrower test (showPlantToggle: a plant with containers). */
   private hasPlants(): boolean { return Object.values(this.symbols.placed).some(s => symbolById(s.symbol)?.kind === 'plant'); }
   /** The editor is in Preview (set by main): no size handle is offered. */
   previewing = false;
@@ -583,9 +585,10 @@ export class OutlineTool {
         if (this.rawAt) this.applyDrag();
       }, GESTURE.holdMs);
     }
-    // The selected plant's size handle (clear of the plant's own hit area) goes before moving a plant.
-    const size = this.sizeHandleAt(p);
-    if (size) {
+    // The selected plant's size handle (clear of the plant's own hit area) goes before moving a plant, unless another placed
+    // symbol is under the press: in a dense row the neighbour is selected and moved, as before the handle existed.
+    const size = this.sizeHandleAt(p), under = size ? this.symbolAt(p) : null;
+    if (size && (under === null || under === size.id)) {
       const s = this.symbols.placed[size.id];
       const offsetFt = handleGrabOffsetFt(s, this.host.toPage(p), this.ftPerPtDrawn(), this.symbolSizeFt(s).w);
       this.drag = { type: 'size', id: size.id, start: p, offsetFt, moved: false };

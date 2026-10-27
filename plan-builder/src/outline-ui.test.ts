@@ -68,6 +68,11 @@ describe('plant size view', () => {
     const u = tool(); u.setPlantView('mature'); place(u, 'lavender'); expect(u.state().plantSizeView).toBe('mature');
     t.undo(); t.undo(); t.undo(); expect(t.state().plantSizeView).toBeUndefined();
   });
+  test('corn placed first still stores Install, so a later oak draws at install size', () => {
+    const t = tool(); place(t, 'corn');
+    expect(t.state().plantSizeView).toBe('install');
+    place(t, 'oak'); expect(t.plantView).toBe('install'); expect(t.state().plantSizeView).toBe('install');
+  });
   test('an object placed first does not decide the view; the first plant after it still stores Install', () => {
     const t = tool(); place(t, 'hot-tub');
     expect(t.state().plantSizeView).toBeUndefined(); expect(t.plantView).toBe('install');
@@ -240,6 +245,20 @@ describe('plant size handle', () => {
     const other = t.symbols.place('lavender', handle);
     t.pointerDown(handle, 'mouse'); t.pointerUp();
     expect(t.selectedSymbol).toBe(other); expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('dense planting: pressing a neighbour inside the selected plant\'s handle area moves the neighbour, not the size', () => {
+    const { t, id, handle } = tool();
+    const b = t.symbols.place('blue-diamond-spruce', { x: handle.x + 4, y: handle.y }); // B's circle covers the handle point
+    expect(drag(t, handle, { x: handle.x + 30, y: handle.y + 10 })).toBe(true);
+    expect(t.symbols.placed[id].customInstall).toBeUndefined(); expect(t.symbols.placed[id]).toMatchObject({ x: 100, y: 100 });
+    expect(t.selectedSymbol).toBe(b);
+    expect(t.symbols.placed[b]).toMatchObject({ x: handle.x + 34, y: handle.y + 10 });
+  });
+  test('dense planting: with nothing else under it, the handle still resizes', () => {
+    const { t, id, handle } = tool();
+    t.symbols.place('blue-diamond-spruce', { x: handle.x + 200, y: handle.y }); // a neighbour, but not under the press
+    drag(t, handle, { x: handle.x + 10, y: handle.y });
+    expect(t.symbols.placed[id].customInstall).toBeDefined(); expect(t.selectedSymbol).toBe(id);
   });
   test('no handle in Preview', () => {
     const { t, id, handle } = tool(); t.previewing = true;

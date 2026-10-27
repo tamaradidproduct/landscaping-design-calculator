@@ -6,7 +6,7 @@ import { formatArea } from './outline';
 import { caption, esc, hint, swatch } from './ui';
 import type { OutlineTool } from './outline-ui';
 import type { LibrarySymbol } from './symbols';
-import { sizeLabel, type PlantSizeView } from './plant-size';
+import { containersFor, sizeLabel, type PlantSizeView } from './plant-size';
 
 /** `size` is the size label of the selected plant: with it, only that size's row shows as selected (without it, every row of the species). */
 export interface SheetSelection { symbol?: string; size?: string; line?: string; material?: string }
@@ -21,13 +21,14 @@ const lineRow = (l: PlantList['lines'][number], selected: boolean) =>
   `<button type="button" class="plant-surface${selected ? ' selected' : ''}" data-sheet-line="${esc(l.item.id)}"${selected ? ' aria-pressed="true"' : ''}>${swatch({ symbol: l.item.thumb })}<span class="plant-text"><span class="plant-name">${esc(l.item.name)}</span>`
   + `<span class="plant-measure">${lengthText(l.feet)} · ${l.runs} ${l.runs === 1 ? 'run' : 'runs'}</span></span></button>`;
 
-/** The whole sheet as HTML: Plants, Objects, Utility markers, Edges & walls, Surfaces; a quiet note when empty. Pure. */
+/** The whole sheet as HTML: Plants, Objects, Utility markers, Edges & walls, Surfaces; a quiet note when empty. Pure.
+ *  The plants' footnote (which view the sizes show) appears only when a row's species has containers, as the toggle does. */
 export function sheetHtml(l: PlantList, sel: SheetSelection, view: PlantSizeView = 'mature'): string {
   if (!l.surfaces.length && !l.lines.length && !l.plants.length && !l.objects.length && !l.markers.length) return hint('Nothing on the plan yet.');
   const cards = (title: string, list: { symbol: LibrarySymbol; quantity: number; size?: string }[], note = '') =>
     list.length ? `${caption(title)}${list.map(e => card(e.symbol, e.quantity, sel.symbol === e.symbol.id && (sel.size === undefined || e.size === undefined || sel.size === e.size), e.size)).join('')}${note}` : '';
   return [
-    cards('Plants', l.plants, hint(view === 'install' ? 'Sizes shown at install. Switch to Mature to see grown sizes.' : 'Sizes shown at mature. Switch to Install to see nursery sizes.')), cards('Objects', l.objects), cards('Utility markers', l.markers),
+    cards('Plants', l.plants, !l.plants.some(e => containersFor(e.symbol.id).length) ? '' : hint(view === 'install' ? 'Sizes shown at install. Switch to Mature to see grown sizes.' : 'Sizes shown at mature. Switch to Install to see nursery sizes.')), cards('Objects', l.objects), cards('Utility markers', l.markers),
     l.lines.length ? `${caption('Edges &amp; walls')}${l.lines.map(x => lineRow(x, sel.line === x.item.id)).join('')}` : '',
     l.surfaces.length ? `${caption('Surfaces')}${l.surfaces.map(r => `<button type="button" class="plant-surface${sel.material === r.material.id ? ' selected' : ''}" data-sheet-material="${esc(r.material.id)}">${swatch({ material: r.material.id })}<span class="plant-text"><span class="plant-name">${esc(r.material.name)}</span>${r.sqft !== null ? `<span class="plant-measure">${formatArea(r.sqft)}</span>` : ''}</span></button>`).join('')}` : '',
   ].join('');

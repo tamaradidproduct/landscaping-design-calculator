@@ -49,4 +49,10 @@ describe('sheetHtml', () => {
     if (plant.category) expect(html).toContain(`<span class="plant-category">${plant.category}</span>`);
     expect(html.match(/class="plant-category"/g)?.length ?? 0).toBe(plant.category ? 1 : 0);
   });
+  test('no footnote when no plant row has containers (corn, vegetables); a footnote with an oak', () => {
+    const only = plantList(Object.fromEntries([put('a', 'corn'), put('b', 'vegetable-plants')]), {}, {}, null, null, 'mature');
+    expect(sheetHtml(only, none, 'mature')).not.toContain('Sizes shown');
+    const oak = plantList(Object.fromEntries([put('a', 'corn'), put('b', 'oak')]), {}, {}, null, null, 'install');
+    expect(sheetHtml(oak, none, 'install')).toContain('Sizes shown at install.');
+  });
 });

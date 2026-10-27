@@ -1,12 +1,12 @@
 // One-time question for an existing plan that has plants but no stored plant-size view.
-import type { PlantSizeView } from './plant-size';
-import { symbolById } from './symbols';
+import { showPlantToggle, type PlantSizeView } from './plant-size';
 import { button } from './ui';
 
-/** True when the plan has no stored view yet and at least one placed symbol is a library plant. */
+/** True when the plan has no stored view yet and has a plant the Install | Mature toggle applies to (one with containers;
+ *  corn and vegetables have one size, so a plan of only those has nothing to choose). The same test as the toggle. */
 export function needsPlantSizePrompt(state: { plantSizeView?: PlantSizeView; symbols?: Record<string, { symbol: string }> }): boolean {
   if (state.plantSizeView !== undefined) return false;
-  return Object.values(state.symbols ?? {}).some(s => symbolById(s.symbol)?.kind === 'plant');
+  return showPlantToggle(Object.values(state.symbols ?? {}).map(s => s.symbol));
 }
 
 /** The answer an interaction gives: a button, Escape or the backdrop (both keep Mature); undefined means ignore. */
