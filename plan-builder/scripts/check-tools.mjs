@@ -23,21 +23,21 @@ const toScreen = ([x, y]) => page.evaluate(([x, y]) => { const r = document.getE
 const drag = async (p, q) => { const a = await toScreen(p), b = await toScreen(q); await page.mouse.move(...a); await page.mouse.down(); await page.mouse.move(...b, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(300); };
 const tap = async p => { await page.mouse.click(...await toScreen(p)); await page.waitForTimeout(400); };
 const esc = async () => { await page.keyboard.press('Escape'); await page.waitForTimeout(150); };
-const dimmed = () => page.$$eval('#add .tool', b => b.length === 4 && b.every(x => x.classList.contains('dim') && x.getAttribute('aria-disabled') === 'true'));
-const active = () => page.$$eval('#add .tool', b => b.length === 4 && b.every(x => !x.classList.contains('dim') && !x.hasAttribute('aria-disabled')));
-const popOpen = () => page.evaluate(() => !!document.querySelector('#add .tool-popover'));
-const picks = (scope = '#add') => page.$$eval(`${scope} [data-pick]`, c => c.map(x => x.dataset.pick));
-const pressedTag = () => page.textContent('#add .chip[aria-pressed=true]').catch(() => '(none)');
+const dimmed = () => page.$$eval('#tools .tool', b => b.length === 4 && b.every(x => x.classList.contains('dim') && x.getAttribute('aria-disabled') === 'true'));
+const active = () => page.$$eval('#tools .tool', b => b.length === 4 && b.every(x => !x.classList.contains('dim') && !x.hasAttribute('aria-disabled')));
+const popOpen = () => page.evaluate(() => !!document.querySelector('#tools .tool-popover'));
+const picks = (scope = '#tools') => page.$$eval(`${scope} [data-pick]`, c => c.map(x => x.dataset.pick));
+const pressedTag = () => page.textContent('#tools .chip[aria-pressed=true]').catch(() => '(none)');
 const zoneIds = () => page.$$eval('#surfaces [data-zone], #surfaces [data-card]', r => [...new Set(r.map(x => x.dataset.zone ?? x.dataset.card))]);
 const sheet = () => onSheet(page, p => p.$eval('#layers-sheet', e => e.innerText.replace(/\n+/g, ' | ')));
-const fillCell = () => page.evaluate(() => { const g = document.querySelector('#add .tool-grid'); return !!g && g.firstElementChild?.matches('[data-act=fill-plot]'); });
+const fillCell = () => page.evaluate(() => { const g = document.querySelector('#tools .tool-grid'); return !!g && g.firstElementChild?.matches('[data-act=fill-plot]'); });
 const shapeFill = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => e.getAttribute('style') ?? '').catch(() => '(missing)');
 
 try {
   // ---- Before the scale ----
-  check('Before the boundary: the four tools are dimmed', await dimmed(), (await page.$$eval('#add .tool', b => b.map(x => x.textContent.trim()))).join());
-  await page.click('#add .tool[data-tool=surfaces]', { force: true }); await page.waitForTimeout(150); // aria-disabled: Playwright would wait for it to enable
-  check('Tapping a dimmed tool shows the hint, no grid', !(await popOpen()) && /set the scale first/.test(await page.textContent('#add .tool-hint').catch(() => '')), await page.textContent('#add .tool-hint').catch(() => '(no hint)'));
+  check('Before the boundary: the four tools are dimmed', await dimmed(), (await page.$$eval('#tools .tool', b => b.map(x => x.textContent.trim()))).join());
+  await page.click('#tools .tool[data-tool=surfaces]', { force: true }); await page.waitForTimeout(150); // aria-disabled: Playwright would wait for it to enable
+  check('Tapping a dimmed tool shows the hint, no grid', !(await popOpen()) && /set the scale first/.test(await page.textContent('#tools .tool-hint').catch(() => '')), await page.textContent('#tools .tool-hint').catch(() => '(no hint)'));
   await page.click('[data-start=boundary]'); await drag([250, 150], [550, 650]); await esc();
   check('Closed boundary, no scale: still dimmed', await dimmed(), '');
   await tap([250, 560]); await setEdgeLength(page, '100'); await esc(); // 500 pt = 100 ft
@@ -63,6 +63,17 @@ try {
   // ---- Shape first, dismissed: hatched, Not counted yet, omitted from the Sheet ----
   await esc(); // closes the grid; the draft stays
   check('Esc closes the grid, the draft stays', !(await popOpen()) && !(await page.$eval('#section-surfaces', s => s.hidden)), '');
+  // Nothing drawn yet, the tool is only armed: not an undo step, and nothing stuck. Undo puts it down without undoing the scale;
+  // tapping another layer's row puts it down and selects that layer.
+  const surfacesHidden = () => page.$eval('#section-surfaces', s => s.hidden);
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
+  check('Undo with nothing drawn drops the empty draft and undoes nothing else', (await surfacesHidden()) && (await active()), `section hidden ${await surfacesHidden()} · tools active ${await active()}`);
+  await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(250);
+  check('…and Redo has no empty draft to bring back', await surfacesHidden(), '');
+  await openTool(page, 'surfaces'); await esc();
+  await page.click('#outlines [data-layer=boundary]'); await page.waitForTimeout(200);
+  check('Tapping a layer row with nothing drawn drops the empty draft and selects it', (await surfacesHidden()) && !!(await page.$('#outlines [data-card=boundary]')), '');
+  await esc(); await openTool(page, 'surfaces'); await esc();
   await drag([270, 170], [330, 230]);
   const [z1] = await zoneIds();
   check('Closing the shape opens the material grid in its card', !!(await page.$('#material-search')) && /Assign material/.test(await page.$eval('#surfaces [data-card]', c => c.innerText).catch(() => '')), z1 ?? 'no zone');
@@ -97,19 +108,19 @@ try {
   // ---- Add: one search over every kind; a query ignores the tag; Recent ----
   await openTool(page, 'add');
   check('Add opens on All', (await pressedTag()) === 'All', await pressedTag());
-  const popH = await page.$eval('#add .tool-popover', e => Math.round(e.getBoundingClientRect().height));
+  const popH = await page.$eval('#tools .tool-popover', e => Math.round(e.getBoundingClientRect().height));
   check('The popover stays short (the grid scrolls inside it)', popH <= 700, `${popH} px`);
   await page.fill('#tool-search', 'sod'); await page.waitForTimeout(100);
   check('Add finds a material with one query ("sod")', (await picks()).includes('premium-sod'), (await picks()).join());
-  const label = await page.$eval('#add [data-pick=premium-sod] .cell-cat', e => e.textContent).catch(() => '(none)');
+  const label = await page.$eval('#tools [data-pick=premium-sod] .cell-cat', e => e.textContent).catch(() => '(none)');
   check('Query results say their category ("Surface")', label === 'Surface', label);
   await page.fill('#tool-search', 'spruce'); await page.waitForTimeout(100);
   check('Add finds a plant with one query ("spruce")', (await picks()).includes('blue-diamond-spruce'), (await picks()).join());
-  await page.fill('#tool-search', ''); await page.click('#add .chip[data-tag="Edges & walls"]'); await page.waitForTimeout(100);
+  await page.fill('#tool-search', ''); await page.click('#tools .chip[data-tag="Edges & walls"]'); await page.waitForTimeout(100);
   const linesOnly = await picks();
   await page.fill('#tool-search', 'sod'); await page.waitForTimeout(100);
   check('A typed query ignores the active tag (Edges & walls + "sod" finds sod)', !linesOnly.includes('premium-sod') && (await picks()).includes('premium-sod'), `${linesOnly.length} edges · ${(await picks()).join()}`);
-  await page.fill('#tool-search', ''); await page.click('#add .chip[data-tag=Recent]'); await page.waitForTimeout(100);
+  await page.fill('#tool-search', ''); await page.click('#tools .chip[data-tag=Recent]'); await page.waitForTimeout(100);
   const recent = await picks();
   check('Recent shows the last picks, newest first', recent[0] === 'premium-sod' && recent.includes('deck-wood') && recent.includes('wood-mulch'), recent.join());
   await esc();
@@ -155,7 +166,7 @@ try {
   await page.click('#outlines [data-act=cancel]'); await page.waitForTimeout(200); await esc();
   await openTool(page, 'surfaces');
   check('Boundary closed again: Fill the plot leads the Surface grid', await fillCell(), '');
-  await page.click('#add .tool-grid [data-act=fill-plot]'); await page.waitForTimeout(250);
+  await page.click('#tools .tool-grid [data-act=fill-plot]'); await page.waitForTimeout(250);
   check('Tapping it opens the boundary card\'s grid', !(await popOpen()) && !!(await page.$('#fill-search')), '');
   await page.click('#outlines [data-pick=white-river-rock]'); await page.waitForTimeout(300);
   check('Picking fills the plot', (await page.$$('.overlay path[data-id=fill]')).length >= 1 && /White river rock \| [\d,]+ sq ft/.test(await sheet()), '');

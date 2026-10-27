@@ -31,16 +31,6 @@ export const MATERIALS: readonly Material[] = SURFACE_SOURCES.map(({ id, name, f
 
 export const material = (id: MaterialId): Material => MATERIALS.find(x => x.id === id)!;
 
-/** The picker's groups, in order. */
-export function materialsByFamily(): { family: Family; materials: Material[] }[] {
-  const groups: { family: Family; materials: Material[] }[] = [];
-  for (const m of MATERIALS) {
-    const g = groups.find(x => x.family === m.family);
-    if (g) g.materials.push(m); else groups.push({ family: m.family, materials: [m] });
-  }
-  return groups;
-}
-
 /** The first 11 materials (flat colours) and what they became. */
 export const LEGACY_MATERIAL_IDS: Record<string, MaterialId> = {
   sod: 'premium-sod', turf: 'festival-turf', mulch: 'wood-mulch', 'river-rock': 'white-river-rock',

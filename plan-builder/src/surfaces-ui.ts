@@ -20,7 +20,7 @@ export const newGrid = (): GridState => ({ query: '', tag: 'Surfaces', recent: l
  * `current` is marked. It opens on the Surfaces tag. */
 export function materialGrid(g: GridState, current?: MaterialId, inputId = 'material-search'): string {
   const entries = searchEntries().filter(e => e.category === 'surfaces');
-  const hintText = g.tag === 'Recent' && !g.query.trim() ? 'No recent surfaces yet.' : 'No matches.';
+  const hintText = g.tag === 'Recent' && !g.query.trim() ? 'No recent surfaces yet' : 'No matches';
   return popoverHtml({ query: g.query, tag: g.tag, tags: tagsFor('surfaces'), results: search(g.query, g.tag, entries, g.recent), hint: hintText, inputId, placeholder: 'Search surfaces', current });
 }
 

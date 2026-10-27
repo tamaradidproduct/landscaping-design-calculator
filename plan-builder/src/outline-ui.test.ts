@@ -35,16 +35,17 @@ describe('Surface tool and material picks', () => {
   function bare() {
     const tool = Object.create(OutlineTool.prototype) as OutlineTool;
     const internals = tool as unknown as { record: () => void; update: () => void };
-    const calls = { record: 0 };
+    const calls = { record: 0, update: 0 };
     Object.assign(tool, {
       outlines: { boundary: { id: 'boundary', kind: 'boundary', name: 'Plot boundary', pts: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }], closed: true } },
       drawing: null, replaced: null, selected: null, selectedCorner: null, selectedEdge: null, selectedSymbol: null, placing: null,
+      symbols: { placed: {} }, lines: { placed: {} },
       lineDraft: null, selectedLine: null, selectedLinePoint: null, lastLineTap: null, lastTap: null, refs: [], cal: null,
       pendingMaterial: null, hiddenLayers: new Set(), hiddenSections: new Set(), shapePrefs: { outline: 'freehand', surface: 'rect' },
       host: { toast: () => {} },
     });
     internals.record = () => { calls.record++; };
-    internals.update = () => {};
+    internals.update = () => { calls.update++; };
     return { tool, calls };
   }
   const square = [{ x: 10, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 20 }, { x: 10, y: 20 }];
@@ -63,11 +64,58 @@ describe('Surface tool and material picks', () => {
   test('a material picked while a surface is drawn applies to it at once, as one undo step', () => {
     const { tool, calls } = bare();
     tool.startSurfaceDrawing();
+    tool.outlines.s1!.pts = [{ x: 10, y: 10 }];
     const before = calls.record;
     tool.pickMaterial('premium-sod');
     expect(calls.record).toBe(before + 1);
     expect(tool.outlines.s1).toMatchObject({ material: 'premium-sod', name: 'Premium sod' });
     expect(tool.pendingMaterial).toBeNull();
+  });
+
+  test('opening the Surface tool only arms it: no undo step until the first point, even with a material picked', () => {
+    const { tool, calls } = bare();
+    tool.startSurfaceDrawing();
+    expect(tool.armedSurface).toBe(true);
+    tool.pickMaterial('premium-sod');
+    expect(calls.record).toBe(0);
+    expect(tool.state().outlines).not.toHaveProperty('s1'); // never saved while armed
+    tool.outlines.s1!.pts = [{ x: 10, y: 10 }];
+    expect(tool.armedSurface).toBe(false);
+  });
+
+  test.each([
+    ['Esc (cancel)', (t: OutlineTool) => t.cancel()],
+    ['Undo', (t: OutlineTool) => t.undo()],
+    ['selecting an outline', (t: OutlineTool) => t.selectOutline('boundary')],
+  ])('an armed Surface tool with nothing drawn is dropped by %s, with no undo step', (_, act) => {
+    const { tool, calls } = bare();
+    tool.startSurfaceDrawing();
+    act(tool);
+    expect(tool.drawing).toBeNull();
+    expect(tool.outlines.s1).toBeUndefined();
+    expect(calls.record).toBe(0);
+  });
+
+  test.each([
+    ['symbol', (t: OutlineTool) => t.selectSymbol('missing-symbol')],
+    ['line', (t: OutlineTool) => t.selectLine('missing-line')],
+    ['outline', (t: OutlineTool) => t.selectOutline('missing-outline')],
+  ])('dropping an armed Surface redraws even when selecting an invalid %s returns early', (_, act) => {
+    const { tool, calls } = bare();
+    tool.startSurfaceDrawing();
+    const before = calls.update;
+    act(tool);
+    expect(tool.drawing).toBeNull();
+    expect(tool.outlines.s1).toBeUndefined();
+    expect(calls.update).toBe(before + 1);
+  });
+
+  test('once a point is placed, the draft is a real one: selecting elsewhere does not drop it', () => {
+    const { tool } = bare();
+    tool.startSurfaceDrawing();
+    tool.outlines.s1!.pts = [{ x: 10, y: 10 }];
+    tool.selectOutline('boundary');
+    expect(tool.drawing).toBe('s1');
   });
 
   test('a material picked replaces an unknown material on the surface being drawn', () => {

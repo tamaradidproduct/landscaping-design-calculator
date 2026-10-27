@@ -32,9 +32,9 @@ try {
   const k = await pxPerPt();
   // Edge tool
   await openTool(page, 'lines'); await page.fill('#tool-search', 'fence'); await page.waitForTimeout(150);
-  const found = await page.$$eval('#add [data-pick] span:first-of-type', x => x.map(i => i.textContent.trim()));
+  const found = await page.$$eval('#tools [data-pick] span:first-of-type', x => x.map(i => i.textContent.trim()));
   check('Search "fence" finds the privacy fence first', found.length >= 1 && found[0] === 'Wood privacy fence', found.join(', '));
-  await page.click('#add [data-pick=wood-privacy-fence]'); await page.waitForTimeout(150);
+  await page.click('#tools [data-pick=wood-privacy-fence]'); await page.waitForTimeout(150);
   check('Picking one starts drawing', !!(await page.$('[data-act=finish-line]')), 'Done button shown');
   // Draw: 3 points, Done
   await tap([200, 200]); await tap([400, 200]); await tap([400, 400]);
@@ -97,7 +97,7 @@ try {
   check('Arming a symbol drops the line selection', (await page.$$('.overlay .line-point')).length === 0 && !!(await page.$('[data-act=stop-placing]')), 'no handles, Done shown');
   await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   // Stepping stone and utility marker: one per tap, direction on the marker, both counted
-  const pickSymbol = async (query, id) => { await openTool(page, 'symbols'); await page.fill('#tool-search', query); await page.waitForTimeout(150); await page.click(`#add [data-pick=${id}]`); await page.waitForTimeout(150); };
+  const pickSymbol = async (query, id) => { await openTool(page, 'symbols'); await page.fill('#tool-search', query); await page.waitForTimeout(150); await page.click(`#tools [data-pick=${id}]`); await page.waitForTimeout(150); };
   const symImgs = () => page.$$eval('.overlay image.symbol[data-id]', i => i.map(x => ({ id: x.dataset.id, src: x.getAttribute('href'), w: +x.getAttribute('width'), h: +x.getAttribute('height'), t: x.getAttribute('transform') })));
   await pickSymbol('porcelain', 'porcelain-pavers'); await tap([300, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);
   await pickSymbol('gas', 'gas-line'); await tap([450, 300]); await page.click('[data-act=stop-placing]'); await page.waitForTimeout(150);

@@ -10,7 +10,7 @@ const BY_ID = new Map([...SURFACE_SOURCES, ...SYMBOL_SOURCES, ...LINE_SOURCES].m
 export async function openTool(page, tool) {
   const id = ALIASES[String(tool).toLowerCase()];
   if (!id) throw new Error(`unknown tool ${tool}`);
-  const btn = `#add .tool[data-tool=${id}]`;
+  const btn = `#tools .tool[data-tool=${id}]`;
   if ((await page.getAttribute(btn, 'aria-pressed')) !== 'true') await page.click(btn);
   await page.waitForSelector('#tool-search');
 }
@@ -22,8 +22,8 @@ export async function addVia(page, tool, name) {
   const id = BY_ID.has(name) ? name : null;
   await page.fill('#tool-search', id ? BY_ID.get(id) : name);
   await page.waitForTimeout(100);
-  if (id) { await page.click(`#add .tool-popover [data-pick="${id}"]`); return; }
-  const cells = await page.$$('#add .tool-popover [data-pick]');
+  if (id) { await page.click(`#tools .tool-popover [data-pick="${id}"]`); return; }
+  const cells = await page.$$('#tools .tool-popover [data-pick]');
   for (const c of cells) {
     if ((await c.$eval('span', s => s.textContent)).trim().toLowerCase() === name.toLowerCase()) { await c.click(); return; } // the name span, not the category label
   }

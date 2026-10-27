@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { SYMBOL_SIZES } from '../scripts/symbol-sizes.mjs';
-import { FIGMA_PX_PER_FT, SYMBOLS, searchSymbols, symbolById, symbolFamilies } from './symbols';
+import { FIGMA_PX_PER_FT, SYMBOLS, symbolById } from './symbols';
 
 describe('symbol library', () => {
   test('72 symbols: 51 plants, 18 objects and 3 markers', () => {
@@ -32,19 +32,13 @@ describe('symbol library', () => {
     expect(symbolById('hot-tub')?.name).toBe('Hot tub');
     expect(symbolById('nope')).toBeUndefined();
   });
-  test('symbolFamilies lists plant families in library order', () => {
-    expect(symbolFamilies('plant').map(f => f.family)).toEqual(['Evergreen trees', 'Deciduous trees', 'Accent trees', 'Accent shrubs', 'Privacy shrubs', 'Large shrubs', 'Perennials', 'Ground covers', 'Ornamental grasses', 'Other']);
-    expect(symbolFamilies('object').map(f => f.family)).toEqual(['Objects', 'Stepping stones']);
-    expect(symbolFamilies('marker').map(f => f.family)).toEqual(['Utility markers']);
-    expect(symbolFamilies().reduce((n, f) => n + f.symbols.length, 0)).toBe(72);
-  });
-  test('searchSymbols matches name, category and family, case-insensitively', () => {
-    const names = (q: string) => searchSymbols(q).map(s => s.name);
-    expect(names('spruce').sort()).toEqual(['Blue Diamond Spruce', 'Fat Albert Spruce']);
-    expect(searchSymbols('EVERGREEN').map(s => s.id)).toEqual(['blue-diamond-spruce', 'austrian-pine', 'fat-albert-spruce']);
-    expect(searchSymbols('grasses').length).toBe(5);
-    expect(searchSymbols('')).toHaveLength(72);
-    expect(searchSymbols('zzzz')).toEqual([]);
+  test('the library lists symbols family by family, in order', () => {
+    const families = (kind?: string) => SYMBOLS.filter(s => !kind || s.kind === kind).map(s => s.family).filter((f, i, all) => f !== all[i - 1]);
+    expect(families('plant')).toEqual(['Evergreen trees', 'Deciduous trees', 'Accent trees', 'Accent shrubs', 'Privacy shrubs', 'Large shrubs', 'Perennials', 'Ground covers', 'Ornamental grasses', 'Other']);
+    expect(families('object')).toEqual(['Objects', 'Stepping stones']);
+    expect(families('marker')).toEqual(['Utility markers']);
+    expect(new Set(families()).size).toBe(families().length); // each family in one run
+    expect(SYMBOLS).toHaveLength(72);
   });
   test('stepping stone and marker footprints come from Figma at 36 px per ft', () => {
     const sz = (id: string) => symbolById(id)!.size;

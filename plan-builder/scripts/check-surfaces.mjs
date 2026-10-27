@@ -30,7 +30,7 @@ const shape = id => page.evaluate(id => {
 const zones = () => page.$$eval('#surfaces .layer-row .layer-name, #surfaces .layer-rename', e => e.map(x => x.value || x.textContent).join(' > '));
 const fillOpacity = id => page.$eval(`.overlay .shape.closed[data-id="${id}"]`, e => getComputedStyle(e).fillOpacity);
 const toast = () => page.textContent('#toast');
-const toolsReady = () => page.evaluate(() => !document.querySelector('#add .tool[data-tool=surfaces]').classList.contains('dim'));
+const toolsReady = () => page.evaluate(() => !document.querySelector('#tools .tool[data-tool=surfaces]').classList.contains('dim'));
 
 try {
 results.push(['Before the plot boundary', `${await page.textContent('#surfaces')} · Surface tool ready: ${await toolsReady()}`.trim()]);

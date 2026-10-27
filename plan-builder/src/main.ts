@@ -210,7 +210,7 @@ outlines.render();
 // Tool row + search popover. Surface starts drawing as soon as it is tapped; a pick is recorded as Recent and routed by its
 // category: a material goes to the surface being drawn (else arms the next one), a plant or object arms placing, a line item
 // starts that line. Each of these cancels a draft of another kind first.
-const toolRow = new ToolRow($('add'), entry => {
+const toolRow = new ToolRow($('tools'), entry => {
   saveRecent(pushRecent(loadRecent(), entry.id));
   if (entry.category === 'surfaces') tool.pickMaterial(entry.id as MaterialId);
   else if (entry.category === 'symbols') tool.startPlacing(entry.id);
