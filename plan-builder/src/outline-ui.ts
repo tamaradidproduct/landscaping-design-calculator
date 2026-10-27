@@ -130,8 +130,9 @@ export class OutlineTool {
   selectedSymbol: string | null = null;
   /** How plants are drawn: at install size or full-grown spread. Unset until chosen (see plantView). */
   plantSizeView: PlantSizeView | undefined = undefined;
-  /** The view in effect: an unset one is Mature for a plan that already has symbols, else Install. */
-  get plantView(): PlantSizeView { return effectiveView(this.plantSizeView, Object.keys(this.symbols.placed).length > 0); }
+  /** The view in effect: an unset one is Mature for a plan that already has a plant, else Install. */
+  get plantView(): PlantSizeView { return effectiveView(this.plantSizeView, this.hasPlants()); }
+  private hasPlants(): boolean { return Object.values(this.symbols.placed).some(s => symbolById(s.symbol)?.kind === 'plant'); }
   /** Switch the plants between install and mature size: one undo step; nothing happens if it is already so. */
   setPlantView(v: PlantSizeView) {
     if (this.plantView === v && this.plantSizeView === v) return;
@@ -279,7 +280,7 @@ export class OutlineTool {
   stopPlacing() { if (!this.placing) return; this.placing = null; this.update(); }
   private placeSymbolAt(screen: Point) {
     if (!this.placing) return;
-    const first = symbolById(this.placing)?.kind === 'plant' && this.plantSizeView === undefined && !Object.keys(this.symbols.placed).length;
+    const first = symbolById(this.placing)?.kind === 'plant' && this.plantSizeView === undefined && !this.hasPlants();
     this.record(); this.symbols.place(this.placing, this.host.toPage(screen));
     if (first) this.plantSizeView = 'install'; // the first plant settles the view, so reopening the plan never asks
     this.update();

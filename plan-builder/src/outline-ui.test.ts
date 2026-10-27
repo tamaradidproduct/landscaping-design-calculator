@@ -68,6 +68,13 @@ describe('plant size view', () => {
     const u = tool(); u.setPlantView('mature'); place(u, 'lavender'); expect(u.state().plantSizeView).toBe('mature');
     t.undo(); t.undo(); t.undo(); expect(t.state().plantSizeView).toBeUndefined();
   });
+  test('an object placed first does not decide the view; the first plant after it still stores Install', () => {
+    const t = tool(); place(t, 'hot-tub');
+    expect(t.state().plantSizeView).toBeUndefined(); expect(t.plantView).toBe('install');
+    place(t, 'lavender'); expect(t.state().plantSizeView).toBe('install');
+    const o = tool(); o.load({ outlines: {}, refs: [], symbols: { y1: { id: 'y1', symbol: 'hot-tub', x: 0, y: 0 } } });
+    expect(o.plantView).toBe('install');
+  });
   test('symbolSizeFt: a plant is a circle of its install or mature diameter; an object keeps its library size', () => {
     const t = tool(); t.load(withPlants);
     const lav = { id: 'y1', symbol: 'lavender', x: 0, y: 0 };
