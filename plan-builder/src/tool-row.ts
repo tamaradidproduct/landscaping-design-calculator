@@ -49,7 +49,7 @@ export function popoverHtml(o: { query: string; tag: string; tags: string[]; res
   const cat = !!o.query.trim(); // a typed query searches every category, so each cell says which
   const body = o.results.length || o.lead
     ? `<div class="tool-grid">${o.lead ?? ''}${o.results.map(r => `<button type="button" class="grid-cell" data-pick="${esc(r.id)}"${r.id === o.current ? ' aria-current="true"' : ''}><img src="${esc(r.thumb)}" alt="" loading="lazy"><span>${esc(r.name)}</span>${cat ? `<span class="text-hint cell-cat">${CATEGORY_LABEL[r.category]}</span>` : ''}</button>`).join('')}</div>`
-    : `<p class="text-hint">${esc(o.hint ?? 'No matches.')}</p>`;
+    : `<p class="text-hint">${esc(o.hint ?? 'No matches')}</p>`;
   return `<div class="tool-popover"><input id="${o.inputId ?? 'tool-search'}" type="search" placeholder="${esc(o.placeholder ?? 'Search everything')}" aria-label="Search" value="${esc(o.query)}" autocomplete="off"><div class="chips">${chips}</div>${body}</div>`;
 }
 
@@ -106,7 +106,7 @@ export class ToolRow {
     let pop = '';
     if (this.active) {
       const { tags, results } = browse(this.active, this.query, this.tag, this.recent);
-      const hint = this.tag === 'Recent' && !this.query.trim() ? 'Nothing picked yet. Your recent picks show here.' : 'No matches.';
+      const hint = this.tag === 'Recent' && !this.query.trim() ? 'Nothing picked yet. Your recent picks show here.' : 'No matches';
       const lead = this.active === 'surfaces' && !this.query.trim() && this.fill?.available() ? fillPlotCell() : undefined;
       pop = popoverHtml({ query: this.query, tag: this.tag, tags, results, hint, lead });
     }
