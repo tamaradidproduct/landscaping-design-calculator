@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { filterLengthChars, hasKeyboardInput } from './length-input';
+import { filterLengthChars, filteredLengthCursor, hasKeyboardInput } from './length-input';
 
 const mm = (matches: Record<string, boolean>) => ({ matchMedia: (q: string) => ({ matches: matches[q] ?? false }) });
 
@@ -17,4 +17,11 @@ describe('filterLengthChars', () => {
   test('normalizes curly prime marks to the keypad marks', () =>
     expect(filterLengthChars('116′ 5″')).toBe(`116' 5"`));
   test('drops letters and other symbols', () => expect(filterLengthChars('12a-b,3e')).toBe('123'));
+});
+
+describe('filteredLengthCursor', () => {
+  test('keeps the cursor position when normalizing a prime mark', () =>
+    expect(filteredLengthCursor('12′', 3)).toBe(3));
+  test('moves the cursor back by only the removed characters before it', () =>
+    expect(filteredLengthCursor('1a2b3', 4)).toBe(2));
 });

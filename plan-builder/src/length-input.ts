@@ -6,3 +6,6 @@ export const hasKeyboardInput = (win: { matchMedia?: (q: string) => { matches: b
 /** Keeps only what the keypad can type (digits, ′ ″ . and the slash/space of `116' 5 1/2"`), so typed input stays numbers-only. */
 export const filterLengthChars = (s: string): string =>
   s.replace(/[′’]/g, "'").replace(/[″”]/g, '"').replace(/[^0-9'". /]/g, '');
+
+export const filteredLengthCursor = (s: string, cursor: number): number =>
+  filterLengthChars(s.slice(0, cursor)).length;

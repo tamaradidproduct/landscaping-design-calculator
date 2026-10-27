@@ -30,7 +30,7 @@ import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
 import { chipPositionAvoiding, edgeMenuItems, type Zone } from './card-helpers';
-import { hasKeyboardInput, filterLengthChars } from './length-input';
+import { hasKeyboardInput, filterLengthChars, filteredLengthCursor } from './length-input';
 import { edgeChip } from './edge-chip';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
@@ -1689,7 +1689,14 @@ export class OutlineTool {
       };
       const f = form.querySelector<HTMLInputElement>('#edge-len')!;
       // Escape leaves the field and goes back to the length (the edge stays selected); the tool ignores keys typed in a field.
-      if (keyboard) f.oninput = () => { const v = filterLengthChars(f.value); if (v !== f.value) { const at = f.selectionStart ?? v.length; f.value = v; f.setSelectionRange(at - 1, at - 1); } };
+      if (keyboard) f.oninput = () => {
+        const val = f.value, v = filterLengthChars(val);
+        if (v !== val) {
+          const at = filteredLengthCursor(val, f.selectionStart ?? val.length);
+          f.value = v;
+          f.setSelectionRange(at, at);
+        }
+      };
       f.onkeydown = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); ui.editing = false; this.renderPopover(); } };
       if (refocus) { f.focus(); if (sel) f.setSelectionRange(sel[0], sel[1]); }
       if (!keyboard) this.wireLengthKeypad(form);
