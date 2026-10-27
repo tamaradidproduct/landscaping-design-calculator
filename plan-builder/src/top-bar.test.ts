@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { topBarHtml, plantToggleHtml, EXPORT_NOTE } from './top-bar';
 import { showPlantToggle } from './plant-size';
+import { SYMBOLS } from './symbols';
 
 const base = { name: '12 Oak St', view: 'edit' as const, canUndo: false, canRedo: false };
 
@@ -46,5 +47,10 @@ describe('showPlantToggle', () => {
   test('needs a plant with containers', () => {
     expect(showPlantToggle([])).toBe(false);
     expect(showPlantToggle(['no-such-symbol'])).toBe(false);
+    expect(showPlantToggle(['oak'])).toBe(true);
+    expect(showPlantToggle(['corn', 'vegetable-plants'])).toBe(false);
+    expect(showPlantToggle(['corn', 'oak'])).toBe(true);
+    const obj = SYMBOLS.find(x => x.kind === 'object')!;
+    expect(showPlantToggle([obj.id])).toBe(false);
   });
 });

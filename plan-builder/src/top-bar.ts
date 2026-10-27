@@ -18,8 +18,8 @@ export const plantToggleHtml = (v: PlantSizeView | undefined) => v === undefined
 
 export function topBarHtml(s: TopBarState): string {
   return `<div class="top-bar-inner"><div class="top-bar-left" id="top-bar-left">${planBarHtml(s.name)}</div>`
-    + segmented('view-switch', 'View', 'view', [{ label: 'Edit', value: 'edit', pressed: s.view === 'edit' }, { label: 'Preview', value: 'preview', pressed: s.view === 'preview' }])
-    + plantToggleHtml(s.plantView)
+    + `<div class="top-bar-centre">` + segmented('view-switch', 'View', 'view', [{ label: 'Edit', value: 'edit', pressed: s.view === 'edit' }, { label: 'Preview', value: 'preview', pressed: s.view === 'preview' }])
+    + plantToggleHtml(s.plantView) + `</div>`
     + `<div class="top-bar-right">`
     + button(lucideIcon('undo'), { mods: ['icon', 'quiet'], id: 'undo', ariaLabel: 'Undo', title: 'Undo (⌘Z)', disabled: !s.canUndo })
     + button(lucideIcon('redo'), { mods: ['icon', 'quiet'], id: 'redo', ariaLabel: 'Redo', title: 'Redo (⇧⌘Z)', disabled: !s.canRedo })

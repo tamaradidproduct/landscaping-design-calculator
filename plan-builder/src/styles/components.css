@@ -270,6 +270,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .top-bar[hidden] { display: none; }
 .top-bar-inner { height: var(--control-md); display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-4); }
 .top-bar-left { position: relative; display: flex; align-items: center; min-width: 0; }
+.top-bar-centre { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
 .top-bar-right { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .top-bar button { min-height: var(--control-md); }
 .top-bar button.icon { border-color: transparent; background: transparent; color: var(--color-ink); }
