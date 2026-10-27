@@ -104,6 +104,14 @@ describe('Surface tool and material picks', () => {
     expect(tool.drawing).toBe('s1');
   });
 
+  test('a material picked replaces an unknown material on the surface being drawn', () => {
+    const { tool } = bare();
+    tool.startSurfaceDrawing();
+    Object.assign(tool.outlines.s1!, { material: 'removed-material', name: 'Removed material' });
+    expect(() => tool.pickMaterial('premium-sod')).not.toThrow();
+    expect(tool.outlines.s1).toMatchObject({ material: 'premium-sod', name: 'Premium sod' });
+  });
+
   test('a material picked with nothing drawn becomes pending and starts a surface with it', () => {
     const { tool } = bare();
     tool.pickMaterial('premium-sod');

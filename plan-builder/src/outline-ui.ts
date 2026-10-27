@@ -446,7 +446,8 @@ export class OutlineTool {
     if (d?.kind === 'surface') {
       if (d.material === m) return;
       if (!this.armedSurface) this.record(); // material first on an armed draft: still nothing to undo
-      if (!d.material || d.name === material(d.material).name) d.name = material(m).name;
+      const oldMat = d.material ? material(d.material) : undefined;
+      if (!oldMat || d.name === oldMat.name) d.name = material(m).name;
       d.material = m;
       this.update();
       return;
