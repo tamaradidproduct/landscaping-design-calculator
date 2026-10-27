@@ -2,6 +2,7 @@
 // real-world size times the zone's texture scale), resized (scalePatterns) as the plan zooms. The picker and Layers
 // swatches use one fixed-size pattern per material.
 import { MATERIALS, material, type MaterialId } from './materials';
+import { MARK } from './overlay-tokens';
 
 /** Smallest tile on screen, so zoomed-out textures don't turn to noise. */
 export const MIN_TILE_PX = 4;
@@ -25,14 +26,14 @@ export function tileSizePx(tileFt: number, ftPerPt: number | null, pxPerPt: numb
 const pattern = (id: string, href: string, px: number) =>
   `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${px}" height="${px}"><image href="${href}" width="${px}" height="${px}" preserveAspectRatio="none"/></pattern>`;
 
-/** The one hatched pattern for surfaces with no material yet: neutral tokens only, a fixed size on screen (swatch, card and plan). */
+/** The one hatched pattern for surfaces with no material yet: neutral tokens only (muted lines on the canvas colour), a
+ * fixed size on screen (swatch, card and plan). Its tile is MARK.hatchTile: a pattern's size is an attribute, not CSS. */
 export const UNASSIGNED_HATCH_ID = 'unassigned-hatch';
 export const UNASSIGNED_FILL = `url(#${UNASSIGNED_HATCH_ID})`;
-const HATCH_PX = 8;
-const hatchPattern = () =>
-  `<pattern id="${UNASSIGNED_HATCH_ID}" patternUnits="userSpaceOnUse" width="${HATCH_PX}" height="${HATCH_PX}" patternTransform="rotate(45)">`
-  + `<rect width="${HATCH_PX}" height="${HATCH_PX}" style="fill:var(--color-feature-fill)"/>`
-  + `<line x1="0" y1="0" x2="0" y2="${HATCH_PX}" style="stroke:var(--color-feature-stroke);stroke-width:2"/></pattern>`;
+const hatchPattern = (px = MARK.hatchTile) =>
+  `<pattern id="${UNASSIGNED_HATCH_ID}" patternUnits="userSpaceOnUse" width="${px}" height="${px}" patternTransform="rotate(45)">`
+  + `<rect width="${px}" height="${px}" style="fill:var(--color-bg)"/>`
+  + `<line x1="0" y1="0" x2="0" y2="${px}" style="stroke:var(--color-muted);stroke-width:var(--stroke-regular)"/></pattern>`;
 
 /** The fixed-size swatch <pattern>s for every material, plus the unassigned hatch (place inside an <svg><defs>). */
 export const patternDefs = (): string => MATERIALS.map(m => pattern(`swatch-${m.id}`, m.thumb, SWATCH_TILE_PX)).join('') + hatchPattern();

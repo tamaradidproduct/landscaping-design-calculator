@@ -52,7 +52,7 @@ export interface ToolHost {
 }
 
 /** A layer's colour (`--c`): the boundary and features by kind, a surface by its material. */
-const colorOf = (o: Outline) => o.kind === 'surface' ? (o.material ? material(o.material).edge : 'var(--color-feature-stroke)') : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
+const colorOf = (o: Outline) => o.kind === 'surface' ? (o.material ? material(o.material).edge : 'var(--color-muted)') : o.kind === 'boundary' ? 'var(--color-boundary)' : 'var(--color-feature)';
 /** A surface's texture fill (its zone's own pattern), as an inline style addition. */
 const fillOf = (o: Outline) => o.kind === 'surface' ? `;fill:${o.material ? zoneFill(o.id) : UNASSIGNED_FILL}` : '';
 const BOUNDARY = 'boundary'; // the plot boundary's id; features get f1, f2…

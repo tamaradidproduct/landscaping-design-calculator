@@ -22,6 +22,9 @@ describe('unassigned hatch', () => {
     const defs = patternDefs();
     expect(defs).toContain(`id="${UNASSIGNED_HATCH_ID}"`); expect(defs).toContain('var(--color-');
     expect(defs).not.toMatch(/#[0-9a-fA-F]{3,6}/);
+    const hatch = defs.slice(defs.indexOf(`id="${UNASSIGNED_HATCH_ID}"`));
+    expect(hatch).not.toContain('--color-feature'); // neutral canvas tokens, not the existing-feature greys
+    expect(hatch).toMatch(/stroke-width:var\(--stroke-/);
     expect(UNASSIGNED_FILL).toBe(`url(#${UNASSIGNED_HATCH_ID})`);
   });
 });
