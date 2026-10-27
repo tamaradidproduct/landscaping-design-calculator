@@ -8,6 +8,12 @@ describe('topBarHtml', () => {
     const h = topBarHtml(base);
     for (const id of ['back-to-plans', 'plan-title', 'plan-more', 'view-switch', 'undo', 'redo', 'export']) expect(h).toContain(`id="${id}"`);
   });
+  test('back and plan actions use full-size icon tap targets', () => {
+    const h = topBarHtml(base);
+    for (const id of ['back-to-plans', 'plan-more']) {
+      expect(h).toMatch(new RegExp(`<button[^>]*id="${id}"[^>]*class="icon"`));
+    }
+  });
   test('undo and redo are disabled from the state', () => {
     expect(topBarHtml(base)).toMatch(/id="undo"[^>]*disabled/);
     expect(topBarHtml({ ...base, canUndo: true })).not.toMatch(/id="undo"[^>]*disabled/);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { applyKeypadKey, button, canvasNudgePad, disclosure, iconButton, layerRow, lineIcon, lucideIcon, numericKeypad, segmented, type KeypadKey } from './ui';
+import { applyKeypadKey, button, canvasNudgePad, disclosure, iconButton, layerCard, layerRow, lineIcon, lucideIcon, numericKeypad, segmented, type KeypadKey } from './ui';
 import { parseFeet } from './outline';
 
 const type = (keys: KeypadKey[]) => keys.reduce((v, k) => applyKeypadKey(v, k), '');
@@ -28,6 +28,13 @@ describe('applyKeypadKey (edge-length / zone-resize numeric keypad)', () => {
 describe('layerRow', () => {
   test('a data key with a dash becomes the dashed attribute the symbol row handler queries', () => {
     expect(layerRow('Spruce', { swatch: 'feature', data: { 'symbol-row': 'spruce' } })).toContain('data-symbol-row="spruce"');
+  });
+});
+
+describe('layerCard', () => {
+  test('Done uses a full-size icon tap target', () => {
+    const html = layerCard({ id: 'line', name: 'Edging', done: true, body: '' });
+    expect(html).toMatch(/<button[^>]*class="icon"[^>]*data-act="collapse"[^>]*aria-label="Done"/);
   });
 });
 
