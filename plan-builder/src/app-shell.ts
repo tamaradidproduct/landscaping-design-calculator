@@ -4,12 +4,14 @@ import { Autosave } from './autosave';
 import { MemoryPlanStore } from './memory-plan-store';
 import { PlanFormatError, type PlanState } from './plan-model';
 import { AccessDeniedError, NOT_FOUND, PdfUnavailableError, PlanInputError, SizeWarning, checkPdf, type PlanStore } from './plan-store';
+import type { PlantSizeView } from './plant-size';
+import { askPlantSize, needsPlantSizePrompt } from './plant-size-prompt';
 import { PlanHead } from './plan-head-ui';
 import { armFilePicker, planInputMessage, PlansScreen, renderLoading, renderNotInvited, renderSignIn } from './plans-ui';
 
 /** What the shell needs from the editor in main.ts. */
 export interface Editor {
-  tool: { load(state: PlanState): void; state(): PlanState; saveRevision: number };
+  tool: { load(state: PlanState): void; state(): PlanState; saveRevision: number; setPlantViewSilently(v: PlantSizeView): void };
   /** Shows the PDF; `name` labels the plot plan layer. 'failed' keeps what was open and shows no message; 'stale': a later open or leaving the editor overtook it. */
   openBytes(bytes: ArrayBuffer, name: string): Promise<OpenResult>;
   /** Hides the plot plan (nothing open) and any editor message. */
@@ -79,6 +81,10 @@ export function startShell(ed: Editor): Shell {
       lastSavedRevision = tool.saveRevision;
       current = { id, address: meta.address, archived: meta.archived };
       head.show(current);
+      if (needsPlantSizePrompt(state)) {
+        const answer = await askPlantSize();
+        if (seq === openSeq) { tool.setPlantViewSilently(answer); } // update() tells the shell, which autosaves
+      }
       if ((await ed.openBytes(bytes, meta.address)) === 'failed' && seq === openSeq) {
         backToPlans(); // clears the editor's messages, so say why after it
         toast("This plan's PDF couldn't be opened. Delete it and start a new plan with a working PDF.");

@@ -138,6 +138,8 @@ export class OutlineTool {
   /** The editor is in Preview (set by main): no size handle is offered. */
   previewing = false;
   /** Switch the plants between install and mature size: one undo step; nothing happens if it is already so. */
+  /** Stores the view without an undo step (the answer to the first-open prompt); the revision bump makes the plan save. */
+  setPlantViewSilently(v: PlantSizeView) { this.plantSizeView = v; this.revision++; this.update(); }
   setPlantView(v: PlantSizeView) {
     if (this.plantView === v && this.plantSizeView === v) return;
     this.record(); this.plantSizeView = v; this.update();
