@@ -63,6 +63,17 @@ try {
   // ---- Shape first, dismissed: hatched, Not counted yet, omitted from the Sheet ----
   await esc(); // closes the grid; the draft stays
   check('Esc closes the grid, the draft stays', !(await popOpen()) && !(await page.$eval('#section-surfaces', s => s.hidden)), '');
+  // Nothing drawn yet, the tool is only armed: not an undo step, and nothing stuck. Undo puts it down without undoing the scale;
+  // tapping another layer's row puts it down and selects that layer.
+  const surfacesHidden = () => page.$eval('#section-surfaces', s => s.hidden);
+  await page.keyboard.press('Meta+z'); await page.waitForTimeout(250);
+  check('Undo with nothing drawn drops the empty draft and undoes nothing else', (await surfacesHidden()) && (await active()), `section hidden ${await surfacesHidden()} · tools active ${await active()}`);
+  await page.keyboard.press('Meta+Shift+z'); await page.waitForTimeout(250);
+  check('…and Redo has no empty draft to bring back', await surfacesHidden(), '');
+  await openTool(page, 'surfaces'); await esc();
+  await page.click('#outlines [data-layer=boundary]'); await page.waitForTimeout(200);
+  check('Tapping a layer row with nothing drawn drops the empty draft and selects it', (await surfacesHidden()) && !!(await page.$('#outlines [data-card=boundary]')), '');
+  await esc(); await openTool(page, 'surfaces'); await esc();
   await drag([270, 170], [330, 230]);
   const [z1] = await zoneIds();
   check('Closing the shape opens the material grid in its card', !!(await page.$('#material-search')) && /Assign material/.test(await page.$eval('#surfaces [data-card]', c => c.innerText).catch(() => '')), z1 ?? 'no zone');

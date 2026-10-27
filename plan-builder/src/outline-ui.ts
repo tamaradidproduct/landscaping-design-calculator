@@ -266,6 +266,7 @@ export class OutlineTool {
     this.record(); this.symbols.place(this.placing, this.host.toPage(screen)); this.update();
   }
   selectSymbol(id: string | null) {
+    this.dropArmedSurface();
     const s = id ? this.symbols.placed[id] : null;
     if (this.drawing || (id && (!s || !this.symbolShown(s)))) return;
     this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = id; this.clearLines();
@@ -341,6 +342,7 @@ export class OutlineTool {
   /** Back out the last point of the line being drawn. */
   private popDraftPoint() { if (this.lineDraft?.points.length) { this.lineDraft.points.pop(); this.lastLineTap = null; this.update(); } }
   selectLine(id: string | null) {
+    this.dropArmedSurface();
     const l = id ? this.lines.placed[id] : null;
     if (this.drawing || (id && (!l || !this.lineShown(l)))) return;
     this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.lineDraft = null;
@@ -389,9 +391,14 @@ export class OutlineTool {
   undo() {
     if (this.drag) return;
     if (this.lineDraft) { if (this.lineDraft.points.length) this.popDraftPoint(); else this.cancelLine(); return; }
+    if (this.dropArmedSurface()) { this.update(); return; } // nothing drawn yet: Undo just puts the Surface tool down
     const s = this.history.undo(this.snapshot()); if (s) this.restore(s);
   }
-  redo() { if (this.drag || this.lineDraft) return; const s = this.history.redo(this.snapshot()); if (s) this.restore(s); }
+  redo() {
+    if (this.drag || this.lineDraft) return;
+    if (this.history.canRedo) this.dropArmedSurface(); // so the redo's own undo step doesn't bring the empty draft back
+    const s = this.history.redo(this.snapshot()); if (s) this.restore(s);
+  }
 
   // ---------- Commands ----------
   /** Outline the plot boundary (replacing the current one, if any). */
@@ -413,14 +420,28 @@ export class OutlineTool {
   /** A material picked before any shape takes it: the next surface drawn (or closed without one) gets it. */
   pendingMaterial: MaterialId | null = null;
   /** The Surface tool: start drawing a new surface right away, before a material is chosen ("Surface N" until one is).
-   * A pending material is used (and consumed); a new surface already being drawn is kept rather than restarted. */
+   * A pending material is used (and consumed); a new surface already being drawn is kept rather than restarted.
+   * Until its first point it is only armed (see armedSurface): no undo step, not saved, and Esc, Undo or selecting
+   * something else drops it, so opening the tool and closing its grid without drawing leaves nothing behind. */
   startSurfaceDrawing() {
     if (!this.boundaryClosed) return;
     const d = this.drawing ? this.outlines[this.drawing] : null;
     if (d?.kind === 'surface' && !this.replaced) return;
     const id = this.nextSurfaceId(), m = this.pendingMaterial;
     this.pendingMaterial = null;
-    this.begin(id, 'surface', m ? material(m).name : `Surface ${id.slice(1)}`, m ?? undefined);
+    this.begin(id, 'surface', m ? material(m).name : `Surface ${id.slice(1)}`, m ?? undefined, false);
+  }
+  /** A new surface draft with no point placed yet: the Surface tool is armed, nothing is drawn. */
+  get armedSurface(): boolean {
+    const d = this.current();
+    return !!d && d.kind === 'surface' && !this.replaced && !d.pts.length;
+  }
+  /** Drop an armed surface draft without an undo step (there is nothing to undo); true if there was one. */
+  private dropArmedSurface(): boolean {
+    if (!this.armedSurface) return false;
+    delete this.outlines[this.drawing!];
+    this.drawing = null; this.pendingMaterial = null; this.lastTap = null;
+    return true;
   }
   /** A material picked from the grid: it goes to the surface being drawn, else to a just-closed surface without one,
    * else it is kept as pending and a new surface starts drawing with it. One undo step. */
@@ -429,7 +450,7 @@ export class OutlineTool {
     const d = this.drawing ? this.outlines[this.drawing] : null;
     if (d?.kind === 'surface') {
       if (d.material === m) return;
-      this.record();
+      if (!this.armedSurface) this.record(); // material first on an armed draft: still nothing to undo
       if (!d.material || d.name === material(d.material).name) d.name = material(m).name;
       d.material = m;
       this.update();
@@ -494,10 +515,10 @@ export class OutlineTool {
   }
   /** Draw an existing outline again from scratch, keeping its name; Cancel puts the old one back. */
   redraw(id: string) { const o = this.outlines[id]; if (o && !o.base) this.begin(id, o.kind, o.name, o.material); }
-  private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId) {
+  private begin(id: string, kind: OutlineKind, name: string, m?: MaterialId, record = true) {
     if (this.drawing) this.cancel();
     this.placing = null; this.selectedSymbol = null; this.clearLines(); // drawing takes over from placing
-    this.record();
+    if (record) this.record();
     this.replaced = this.outlines[id] ?? null;
     this.outlines[id] = { id, kind, name, pts: [], closed: false, ...(m ? { material: m } : {}) };
     this.hiddenLayers.delete(id); this.hiddenSections.delete(groupOf(this.outlines[id]!)); // drawing into a hidden layer shows it
@@ -509,6 +530,7 @@ export class OutlineTool {
   cancel() {
     this.pendingMaterial = null; // a material armed for the next surface is dropped with the drawing
     if (!this.drawing) return;
+    if (this.dropArmedSurface()) { this.update(); return; }
     this.record();
     if (this.replaced) this.outlines[this.drawing] = this.replaced; else delete this.outlines[this.drawing];
     this.replaced = null; this.drawing = null; this.update();
@@ -1009,6 +1031,7 @@ export class OutlineTool {
   }
   /** Select an outline from the Layers panel (null: drop the selection). */
   selectOutline(id: string | null) {
+    this.dropArmedSurface();
     if (this.drawing || (id && (!this.outlines[id]?.closed || this.isHidden(id)))) return;
     if (id !== this.selected) this.aspectLock = false;
     this.placing = null; this.selectedSymbol = null; this.clearLines();
