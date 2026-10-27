@@ -95,6 +95,7 @@ const tool = new OutlineTool({
   toPage: s => applyCorrection(invertCorrection(correction), { x: (s.x - view.x) / view.scale / fitScale, y: (s.y - view.y) / view.scale / fitScale }),
   toScreen: p => { const q = applyCorrection(correction, p); return { x: q.x * fitScale * view.scale + view.x, y: q.y * fitScale * view.scale + view.y }; },
   pxPerPt: pxPerPtNow,
+  viewSize: () => ({ w: stage.clientWidth, h: stage.clientHeight }),
   drawMagnified(ctx, s, zoom, size) {
     const span = size / zoom; // screen px shown in the magnifier
     ctx.globalAlpha = 1; ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, size, size);

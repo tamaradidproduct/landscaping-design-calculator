@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, isAssigned, omittedInPreview, type Outline } from './outline';
+import { areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, edgeLengthPt, edgeMid, formatFeet, formatScale, guides, insertCorner, removeCorner, nearestEdge, offHandle, outlinePath, parseFeet, labelPoint, insidePolygon, outlineSuggestions, rectCorners, parseRadius, cutOrder, nearestOnRing, edgeTapOrder, snapSources, moveInSection, moveInSectionTo, sectionPosition, splitEdge, stepTexScale, isAssigned, omittedInPreview, type Outline } from './outline';
 import { edgeAt } from './fillet';
 import { MARK } from './overlay-tokens';
 
@@ -373,5 +373,31 @@ describe('omittedInPreview', () => {
     expect(omittedInPreview(s, true)).toBe(true); expect(omittedInPreview(s, false)).toBe(false);
     expect(omittedInPreview({ ...s, material: 'sand' }, true)).toBe(false);
     expect(omittedInPreview({ ...s, kind: 'feature' }, true)).toBe(false);
+  });
+});
+
+describe('removeCorner (#64)', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  test('drops the point; its two edges become one straight edge', () => {
+    const r = removeCorner(sq, [0.1, 0.2, 0.3, 0.4], 1);
+    expect(r.pts).toEqual([sq[0], sq[2], sq[3]]);
+    expect(r.bulges).toEqual([0, 0.3, 0.4]);
+  });
+  test('removing the last point wraps: the edge from the one before to the first is straight', () => {
+    const r = removeCorner(sq, [0.1, 0.2, 0.3, 0.4], 3);
+    expect(r.pts).toEqual([sq[0], sq[1], sq[2]]);
+    expect(r.bulges).toEqual([0.1, 0.2, 0]);
+  });
+  test('removing the first point keeps the edge before it straight', () => {
+    const r = removeCorner(sq, [0.1, 0.2, 0.3, 0.4], 0);
+    expect(r.pts).toEqual([sq[1], sq[2], sq[3]]);
+    expect(r.bulges).toEqual([0.2, 0.3, 0]);
+  });
+  test('leaves undefined bulges undefined', () => {
+    expect(removeCorner(sq, undefined, 2).bulges).toBeUndefined();
+  });
+  test('is the inverse of insertCorner for straight edges', () => {
+    const ins = insertCorner(sq, undefined, 1, 0.5);
+    expect(removeCorner(ins.pts, ins.bulges, 2).pts).toEqual(sq);
   });
 });

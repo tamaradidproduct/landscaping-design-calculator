@@ -21,6 +21,9 @@
 /* The edge's own "+": tap to insert a corner/point there, off the edge so it never sits on the bend handle */
 .overlay .insert-handle circle { fill: var(--color-surface); stroke: var(--c); stroke-width: var(--stroke-hairline); opacity: var(--opacity-handle); }
 .overlay .insert-handle path { stroke: var(--c); stroke-width: var(--stroke-hairline); opacity: var(--opacity-handle); }
+.overlay .trash-handle circle { fill: var(--color-surface); stroke: var(--c); stroke-width: var(--stroke-hairline); }
+.overlay .trash-handle svg { fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.overlay .trash-handle.blocked { opacity: 0.4; }
 .overlay .selected-corner { fill: none; stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
 
 /* Labels: a halo in the surface colour keeps them readable over the plan */
