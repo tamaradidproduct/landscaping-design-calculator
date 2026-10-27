@@ -86,3 +86,61 @@ describe('plant size view', () => {
     expect(t.symbolSizeFt({ id: 'y2', symbol: 'hot-tub', x: 0, y: 0 })).toEqual(symbolById('hot-tub')!.size);
   });
 });
+
+describe('plant container choice', () => {
+  function tool(): OutlineTool {
+    const t = Object.create(OutlineTool.prototype) as OutlineTool;
+    Object.assign(t, {
+      host: { toPage: (p: { x: number; y: number }) => p, historyChanged: () => {} }, history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(),
+      outlines: {}, refs: [], hiddenLayers: new Set(), hiddenSections: new Set(), magnifier: {}, revision: 0, update: () => {}, placing: null,
+    });
+    return t;
+  }
+  const put = (t: OutlineTool, symbol: string) => t.symbols.place(symbol, { x: 0, y: 0 });
+  const spruces = (t: OutlineTool) => [put(t, 'blue-diamond-spruce'), put(t, 'blue-diamond-spruce'), put(t, 'blue-diamond-spruce')];
+
+  test('setContainer stores the label, undo restores', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce');
+    t.setContainer(id, '5 gal'); expect(t.symbols.placed[id].container).toBe('5 gal');
+    t.undo(); expect(t.symbols.placed[id].container).toBeUndefined();
+  });
+  test('setContainer after setCustomInstall leaves only container', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce');
+    t.setCustomInstall(id, 3); expect(t.symbols.placed[id].customInstall).toBe(3);
+    t.setContainer(id, '5 gal');
+    expect(t.symbols.placed[id].container).toBe('5 gal'); expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('setCustomInstall clamps, drops container, and ignores plants without containers', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce'), corn = put(t, 'corn');
+    t.setContainer(id, '5 gal'); t.setCustomInstall(id, 999);
+    expect(t.symbols.placed[id].customInstall).toBe(symbolById('blue-diamond-spruce')!.size.w);
+    expect(t.symbols.placed[id].container).toBeUndefined();
+    t.setCustomInstall(corn, 2); expect(t.symbols.placed[corn].customInstall).toBeUndefined();
+  });
+  test('setCustomInstall records no undo step of its own', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce');
+    t.setCustomInstall(id, 3); t.undo(); expect(t.symbols.placed[id]).toBeDefined();
+    expect((t as unknown as { history: History<unknown> }).history.canUndo).toBe(false);
+  });
+  test('applyToSpecies copies the container to the others, leaves other species, one undo', () => {
+    const t = tool(), [a, b, c] = spruces(t), lav = put(t, 'lavender');
+    t.setContainer(a, '5 gal');
+    expect(t.applyToSpecies(a)).toBe(2);
+    expect(t.symbols.placed[b].container).toBe('5 gal'); expect(t.symbols.placed[c].container).toBe('5 gal');
+    expect(t.symbols.placed[lav].container).toBeUndefined();
+    t.undo(); expect(t.symbols.placed[b].container).toBeUndefined(); expect(t.symbols.placed[c].container).toBeUndefined();
+    expect(t.symbols.placed[a].container).toBe('5 gal');
+  });
+  test('applyToSpecies on a lone plant returns 0 and records nothing', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce');
+    expect(t.applyToSpecies(id)).toBe(0); expect((t as unknown as { history: History<unknown> }).history.canUndo).toBe(false);
+  });
+  test('applyToSpecies carries a custom size, and clears both when the source has neither', () => {
+    const t = tool(), [a, b, c] = spruces(t);
+    t.setContainer(b, '5 gal'); t.setCustomInstall(a, 3); t.applyToSpecies(a);
+    expect(t.symbols.placed[b]).toMatchObject({ customInstall: 3 }); expect(t.symbols.placed[b].container).toBeUndefined();
+    t.setContainer(a, '5 gal'); t.setContainer(a, '6 ft B&B'); delete t.symbols.placed[a].container;
+    expect(t.applyToSpecies(a)).toBe(2);
+    expect(t.symbols.placed[c].customInstall).toBeUndefined(); expect(t.symbols.placed[c].container).toBeUndefined();
+  });
+});

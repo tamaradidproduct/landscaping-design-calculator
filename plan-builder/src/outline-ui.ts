@@ -17,7 +17,7 @@ import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
-import { effectiveView, plantDiameter, type PlantSizeView } from './plant-size';
+import { clampCustom, effectiveView, plantDiameter, type PlantSizeView } from './plant-size';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -294,6 +294,31 @@ export class OutlineTool {
   rotateSymbol(id: string, deg: number) {
     const s = this.symbols.placed[id]; if (!s || normalizeDeg(deg) === (s.rot ?? 0)) return;
     this.record(); this.symbols.setRotation(id, deg); this.update();
+  }
+  /** Pick a plant's install container: one undo step; replaces any custom size. */
+  setContainer(id: string, container: string) {
+    const s = this.symbols.placed[id]; if (!s) return;
+    this.record(); s.container = container; delete s.customInstall; this.update();
+  }
+  /** Set a plant's custom install diameter (ft, clamped to its mature size); replaces the container. No undo step of its own, so a handle drag can call it repeatedly inside one record(). */
+  setCustomInstall(id: string, ft: number) {
+    const s = this.symbols.placed[id]; if (!s) return;
+    const c = clampCustom(s.symbol, ft); if (c === null) return;
+    s.customInstall = c; delete s.container; this.update();
+  }
+  /** Copy this plant's container or custom size to every other placed plant of the same kind (one undo step); returns how many it changed. With neither set on the source, the others are cleared back to the default. */
+  applyToSpecies(id: string): number {
+    const src = this.symbols.placed[id]; if (!src) return 0;
+    const others = Object.values(this.symbols.placed).filter(p => p.id !== id && p.symbol === src.symbol);
+    if (!others.length) return 0;
+    this.record();
+    for (const p of others) {
+      delete p.container; delete p.customInstall;
+      if (src.customInstall !== undefined) p.customInstall = src.customInstall;
+      else if (src.container !== undefined) p.container = src.container;
+    }
+    this.update();
+    return others.length;
   }
   removeSymbol(id: string) {
     if (!this.symbols.placed[id]) return;
