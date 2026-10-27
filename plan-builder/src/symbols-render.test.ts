@@ -28,6 +28,22 @@ describe('symbolsSvg', () => {
     const svg = symbolsSvg({ ...base, placed: [tub, spruce], selected: 'y1' });
     expect(svg.match(/symbol-halo/g)).toHaveLength(1);
   });
+  test('the size handle sits on the selected plant\'s halo, at its right edge, only when asked for', () => {
+    const svg = symbolsSvg({ ...base, placed: [spruce], selected: 'y2', handle: true });
+    expect(svg.match(/class="symbol-handle"/g)).toHaveLength(1);
+    expect(svg).toContain('data-handle="size"');
+    // centre (20, 20); halo radius = spread ÷ 0.05 × 2 ÷ 2 + 3
+    const r = symbolById('blue-diamond-spruce')!.size.w / 0.05 + 3;
+    expect(svg).toContain(`cx="${(20 + r).toFixed(1)}" cy="20.0"`);
+    expect(symbolsSvg({ ...base, placed: [spruce], selected: 'y2', handle: false })).not.toContain('symbol-handle');
+    expect(symbolsSvg({ ...base, placed: [spruce], selected: 'y2' })).not.toContain('symbol-handle');
+    expect(symbolsSvg({ ...base, placed: [spruce], selected: null, handle: true })).not.toContain('symbol-handle');
+  });
+  test('no size handle on a selected object or a plant without containers', () => {
+    expect(symbolsSvg({ ...base, placed: [tub], selected: 'y1', handle: true })).not.toContain('symbol-handle');
+    const corn = { id: 'y5', symbol: 'corn', x: 0, y: 0 };
+    expect(symbolsSvg({ ...base, placed: [corn], selected: 'y5', handle: true })).not.toContain('symbol-handle');
+  });
   test('a ghost shows the armed symbol at the pointer, see-through', () => {
     const svg = symbolsSvg({ ...base, placed: [], ghost: { symbol: 'hot-tub', at: { x: 300, y: 300 } } });
     expect(svg).toContain('class="symbol ghost"'); expect(svg).toContain('x="160.0"');

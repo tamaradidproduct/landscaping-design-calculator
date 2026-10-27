@@ -15,9 +15,9 @@ import { clampLineWidth, lineItemById } from './line-items';
 import { FILL_ID, fillOutline, syncFill } from './plot-fill';
 import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
-import { normalizeDeg, SymbolLayer } from './symbol-layer';
-import { symbolsSvg } from './symbols-render';
-import { clampCustom, effectiveView, plantDiameter, type PlantSizeView } from './plant-size';
+import { normalizeDeg, SymbolLayer, symbolSizePt } from './symbol-layer';
+import { sizeHandlePos, symbolsSvg } from './symbols-render';
+import { clampCustom, effectiveView, handleDiameterFt, plantDiameter, type PlantSizeView } from './plant-size';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -70,6 +70,8 @@ type Drag =
   | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean }
   // A placed symbol being moved (the press in screen px, and where the symbol was in page points).
   | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean }
+  // The selected plant's size handle (Install view): the press in screen px.
+  | { type: 'size'; id: string; start: Point; moved: boolean }
   // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
   // `inserted`: see the outline corner's own flag above.
   | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean; inserted?: boolean }
@@ -133,6 +135,8 @@ export class OutlineTool {
   /** The view in effect: an unset one is Mature for a plan that already has a plant, else Install. */
   get plantView(): PlantSizeView { return effectiveView(this.plantSizeView, this.hasPlants()); }
   private hasPlants(): boolean { return Object.values(this.symbols.placed).some(s => symbolById(s.symbol)?.kind === 'plant'); }
+  /** The editor is in Preview (set by main): no size handle is offered. */
+  previewing = false;
   /** Switch the plants between install and mature size: one undo step; nothing happens if it is already so. */
   setPlantView(v: PlantSizeView) {
     if (this.plantView === v && this.plantSizeView === v) return;
@@ -341,6 +345,14 @@ export class OutlineTool {
     const a = this.host.toPage({ x: 0, y: 0 }), b = this.host.toPage({ x: dx, y: dy });
     this.symbols.move(id, b.x - a.x, b.y - a.y); this.update();
   }
+  /** Where the selected plant's size handle is (screen): only in the Install view, outside Preview, for a plant with containers. */
+  private sizeHandle(): { id: string; at: Point } | null {
+    const s = this.selectedSymbol ? this.symbols.placed[this.selectedSymbol] : undefined;
+    if (!s || this.previewing || this.plantView !== 'install' || !this.symbolShown(s)) return null;
+    const at = sizeHandlePos(s, { toScreen: q => this.host.toScreen(q), ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: this.host.pxPerPt(), sizeOf: q => this.symbolSizeFt(q) });
+    return at ? { id: s.id, at } : null;
+  }
+  private sizeHandleAt(p: Point) { const h = this.sizeHandle(); return h && dist(h.at, p) < HIT.sizeHandle ? h : null; }
   private symbolAt(screen: Point): string | null {
     return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt(), s => this.symbolSizeFt(s));
   }
@@ -567,6 +579,12 @@ export class OutlineTool {
         if (this.rawAt) this.applyDrag();
       }, GESTURE.holdMs);
     }
+    // The selected plant's size handle sits on its halo, partly over the plant: it goes before moving the plant.
+    const size = this.sizeHandleAt(p);
+    if (size) {
+      this.drag = { type: 'size', id: size.id, start: p, moved: false };
+      this.dragBefore = this.snapshot(); return true;
+    }
     // The selected surface corner's round handle sits inside the corner, so it goes before the corner itself.
     const round = this.roundHandleAt(p);
     if (round) {
@@ -704,6 +722,14 @@ export class OutlineTool {
       const a = this.host.toPage(d.start), b = this.host.toPage(p), s = this.symbols.placed[d.id];
       if (s) { s.x = d.before.x + b.x - a.x; s.y = d.before.y + b.y - a.y; }
       this.render(); return;
+    }
+    if (d.type === 'size') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
+      d.moved = true;
+      const s = this.symbols.placed[d.id];
+      // Feet per page point, as the plant is drawn (a plan without a scale yet uses the default size).
+      if (s) this.setCustomInstall(d.id, handleDiameterFt(s, this.host.toPage(p), 1 / symbolSizePt({ w: 1, d: 1 }, this.cal?.ftPerPt ?? null).w));
+      return;
     }
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {
       if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
@@ -891,7 +917,7 @@ export class OutlineTool {
       else if (d.type === 'line-point') this.selectedLinePoint = this.selectedLinePoint === d.i ? null : d.i; // a tap selects (or drops) the point
       this.dragBefore = null; this.update(); return;
     }
-    if (d.type === 'symbol') {
+    if (d.type === 'symbol' || d.type === 'size') {
       if (d.moved && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       this.dragBefore = null; this.update(); return;
     }
@@ -1082,7 +1108,7 @@ export class OutlineTool {
     this.hoverCorner = near;
     if (cornerChanged && !changed && !this.drawing) this.render();
     // On the selected surface, say what a drag would do (and show it in the pointer).
-    const action = p && !this.drag ? this.zoneActionAt(p) ?? this.bendTipAt(p) : null;
+    const action = p && !this.drag ? (this.sizeHandleAt(p) ? { label: 'Drag to set the install size', cursor: 'ew-resize' } : null) ?? this.zoneActionAt(p) ?? this.bendTipAt(p) : null;
     this.stageEl.style.cursor = action ? action.cursor : '';
     if (action && p) this.showTipText(action.label, p);
     else if (edge && p) this.showTip(edge, p); else this.hideTip();
@@ -1387,7 +1413,7 @@ export class OutlineTool {
     });
     const symbolsMarkup = ln.runs + symbolsSvg({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
-      selected: this.selectedSymbol, sizeOf: s => this.symbolSizeFt(s), ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
+      selected: this.selectedSymbol, sizeOf: s => this.symbolSizeFt(s), handle: !this.previewing && this.plantView === 'install', ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
     let symbolsDone = false, top = ln.top;
     for (const o of paint) {

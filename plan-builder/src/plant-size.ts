@@ -23,6 +23,13 @@ export function clampCustom(symbolId: string, ft: number): number | null {
   return Math.min(ft, mature(symbolId));
 }
 
+/** The smallest diameter the canvas size handle sets (ft). */
+export const MIN_HANDLE_FT = 0.25;
+/** The diameter (ft) the size handle sets with the pointer at `pointer`: twice its distance from the plant's centre (both in page points), never under 0.25 ft. */
+export function handleDiameterFt(centre: { x: number; y: number }, pointer: { x: number; y: number }, ftPerPt: number): number {
+  return Math.max(MIN_HANDLE_FT, 2 * Math.hypot(pointer.x - centre.x, pointer.y - centre.y) * ftPerPt);
+}
+
 function installEntry(symbolId: string, choice: SizeChoice): Container | null {
   const list = containersFor(symbolId);
   return list.find(c => c.container === choice.container) ?? defaultContainer(symbolId);

@@ -159,3 +159,70 @@ describe('plant container choice', () => {
     expect((t as unknown as { history: History<unknown> }).history.canUndo).toBe(false);
   });
 });
+
+describe('plant size handle', () => {
+  // 1 screen px = 1 page pt = 0.1 ft. The spruce sits at (100, 100); its default install size is the last container.
+  const FT_PER_PT = 0.1;
+  function tool(view: 'install' | 'mature' = 'install'): { t: OutlineTool; id: string; handle: { x: number; y: number } } {
+    const t = Object.create(OutlineTool.prototype) as OutlineTool;
+    const id_ = (p: { x: number; y: number }) => ({ x: p.x, y: p.y });
+    Object.assign(t, {
+      host: { toPage: id_, toScreen: id_, pxPerPt: () => 1, historyChanged: () => {}, changed: () => {} }, history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(),
+      outlines: {}, refs: [], hiddenLayers: new Set(), hiddenSections: new Set(), magnifier: {}, revision: 0, update: () => {}, render: () => {}, hideTip: () => {},
+      placing: null, lineDraft: null, drawing: null, selected: null, selectedCorner: null, selectedEdge: null, selectedLine: null, selectedLinePoint: null,
+      hoverCorner: null, drag: null, cal: { ftPerPt: FT_PER_PT }, plantSizeView: view, visible: new Map(), symbolShown: () => true, lineShown: () => true,
+    });
+    const id = t.symbols.place('blue-diamond-spruce', { x: 100, y: 100 });
+    t.selectedSymbol = id;
+    const r = plantDiameter('blue-diamond-spruce', {}, view) / FT_PER_PT / 2 + 3; // the halo's radius (px)
+    return { t, id, handle: { x: 100 + r, y: 100 } };
+  }
+  const drag = (t: OutlineTool, from: { x: number; y: number }, to: { x: number; y: number }) => {
+    const took = t.pointerDown(from, 'mouse'); t.pointerMove(to); t.pointerUp(); return took;
+  };
+  const canUndo = (t: OutlineTool) => (t as unknown as { history: History<unknown> }).history.canUndo;
+
+  test('dragging the handle out by 1 ft sets a custom diameter of twice the distance to the centre; one undo restores the container', () => {
+    const { t, id, handle } = tool();
+    t.setContainer(id, '5 gal'); (t as unknown as { history: History<unknown> }).history.clear();
+    const to = { x: handle.x + 1 / FT_PER_PT, y: handle.y };
+    expect(drag(t, handle, to)).toBe(true);
+    expect(t.symbols.placed[id].customInstall).toBeCloseTo(2 * (to.x - 100) * FT_PER_PT);
+    expect(t.symbols.placed[id].container).toBeUndefined();
+    expect(t.symbols.placed[id]).toMatchObject({ x: 100, y: 100 }); // the plant itself did not move
+    t.undo();
+    expect(t.symbols.placed[id].container).toBe('5 gal'); expect(t.symbols.placed[id].customInstall).toBeUndefined();
+    expect(canUndo(t)).toBe(false);
+  });
+  test('a drag of many moves is still one undo step', () => {
+    const { t, id, handle } = tool();
+    t.pointerDown(handle, 'mouse');
+    for (let k = 1; k <= 5; k++) t.pointerMove({ x: handle.x + k * 4, y: handle.y });
+    t.pointerUp();
+    expect(t.symbols.placed[id].customInstall).toBeDefined();
+    t.undo(); expect(t.symbols.placed[id].customInstall).toBeUndefined(); expect(canUndo(t)).toBe(false);
+  });
+  test('past mature the size clamps at the mature spread; below 0.25 ft it stops at 0.25', () => {
+    const { t, id, handle } = tool();
+    drag(t, handle, { x: 5000, y: 100 });
+    expect(t.symbols.placed[id].customInstall).toBe(symbolById('blue-diamond-spruce')!.size.w);
+    const u = tool();
+    drag(u.t, u.handle, { x: 100.5, y: 100 });
+    expect(u.t.symbols.placed[u.id].customInstall).toBe(0.25);
+  });
+  test('a tap on the handle changes nothing and records nothing', () => {
+    const { t, id, handle } = tool();
+    drag(t, handle, handle);
+    expect(t.symbols.placed[id].customInstall).toBeUndefined(); expect(canUndo(t)).toBe(false);
+  });
+  test('no handle in the Mature view: the same drag does not set a size', () => {
+    const { t, id, handle } = tool('mature');
+    drag(t, handle, { x: handle.x + 10, y: handle.y });
+    expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('handleDiameterFt is twice the page distance in feet, floored at 0.25', async () => {
+    const { handleDiameterFt } = await import('./plant-size');
+    expect(handleDiameterFt({ x: 0, y: 0 }, { x: 30, y: 40 }, 0.1)).toBeCloseTo(10);
+    expect(handleDiameterFt({ x: 0, y: 0 }, { x: 0, y: 0 }, 0.1)).toBe(0.25);
+  });
+});

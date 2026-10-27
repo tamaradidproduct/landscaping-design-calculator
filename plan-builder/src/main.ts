@@ -234,6 +234,7 @@ function setView(v: EditorView) {
   const preview = v === 'preview';
   if (preview === previewing) return;
   previewing = preview; sheetOpen = preview; bar.view = v; updateBar();
+  tool.previewing = preview; tool.render(); // no plant size handle in Preview
   $('layers-edit').hidden = preview; $('layers-sheet').hidden = !preview;
   applyPlanLook();
   if (preview) { renderSheet($('layers-sheet'), tool); if (page) { editView = view; fitDrawing(); } }

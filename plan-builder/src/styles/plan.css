@@ -56,6 +56,8 @@
 .overlay .symbol.ghost { opacity: var(--opacity-symbol-ghost); }
 .overlay .symbol-halo { fill: none; stroke: var(--color-accent); stroke-width: var(--stroke-bold); stroke-dasharray: var(--dash-guide); }
 .overlay .round-handle { fill: var(--color-paper); stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
+/* Plants (Install view): the dot on the selected plant's halo that drags its install size */
+.overlay .symbol-handle { fill: var(--color-paper); stroke: var(--color-accent); stroke-width: var(--stroke-bold); }
 /* Lines: the run's patterns draw under the pointer's reach; the halo and draft are only looked at */
 .overlay .line { pointer-events: none; }
 .overlay .line-halo, .overlay .line-draft { fill: none; stroke: var(--color-accent); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
