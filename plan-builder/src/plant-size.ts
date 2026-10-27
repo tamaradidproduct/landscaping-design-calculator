@@ -25,9 +25,15 @@ export function clampCustom(symbolId: string, ft: number): number | null {
 
 /** The smallest diameter the canvas size handle sets (ft). */
 export const MIN_HANDLE_FT = 0.25;
-/** The diameter (ft) the size handle sets with the pointer at `pointer`: twice its distance from the plant's centre (both in page points), never under 0.25 ft. */
-export function handleDiameterFt(centre: { x: number; y: number }, pointer: { x: number; y: number }, ftPerPt: number): number {
-  return Math.max(MIN_HANDLE_FT, 2 * Math.hypot(pointer.x - centre.x, pointer.y - centre.y) * ftPerPt);
+type Pt = { x: number; y: number };
+const distFt = (a: Pt, b: Pt, ftPerPt: number) => Math.hypot(b.x - a.x, b.y - a.y) * ftPerPt;
+/** How far (ft) the press on the size handle is outside the plant's current radius: kept for the whole drag, so grabbing the handle never makes the plant jump. */
+export function handleGrabOffsetFt(centre: Pt, pointer: Pt, ftPerPt: number, diameterFt: number): number {
+  return distFt(centre, pointer, ftPerPt) - diameterFt / 2;
+}
+/** The diameter (ft) the size handle sets with the pointer at `pointer`: twice its distance from the plant's centre (both in page points) less the grab offset, never under 0.25 ft. */
+export function handleDiameterFt(centre: Pt, pointer: Pt, ftPerPt: number, offsetFt = 0): number {
+  return Math.max(MIN_HANDLE_FT, 2 * (distFt(centre, pointer, ftPerPt) - offsetFt));
 }
 
 function installEntry(symbolId: string, choice: SizeChoice): Container | null {

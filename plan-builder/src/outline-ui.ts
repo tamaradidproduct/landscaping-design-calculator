@@ -17,7 +17,7 @@ import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer, symbolSizePt } from './symbol-layer';
 import { sizeHandlePos, symbolsSvg } from './symbols-render';
-import { clampCustom, effectiveView, handleDiameterFt, plantDiameter, type PlantSizeView } from './plant-size';
+import { clampCustom, effectiveView, handleDiameterFt, handleGrabOffsetFt, plantDiameter, type PlantSizeView } from './plant-size';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -70,8 +70,8 @@ type Drag =
   | { type: 'round'; id: string; i: number; start: Point; r0: number; radiiBefore: number[]; moved: boolean }
   // A placed symbol being moved (the press in screen px, and where the symbol was in page points).
   | { type: 'symbol'; id: string; start: Point; before: Point; moved: boolean }
-  // The selected plant's size handle (Install view): the press in screen px.
-  | { type: 'size'; id: string; start: Point; moved: boolean }
+  // The selected plant's size handle (Install view): the press in screen px, and how far (ft) outside the plant's radius it was.
+  | { type: 'size'; id: string; start: Point; offsetFt: number; moved: boolean }
   // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
   // `inserted`: see the outline corner's own flag above.
   | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean; inserted?: boolean }
@@ -352,6 +352,8 @@ export class OutlineTool {
     const at = sizeHandlePos(s, { toScreen: q => this.host.toScreen(q), ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: this.host.pxPerPt(), sizeOf: q => this.symbolSizeFt(q) });
     return at ? { id: s.id, at } : null;
   }
+  /** Feet per page point as plants are drawn (a plan without a scale yet uses the default size). */
+  private ftPerPtDrawn(): number { return 1 / symbolSizePt({ w: 1, d: 1 }, this.cal?.ftPerPt ?? null).w; }
   private sizeHandleAt(p: Point) { const h = this.sizeHandle(); return h && dist(h.at, p) < HIT.sizeHandle ? h : null; }
   private symbolAt(screen: Point): string | null {
     return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt(), s => this.symbolSizeFt(s));
@@ -582,7 +584,9 @@ export class OutlineTool {
     // The selected plant's size handle sits on its halo, partly over the plant: it goes before moving the plant.
     const size = this.sizeHandleAt(p);
     if (size) {
-      this.drag = { type: 'size', id: size.id, start: p, moved: false };
+      const s = this.symbols.placed[size.id];
+      const offsetFt = handleGrabOffsetFt(s, this.host.toPage(p), this.ftPerPtDrawn(), this.symbolSizeFt(s).w);
+      this.drag = { type: 'size', id: size.id, start: p, offsetFt, moved: false };
       this.dragBefore = this.snapshot(); return true;
     }
     // The selected surface corner's round handle sits inside the corner, so it goes before the corner itself.
@@ -727,8 +731,7 @@ export class OutlineTool {
       if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
       d.moved = true;
       const s = this.symbols.placed[d.id];
-      // Feet per page point, as the plant is drawn (a plan without a scale yet uses the default size).
-      if (s) this.setCustomInstall(d.id, handleDiameterFt(s, this.host.toPage(p), 1 / symbolSizePt({ w: 1, d: 1 }, this.cal?.ftPerPt ?? null).w));
+      if (s) this.setCustomInstall(d.id, handleDiameterFt(s, this.host.toPage(p), this.ftPerPtDrawn(), d.offsetFt));
       return;
     }
     if (d.type === 'move' || d.type === 'side' || d.type === 'round') {

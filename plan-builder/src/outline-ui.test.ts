@@ -182,12 +182,13 @@ describe('plant size handle', () => {
   };
   const canUndo = (t: OutlineTool) => (t as unknown as { history: History<unknown> }).history.canUndo;
 
-  test('dragging the handle out by 1 ft sets a custom diameter of twice the distance to the centre; one undo restores the container', () => {
-    const { t, id, handle } = tool();
+  test('dragging the handle out by 1 ft grows the plant by 2 ft as a custom size; one undo restores the container', () => {
+    const { t, id } = tool();
     t.setContainer(id, '5 gal'); (t as unknown as { history: History<unknown> }).history.clear();
+    const handle = { x: 100 + plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install') / FT_PER_PT / 2 + 3, y: 100 }; // on the 5 gal halo
     const to = { x: handle.x + 1 / FT_PER_PT, y: handle.y };
     expect(drag(t, handle, to)).toBe(true);
-    expect(t.symbols.placed[id].customInstall).toBeCloseTo(2 * (to.x - 100) * FT_PER_PT);
+    expect(t.symbols.placed[id].customInstall).toBeCloseTo(plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install') + 2); // grows by 2 ft, no jump from where the handle was grabbed
     expect(t.symbols.placed[id].container).toBeUndefined();
     expect(t.symbols.placed[id]).toMatchObject({ x: 100, y: 100 }); // the plant itself did not move
     t.undo();
@@ -219,6 +220,15 @@ describe('plant size handle', () => {
     const { t, id, handle } = tool('mature');
     drag(t, handle, { x: handle.x + 10, y: handle.y });
     expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('the handle keeps its grab offset: no move leaves the size; 1 ft out grows it by 2 ft; inward stops at 0.25', async () => {
+    const { handleDiameterFt, handleGrabOffsetFt } = await import('./plant-size');
+    const c = { x: 0, y: 0 }, grab = { x: 25.5, y: 0 }; // 3 pt outside a 4.5 ft plant at 0.1 ft/pt
+    const off = handleGrabOffsetFt(c, grab, 0.1, 4.5);
+    expect(off).toBeCloseTo(0.3);
+    expect(handleDiameterFt(c, grab, 0.1, off)).toBeCloseTo(4.5);
+    expect(handleDiameterFt(c, { x: 35.5, y: 0 }, 0.1, off)).toBeCloseTo(6.5);
+    expect(handleDiameterFt(c, { x: 0, y: 2 }, 0.1, off)).toBe(0.25);
   });
   test('handleDiameterFt is twice the page distance in feet, floored at 0.25', async () => {
     const { handleDiameterFt } = await import('./plant-size');
