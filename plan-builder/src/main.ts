@@ -65,7 +65,7 @@ function updateBar() {
 }
 $('top-bar').addEventListener('click', e => {
   const b = (e.target as HTMLElement).closest<HTMLButtonElement>('#plant-view-switch [data-plantview]');
-  if (b && !previewing) tool.setPlantView(b.dataset.plantview === 'mature' ? 'mature' : 'install'); // changed() re-renders bar, canvas and sheet
+  if (b) tool.setPlantView(b.dataset.plantview === 'mature' ? 'mature' : 'install'); // works in Edit and Preview; update() re-renders bar, canvas and sheet
 });
 
 let correction: Correction = IDENTITY;   // page points → true-shape points (a stretched plan, once corrected)
