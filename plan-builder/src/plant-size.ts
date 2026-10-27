@@ -13,6 +13,11 @@ export function containersFor(symbolId: string): readonly Container[] {
   return PLANT_INSTALL_SIZES[symbolId]?.install ?? NONE;
 }
 
+/** Whether the top bar offers Install | Mature: some placed symbol is a plant that has install containers. */
+export function showPlantToggle(placedSymbolIds: readonly string[]): boolean {
+  return placedSymbolIds.some(id => symbolById(id)?.kind === 'plant' && containersFor(id).length > 0);
+}
+
 export function defaultContainer(symbolId: string): Container | null {
   const list = containersFor(symbolId);
   return list.length ? list[list.length - 1] : null;

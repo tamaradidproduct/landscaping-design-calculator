@@ -282,4 +282,7 @@ button.plant-card.selected, button.plant-surface.selected { background: var(--co
 .top-bar.previewing button.quiet { opacity: var(--opacity-layer-off); }
 
 /* Narrow screens: the name truncates first, then Export shows its icon only */
+#plant-view-switch > button { min-height: 44px; }
+.top-bar .label-short { display: none; }
+@media (max-width: 900px) { .top-bar .label-short { display: inline; } .top-bar .label-full { display: none; } }
 @media (max-width: 900px) { .top-bar .export-label { display: none; } .top-bar button.bar-action { min-width: var(--control-sm); padding: 0; } }
