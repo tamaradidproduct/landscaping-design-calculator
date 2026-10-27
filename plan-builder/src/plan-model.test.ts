@@ -204,6 +204,7 @@ describe('what the editor saves and loads', () => {
     outlines: { s1: surface }, refs: [], hiddenLayers: ['s1', 'y1'], hiddenSections: ['symbols'],
     symbols: { y1: { id: 'y1', symbol: 'hot-tub', x: 1, y: 2, rot: 45 } },
     lines: { l1: { id: 'l1', item: 'dry-river', points: [{ x: 0, y: 0 }, { x: 9, y: 9 }], widthFt: 2 } },
+    plantSizeView: 'install',
   };
   test('planStateOf returns every editor field of a document, as copies', () => {
     const doc = fromDoc(toDoc(full, meta)), st = planStateOf(doc);
@@ -215,10 +216,47 @@ describe('what the editor saves and loads', () => {
   });
   test('editorFields lists what to write and which optional fields to clear', () => {
     const f = editorFields(toDoc(full, meta));
-    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'outlines', 'refs', 'symbols', 'updatedAt', 'v']);
+    expect(Object.keys(f.write).sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'outlines', 'plantSizeView', 'refs', 'symbols', 'updatedAt', 'v']);
     expect(f.clear).toEqual([]);
     const bare = editorFields(toDoc(state, meta));
     expect(Object.keys(bare.write).sort()).toEqual(['outlines', 'refs', 'updatedAt', 'v']);
-    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'symbols']);
+    expect(bare.clear.sort()).toEqual(['hiddenLayers', 'hiddenSections', 'lines', 'plantSizeView', 'symbols']);
+  });
+});
+
+describe('plant size view and per-plant size choice', () => {
+  const sym = (over: any) => ({ id: 'y1', symbol: 'lavender', x: 1, y: 1, ...over });
+  const withSyms = (symbols: any, extra: any = {}) => ({ ...valid(), ...extra, symbols });
+  test.each(['install', 'mature'] as const)('plantSizeView %s round-trips', v => {
+    const doc = fromDoc(toDoc({ ...state, plantSizeView: v }, meta));
+    expect(doc.plantSizeView).toBe(v);
+    expect(planStateOf(doc).plantSizeView).toBe(v);
+  });
+  test('a bad plantSizeView is an invalid plan', () => expect(reasonOf({ ...valid(), plantSizeView: 'big' })).toBe('invalid'));
+  test('a pre-change plan loads without a plantSizeView', () => {
+    const doc = fromDoc(valid());
+    expect(doc.plantSizeView).toBeUndefined();
+    expect('plantSizeView' in planStateOf(doc)).toBe(false);
+  });
+  test('a bad container or customInstall is dropped, not an error', () => {
+    const doc = fromDoc(withSyms({ y1: sym({ container: 'nope', customInstall: -3 }) }));
+    expect(doc.symbols!.y1).toEqual({ id: 'y1', symbol: 'lavender', x: 1, y: 1 });
+    expect('container' in doc.symbols!.y1).toBe(false);
+    expect('customInstall' in doc.symbols!.y1).toBe(false);
+  });
+  test('customInstall is clamped to the mature size', () => {
+    const doc = fromDoc(withSyms({ y1: sym({ symbol: 'blue-diamond-spruce', customInstall: 99 }) }));
+    expect(doc.symbols!.y1.customInstall).toBe(10);
+  });
+  test('with both container and customInstall only customInstall is kept', () => {
+    const doc = fromDoc(withSyms({ y1: sym({ symbol: 'blue-diamond-spruce', container: '5 gal', customInstall: 4 }) }));
+    expect(doc.symbols!.y1.customInstall).toBe(4);
+    expect('container' in doc.symbols!.y1).toBe(false);
+  });
+  test('editorFields clears plantSizeView when absent and writes it when present', () => {
+    expect(editorFields(toDoc(state, meta)).clear).toContain('plantSizeView');
+    const f = editorFields(toDoc({ ...state, plantSizeView: 'mature' }, meta));
+    expect(f.write.plantSizeView).toBe('mature');
+    expect(f.clear).not.toContain('plantSizeView');
   });
 });

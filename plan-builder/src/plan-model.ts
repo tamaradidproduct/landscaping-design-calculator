@@ -5,14 +5,15 @@ import { symbolById } from './symbols';
 import { LINE_WIDTH_FT, lineItemById } from './line-items';
 import type { Reference } from './scale';
 import { normalizeMaterialId } from './materials';
+import { normalizeChoice, type PlantSizeView } from './plant-size';
 
 export interface PdfInfo { name: string; size: number; rev: number; uploaded: boolean }
 /** `hiddenLayers` (outline ids) and `hiddenSections` are absent when nothing is hidden. */
 /** A plant or object dropped on the plan: where its centre is (page points) and how far it is turned (degrees, absent = 0). */
-export interface PlacedSymbol { id: string; symbol: string; x: number; y: number; rot?: number }
+export interface PlacedSymbol { id: string; symbol: string; x: number; y: number; rot?: number; container?: string; customInstall?: number }
 /** A run drawn on the plan (a fence, a wall, edging, a dry river): its points (page points), a bend per segment (as an outline's bulges) and its width in feet. */
 export interface PlacedLine { id: string; item: string; points: { x: number; y: number }[]; bulges?: number[]; widthFt: number }
-export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[]; symbols?: Record<string, PlacedSymbol>; lines?: Record<string, PlacedLine> }
+export interface PlanState { outlines: Record<string, Outline>; refs: Reference[]; hiddenLayers?: string[]; hiddenSections?: Group[]; symbols?: Record<string, PlacedSymbol>; lines?: Record<string, PlacedLine>; plantSizeView?: PlantSizeView }
 /** `archived` is absent on plans that were never archived. */
 export interface PlanDoc extends PlanState { v: 1; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; archived?: boolean }
 export interface PlanMeta { id: string; address: string; createdAt: number; updatedAt: number; pdf: PdfInfo; pending: boolean; archived: boolean }
@@ -33,8 +34,8 @@ export function cleanAddress(raw: string): string | null {
 /** Deep copy; JSON drops `undefined` keys, which Firestore rejects. */
 const strip = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
-export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections' | 'symbols' | 'lines'>): PlanDoc =>
-  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections, symbols: state.symbols, lines: state.lines });
+export const toDoc = (state: PlanState, meta: Omit<PlanDoc, 'v' | 'outlines' | 'refs' | 'hiddenLayers' | 'hiddenSections' | 'symbols' | 'lines' | 'plantSizeView'>): PlanDoc =>
+  strip({ v: 1, ...meta, outlines: state.outlines, refs: state.refs, hiddenLayers: state.hiddenLayers, hiddenSections: state.hiddenSections, symbols: state.symbols, lines: state.lines, plantSizeView: state.plantSizeView });
 
 const invalid = (what: string): never => { throw new PlanFormatError('invalid', `Invalid plan: ${what}`); };
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -57,10 +58,10 @@ function checkOutline(key: string, o: unknown) {
 /** The editor's part of a document (what the tool loads), as copies. */
 export const planStateOf = (d: PlanDoc): PlanState => structuredClone({
   outlines: d.outlines, refs: d.refs,
-  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}), ...(d.lines ? { lines: d.lines } : {}),
+  ...(d.hiddenLayers ? { hiddenLayers: d.hiddenLayers } : {}), ...(d.hiddenSections ? { hiddenSections: d.hiddenSections } : {}), ...(d.symbols ? { symbols: d.symbols } : {}), ...(d.lines ? { lines: d.lines } : {}), ...(d.plantSizeView ? { plantSizeView: d.plantSizeView } : {}),
 });
 
-const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols', 'lines'] as const;
+const OPTIONAL_EDITOR_FIELDS = ['hiddenLayers', 'hiddenSections', 'symbols', 'lines', 'plantSizeView'] as const;
 /**
  * The fields a save writes: only the editor's (a full set could clobber a newer pdf or address from another device). An
  * optional field the plan no longer has is listed in `clear`, so the stored one is removed, not left behind.
@@ -87,6 +88,7 @@ export function fromDoc(data: unknown): PlanDoc {
   if (Object.values(data.outlines).filter(o => (o as Record<string, unknown>).base).length > 1) invalid('more than one plot fill');
   if (data.hiddenLayers !== undefined && !(Array.isArray(data.hiddenLayers) && data.hiddenLayers.every(x => typeof x === 'string'))) invalid('hiddenLayers');
   if (data.hiddenSections !== undefined && !(Array.isArray(data.hiddenSections) && data.hiddenSections.every(x => GROUPS.includes(x as Group)))) invalid('hiddenSections');
+  if (data.plantSizeView !== undefined && data.plantSizeView !== 'install' && data.plantSizeView !== 'mature') invalid('plantSizeView');
   if (data.symbols !== undefined) {
     if (!isObj(data.symbols)) return invalid('symbols');
     Object.entries(data.symbols).forEach(([k, p]) => {
@@ -117,6 +119,11 @@ export function fromDoc(data: unknown): PlanDoc {
     const id = normalizeMaterialId(o.material);
     if (!id) return invalid(`outline ${o.id} material`);
     o.material = id;
+  }
+  for (const p of Object.values(doc.symbols ?? {})) {
+    const choice = normalizeChoice(p.symbol, { container: p.container, customInstall: p.customInstall });
+    for (const k of ['container', 'customInstall'] as const) delete p[k];
+    Object.assign(p, choice);
   }
   return doc;
 }
