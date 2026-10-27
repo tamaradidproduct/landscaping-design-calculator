@@ -143,4 +143,19 @@ describe('plant container choice', () => {
     expect(t.applyToSpecies(a)).toBe(2);
     expect(t.symbols.placed[c].customInstall).toBeUndefined(); expect(t.symbols.placed[c].container).toBeUndefined();
   });
+  test('useCustomSize stores the current install diameter; undo restores the container', () => {
+    const t = tool(), id = put(t, 'blue-diamond-spruce');
+    t.setContainer(id, '5 gal'); t.useCustomSize(id);
+    expect(t.symbols.placed[id].customInstall).toBe(plantDiameter('blue-diamond-spruce', { container: '5 gal' }, 'install'));
+    expect(t.symbols.placed[id].container).toBeUndefined();
+    t.undo(); expect(t.symbols.placed[id].container).toBe('5 gal'); expect(t.symbols.placed[id].customInstall).toBeUndefined();
+  });
+  test('useCustomSize is a no-op for corn and for an already-custom plant', () => {
+    const t = tool(), corn = put(t, 'corn'), id = put(t, 'blue-diamond-spruce');
+    t.useCustomSize(corn); expect(t.symbols.placed[corn].customInstall).toBeUndefined();
+    expect((t as unknown as { history: History<unknown> }).history.canUndo).toBe(false);
+    t.setCustomInstall(id, 3); t.useCustomSize(id); t.useCustomSize('nope');
+    expect(t.symbols.placed[id].customInstall).toBe(3);
+    expect((t as unknown as { history: History<unknown> }).history.canUndo).toBe(false);
+  });
 });

@@ -306,6 +306,12 @@ export class OutlineTool {
     const c = clampCustom(s.symbol, ft); if (c === null) return;
     s.customInstall = c; delete s.container; this.update();
   }
+  /** Make a plant custom at its current install diameter (one undo step), so the canvas handle can adjust it. No-op without containers or if already custom. */
+  useCustomSize(id: string) {
+    const s = this.symbols.placed[id]; if (!s || s.customInstall !== undefined) return;
+    const c = clampCustom(s.symbol, plantDiameter(s.symbol, s, 'install')); if (c === null) return;
+    this.record(); s.customInstall = c; delete s.container; this.update();
+  }
   /** Copy this plant's container or custom size to every other placed plant of the same kind (one undo step); returns how many it changed. With neither set on the source, the others are cleared back to the default. */
   applyToSpecies(id: string): number {
     const src = this.symbols.placed[id]; if (!src) return 0;

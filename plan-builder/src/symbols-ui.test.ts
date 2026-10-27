@@ -26,6 +26,7 @@ describe('plant card', () => {
     expect(h).toContain('Install 4.5 ft across · mature 10 ft');
     expect(h).toContain('Drag the handle on the plan to set a custom size.');
     expect(h).not.toContain('disabled');
+    expect(h).toMatch(/<button[^>]*data-act="custom-size"[^>]*>Custom</);
   });
   test('a custom size presses Custom and shows in the sub-line', () => {
     const h = symbolCard(tool([spruce('y1', { customInstall: 6 })], 'install'), 'y1');

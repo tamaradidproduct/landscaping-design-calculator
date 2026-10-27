@@ -112,6 +112,7 @@ export class SymbolsSection {
     card.querySelector<HTMLButtonElement>('[data-act=rot-down]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), -1)));
     card.querySelector<HTMLButtonElement>('[data-act=rot-up]')?.addEventListener('click', () => t.rotateSymbol(selId, stepRotation(cur(), 1)));
     card.querySelectorAll<HTMLButtonElement>('button.chip[data-container]').forEach(b => { b.onclick = () => t.setContainer(selId, b.dataset.container!); });
+    card.querySelector<HTMLButtonElement>('[data-act=custom-size]')?.addEventListener('click', () => t.useCustomSize(selId));
     card.querySelector<HTMLButtonElement>('[data-act=apply-species]')?.addEventListener('click', () => t.applyToSpecies(selId));
     card.querySelector<HTMLButtonElement>('[data-act=delete-symbol]')?.addEventListener('click', () => t.removeSymbol(selId));
     const rot = card.querySelector<HTMLInputElement>('#symbol-rotation');
