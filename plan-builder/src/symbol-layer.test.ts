@@ -100,3 +100,16 @@ describe('stepRotation', () => {
     expect([stepRotation(0, -1), stepRotation(10, -1), stepRotation(15, -1), stepRotation(30, -1)]).toEqual([345, 0, 0, 15]);
   });
 });
+
+// 10 px per pt keeps the 14 px minimum target (1.4 pt) under the circles tested
+describe('hit test with a size override', () => {
+  const spruce = (): SymbolLayer => { const l = new SymbolLayer(); l.place('blue-diamond-spruce', { x: 0, y: 0 }); return l; };
+  test('sizeOf shrinks the target to the given circle', () => {
+    const l = spruce(), sizeOf = () => ({ w: 4.5, d: 4.5 });
+    expect(l.hitTest({ x: 2, y: 0 }, all, 1, 10, sizeOf)).toBe('y1');
+    expect(l.hitTest({ x: 3, y: 0 }, all, 1, 10, sizeOf)).toBeNull();
+  });
+  test('without sizeOf the mature spread is used', () => {
+    expect(spruce().hitTest({ x: 3, y: 0 }, all, 1, 10)).toBe('y1');
+  });
+});

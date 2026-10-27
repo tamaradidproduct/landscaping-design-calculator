@@ -17,6 +17,7 @@ import { surfaceAreasPt2 } from './surface-area';
 import { groupOf, isHidden, isLineHidden, isSymbolHidden, type Group } from './sections';
 import { normalizeDeg, SymbolLayer } from './symbol-layer';
 import { symbolsSvg } from './symbols-render';
+import { effectiveView, plantDiameter, type PlantSizeView } from './plant-size';
 import { symbolById } from './symbols';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
@@ -127,6 +128,22 @@ export class OutlineTool {
   /** The library symbol armed for placing (each tap drops one), or null. */
   placing: string | null = null;
   selectedSymbol: string | null = null;
+  /** How plants are drawn: at install size or full-grown spread. Unset until chosen (see plantView). */
+  plantSizeView: PlantSizeView | undefined = undefined;
+  /** The view in effect: an unset one is Mature for a plan that already has symbols, else Install. */
+  get plantView(): PlantSizeView { return effectiveView(this.plantSizeView, Object.keys(this.symbols.placed).length > 0); }
+  /** Switch the plants between install and mature size: one undo step; nothing happens if it is already so. */
+  setPlantView(v: PlantSizeView) {
+    if (this.plantView === v && this.plantSizeView === v) return;
+    this.record(); this.plantSizeView = v; this.update();
+  }
+  /** A placed symbol's footprint in feet: a plant is a circle of its diameter in the current view; an object or marker keeps its library size. */
+  symbolSizeFt(s: PlacedSymbol): { w: number; d: number } {
+    const lib = symbolById(s.symbol); if (!lib) return { w: 0, d: 0 };
+    if (lib.kind !== 'plant') return lib.size;
+    const d = plantDiameter(s.symbol, s, this.plantView);
+    return { w: d, d };
+  }
   /** Lines drawn on the plan (fence, walls, edging, dry river). */
   lines = new LineLayer();
   /** The line being drawn (its points are page points): each tap adds one, until finishLine (Done, Enter) or cancelLine (Esc). */
@@ -186,7 +203,7 @@ export class OutlineTool {
   private snapshot(): Snapshot {
     return {
       outlines: structuredClone(this.outlines), drawing: this.drawing, refs: structuredClone(this.refs), selectedCorner: this.selectedCorner,
-      selected: this.selected, replaced: structuredClone(this.replaced), symbols: structuredClone(this.symbols.placed), lines: structuredClone(this.lines.placed),
+      selected: this.selected, replaced: structuredClone(this.replaced), symbols: structuredClone(this.symbols.placed), lines: structuredClone(this.lines.placed), plantSizeView: this.plantSizeView,
     };
   }
   /** Call right before every change the user may want to undo. */
@@ -195,7 +212,7 @@ export class OutlineTool {
     this.outlines = s.outlines; this.drawing = s.drawing; this.refs = s.refs; this.selectedCorner = s.selectedCorner;
     this.selected = s.selected; this.replaced = s.replaced;
     this.symbols.placed = s.symbols; if (this.selectedSymbol && !s.symbols[this.selectedSymbol]) this.selectedSymbol = null;
-    this.lines.placed = s.lines; this.lineDraft = null; this.lastLineTap = null;
+    this.lines.placed = s.lines; this.lineDraft = null; this.lastLineTap = null; this.plantSizeView = s.plantSizeView;
     if (this.selectedLine && !s.lines[this.selectedLine]) { this.selectedLine = null; this.selectedLinePoint = null; }
     else if (this.selectedLinePoint !== null && !(this.selectedLine && s.lines[this.selectedLine]?.points[this.selectedLinePoint])) this.selectedLinePoint = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
@@ -209,7 +226,7 @@ export class OutlineTool {
   load(state: PlanState) {
     this.outlines = structuredClone(state.outlines); this.refs = structuredClone(state.refs);
     this.symbols.placed = structuredClone(state.symbols ?? {}); this.placing = null; this.selectedSymbol = null;
-    this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
+    this.plantSizeView = state.plantSizeView; this.lines.placed = structuredClone(state.lines ?? {}); this.lineDraft = null; this.selectedLine = null; this.selectedLinePoint = null; this.lastLineTap = null;
     this.hiddenLayers = new Set(state.hiddenLayers?.filter(id => state.outlines[id] || this.symbols.placed[id] || this.lines.placed[id])); this.hiddenSections = new Set(state.hiddenSections);
     this.drawing = null; this.replaced = null; this.selected = null; this.selectedCorner = null;
     this.drag = null; this.dragAt = null; this.snapped = null; this.stick = null; this.angle = null; this.hoverPlaced = null;
@@ -227,6 +244,7 @@ export class OutlineTool {
       outlines, refs: structuredClone(this.refs), hiddenLayers: layers.length ? layers : undefined, hiddenSections: this.hiddenSections.size ? [...this.hiddenSections] : undefined,
       symbols: Object.keys(this.symbols.placed).length ? structuredClone(this.symbols.placed) : undefined,
       lines: Object.keys(this.lines.placed).length ? structuredClone(this.lines.placed) : undefined,
+      plantSizeView: this.plantSizeView,
     };
   }
   isHidden(id: string): boolean { const o = this.outlines[id]; return !!o && isHidden(o, this.hiddenLayers, this.hiddenSections); }
@@ -261,7 +279,10 @@ export class OutlineTool {
   stopPlacing() { if (!this.placing) return; this.placing = null; this.update(); }
   private placeSymbolAt(screen: Point) {
     if (!this.placing) return;
-    this.record(); this.symbols.place(this.placing, this.host.toPage(screen)); this.update();
+    const first = symbolById(this.placing)?.kind === 'plant' && this.plantSizeView === undefined && !Object.keys(this.symbols.placed).length;
+    this.record(); this.symbols.place(this.placing, this.host.toPage(screen));
+    if (first) this.plantSizeView = 'install'; // the first plant settles the view, so reopening the plan never asks
+    this.update();
   }
   selectSymbol(id: string | null) {
     const s = id ? this.symbols.placed[id] : null;
@@ -289,7 +310,7 @@ export class OutlineTool {
     this.symbols.move(id, b.x - a.x, b.y - a.y); this.update();
   }
   private symbolAt(screen: Point): string | null {
-    return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt());
+    return this.symbols.hitTest(this.host.toPage(screen), this.symbolShown, this.cal?.ftPerPt ?? null, this.host.pxPerPt(), s => this.symbolSizeFt(s));
   }
   // ---------- Lines ----------
   /** Whether a drawn line is drawn and can be tapped. */
@@ -1334,7 +1355,7 @@ export class OutlineTool {
     });
     const symbolsMarkup = ln.runs + symbolsSvg({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
-      selected: this.selectedSymbol, ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
+      selected: this.selectedSymbol, sizeOf: s => this.symbolSizeFt(s), ghost: this.placing && this.hoverAt ? { symbol: this.placing, at: this.hoverAt } : undefined,
     });
     let symbolsDone = false, top = ln.top;
     for (const o of paint) {
@@ -1651,4 +1672,5 @@ interface Snapshot {
   replaced: Outline | null;
   symbols: Record<string, PlacedSymbol>;
   lines: Record<string, PlacedLine>;
+  plantSizeView: PlantSizeView | undefined;
 }

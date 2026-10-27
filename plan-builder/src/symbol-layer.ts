@@ -51,13 +51,14 @@ export class SymbolLayer {
 
   /**
    * The topmost (last placed) symbol under a page point among those `shown`, or null: a plant is a circle of its spread, an
-   * object its rectangle turned with it. A target is never smaller than 14 px, so a tiny symbol can still be tapped.
+   * object its rectangle turned with it (`sizeOf` gives a symbol's footprint in feet; default the library size). A target is never smaller than 14 px, so a tiny symbol can still be tapped.
    */
-  hitTest(p: Point, shown: (s: PlacedSymbol) => boolean, ftPerPt: number | null, pxPerPt: number): string | null {
+  hitTest(p: Point, shown: (s: PlacedSymbol) => boolean, ftPerPt: number | null, pxPerPt: number,
+    sizeOf?: (s: PlacedSymbol) => { w: number; d: number }): string | null {
     const minHalf = MIN_HIT_PX / pxPerPt, all = this.ordered();
     for (let k = all.length - 1; k >= 0; k--) {
       const s = all[k], lib = symbolById(s.symbol); if (!lib || !shown(s)) continue;
-      const size = symbolSizePt(lib.size, ftPerPt), hw = Math.max(size.w / 2, minHalf), hd = Math.max(size.d / 2, minHalf);
+      const size = symbolSizePt(sizeOf ? sizeOf(s) : lib.size, ftPerPt), hw = Math.max(size.w / 2, minHalf), hd = Math.max(size.d / 2, minHalf);
       const a = -normalizeDeg(s.rot ?? 0) * Math.PI / 180, dx = p.x - s.x, dy = p.y - s.y;
       const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
       if (lib.kind === 'plant' ? Math.hypot(lx, ly) <= hw : Math.abs(lx) <= hw && Math.abs(ly) <= hd) return s.id;
