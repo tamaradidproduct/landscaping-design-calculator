@@ -24,6 +24,8 @@ const toScreen = async ([x, y]) => page.evaluate(([x, y]) => {
   return [r.left + x * r.width / 612, r.top + y * r.height / 1008];
 }, [x, y]);
 const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+// A third of the way along an edge: clear of the bend handle at its middle (hovering that shows "Drag to curve the side").
+const along = (a, b, t = 1 / 3) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
 // Zoom so the lot fills the screen (ctrl+wheel = pinch) around the lot's middle.
 const center = await toScreen(mid(C.TL, C.BR));
@@ -44,7 +46,7 @@ await setEdgeLength(page, '116.45');
 results.push(['Scale', await page.textContent('#toast')]); // the toast after typing a length names the scale
 
 async function hoverLength(a, b) {
-  await page.mouse.move(...await toScreen(mid(a, b))); await page.waitForTimeout(100);
+  await page.mouse.move(...await toScreen(along(a, b))); await page.waitForTimeout(100);
   return page.evaluate(() => document.querySelector('.tip').textContent);
 }
 const pct = (txt, printed) => `${txt} (printed ${printed}′, ${(((parseFloat(txt) - printed) / printed) * 100).toFixed(2)}%)`;
@@ -62,8 +64,9 @@ results.push(['Left edge after moving the corner', await hoverLength(C.TL, [C.BL
 
 // Redo, then close with a double-click instead of the button.
 await page.click('#outlines [data-card=boundary] [data-act=redraw]'); // the boundary is selected after the drag, so its card is open
-for (const k of ['TL', 'TR', 'BR']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
-await page.mouse.dblclick(...await toScreen(C.BL));
+// Place all four corners, then double-click the last one: a double-click on a new spot closes without it (#22).
+for (const k of ['TL', 'TR', 'BR', 'BL']) { await page.mouse.click(...await toScreen(C[k])); await page.waitForTimeout(400); }
+await page.mouse.dblclick(...await toScreen(C.BL)); await page.waitForTimeout(400);
 results.push(['Redo + close with double-click (4 corners)', await page.evaluate(() => {
   const d = document.querySelector('.overlay .shape.closed')?.getAttribute('d') ?? '';
   return d ? `${(d.match(/[ML]/g) || []).length} corners` : 'not closed';

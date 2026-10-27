@@ -25,6 +25,8 @@ const toScreen = async ([x, y]) => page.evaluate(([x, y]) => {
   return [r.left + x * r.width / 612, r.top + y * r.height / 1008];
 }, [x, y]);
 const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+// A third of the way along an edge: clear of the bend handle at its middle (hovering that shows "Drag to curve the side").
+const along = (a, b, t = 1 / 3) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 const aspect = () => page.evaluate(() => { const r = document.getElementById('page').getBoundingClientRect(); return (r.height / r.width) / (1008 / 612); });
 const scaleText = () => page.textContent('#toast'); // the toast after typing a length names the scale
 async function typeLength(a, b, feet) {
@@ -32,7 +34,7 @@ async function typeLength(a, b, feet) {
   await setEdgeLength(page, feet); await page.waitForTimeout(600);
 }
 async function hoverLength(a, b) {
-  await page.mouse.move(...await toScreen(mid(a, b))); await page.waitForTimeout(150);
+  await page.mouse.move(...await toScreen(along(a, b))); await page.waitForTimeout(150);
   return page.evaluate(() => document.querySelector('.tip').textContent);
 }
 
