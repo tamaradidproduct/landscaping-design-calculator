@@ -1,7 +1,7 @@
 // Steps 2–3: outline the plot boundary, set the scale from one printed edge length, and mark any number
 // of named existing features (house, driveway…). Snapping, guides, curves and undo/redo apply to all of them.
 import {
-  areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, nearestEdge,
+  areaPt2, avgPoint, bulgeToward, closesOnRepeatTap, constrain45, dist, edgeMid, edgePoints, formatFeet, formatScale, guides, insertCorner, removeCorner, nearestEdge,
   edgeTapOrder, moveInSection, moveInSectionTo, nearestOnRing, offHandle, snapSources, outlinePath, parseFeet, parseRadius, rectCorners,
   TEX_SCALE, isAssigned, duplicable, omittedInPreview, type Outline, type OutlineKind, type OutlineShape,
 } from './outline';
@@ -19,6 +19,8 @@ import { normalizeDeg, SymbolLayer, symbolSizePt } from './symbol-layer';
 import { sizeHandlePos, symbolsSvg } from './symbols-render';
 import { clampCustom, effectiveView, handleDiameterFt, handleGrabOffsetFt, plantDiameter, type PlantSizeView } from './plant-size';
 import { symbolById } from './symbols';
+import { floatingIconPos } from './float-icon';
+import { LUCIDE } from './lucide-icons';
 import { calibrate, IDENTITY, lineFeet, sameCorrection, type Calibration, type Correction, type Reference } from './scale';
 import { GESTURE, HIT, MAGNIFIER, MARK, POPOVER, SQUARE_CHIP, TIP } from './overlay-tokens';
 import { alignAll, alignCorner, cornerAngle, type Tidied } from './square';
@@ -43,6 +45,8 @@ export interface ToolHost {
   /** Draw the plan under screen point `s` into ctx (for the magnifier), magnified by `zoom`. */
   drawMagnified(ctx: CanvasRenderingContext2D, s: Point, zoom: number, size: number): void;
   toast(msg: string): void;
+  /** The plan area's size in screen px (to keep floating icons inside it). */
+  viewSize(): { w: number; h: number };
   /** Called whenever what can be undone/redone changes. */
   historyChanged(canUndo: boolean, canRedo: boolean): void;
   /** Called after every change to the outlines, what is being drawn, or the selection. */
@@ -101,6 +105,8 @@ export class OutlineTool {
   private selectedEdge: { id: string; i: number; fixed: 0 | 1 } | null = null;
   /** `added` marks a tap that placed this as a new point (only to signal a possible double-tap), so closing on a repeat of it must drop it. */
   private lastTap: { t: number; finger: Point; added: boolean } | null = null;
+  /** When the current press began: a double-tap is judged by the gap between the first tap's redraw finishing and the second press starting, so a slow redraw can't use up the window. */
+  private pressT = 0;
   /** Snapping, separately for tracing outlines (on by default) and designing surfaces (off by default). */
   private snap = { outlines: true, surfaces: false };
   /** Whether snapping is on for what is being drawn or edited now (a surface, or an outline). */
@@ -645,7 +651,7 @@ export class OutlineTool {
     this.hideTip();
     if (this.placing) return false; // armed: a tap places (see tap), a drag still pans
     if (this.lineDraft) { this.drag = { type: 'draft', start: p, at: p, moved: false }; return true; } // drawing a line: the release places (a drag bends)
-    this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p;
+    this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p; this.pressT = performance.now();
     if (!this.drawing) this.stick = null; // keep only the target the placing preview is showing
     if (pointerType !== 'mouse') {
       // Press and hold still before moving: place this point freely (no snapping).
@@ -676,6 +682,8 @@ export class OutlineTool {
     }
     // Tapping the "+" inserts a corner there (at the edge's middle) and grabs it immediately, so sliding it
     // off to one side is the same gesture as moving any other corner. One undo step either way (see `inserted`).
+    const trash = this.trashAt(p);
+    if (trash) { this.removeCorner(trash.id, trash.i); return true; }
     const insert = this.drawing ? null : this.insertHandleAt(p);
     if (insert) {
       this.dragBefore = this.snapshot();
@@ -1028,7 +1036,7 @@ export class OutlineTool {
       // A tap (no drag) on a corner while drawing: the first corner closes the shape outright. A quick
       // second tap on the last corner closes it too — whether that corner was just placed by the first
       // half of the double-tap (it only exists to signal one, so it's dropped first) or was already there.
-      const o = this.current(), now = performance.now();
+      const o = this.current(), now = this.pressT;
       const tapped = !d.moved && o && d.id === o.id;
       if (tapped && d.i === 0 && o.pts.length >= 3) { this.lastTap = null; this.dragAt = null; this.close(); return; }
       if (tapped) {
@@ -1043,9 +1051,11 @@ export class OutlineTool {
       // An inserted corner is one undo step whether or not it's then dragged (it already changed the outline).
       if ((d.moved || d.inserted) && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
       // A plain tap on the last corner doesn't close it yet, but is stamped so a quick repeat tap can.
-      else if (tapped && d.i === o.pts.length - 1) this.lastTap = { t: now, finger: this.dragAt ?? { x: 0, y: 0 }, added: false };
+      const stampFinger = this.dragAt ?? { x: 0, y: 0 };
       this.dragBefore = null;
-      this.dragAt = null; this.snapped = null; this.update(); return;
+      this.dragAt = null; this.snapped = null; this.update();
+      if (!(d.moved || d.inserted) && tapped && d.i === o.pts.length - 1) this.lastTap = { t: performance.now(), finger: stampFinger, added: false };
+      return;
     }
     const o = this.current(); if (!o || !this.dragAt) return;
     if (this.shape === 'rect') {
@@ -1053,7 +1063,7 @@ export class OutlineTool {
       if (d.rectStart && dist(d.finger, d.start) < GESTURE.holdSlop) { this.dragAt = null; this.snapped = null; this.update(); return; }
       this.finishRect(this.dragAt); return;
     }
-    const now = performance.now();
+    const now = this.pressT;
     const recent = !!(this.lastTap && now - this.lastTap.t < GESTURE.doubleTapMs && dist(this.lastTap.finger, d.finger) < 30);
     const { close: shouldClose, popLast } = closesOnRepeatTap(o.pts.length, recent, this.lastTap?.added ?? false);
     if (shouldClose) {
@@ -1064,9 +1074,9 @@ export class OutlineTool {
     this.record();
     o.pts.push(this.host.toPage(this.dragAt));
     this.selectedCorner = { id: o.id, i: o.pts.length - 1 };
-    this.lastTap = { t: now, finger: d.finger, added: true };
     this.dragAt = null; this.snapped = null;
     this.update();
+    this.lastTap = { t: performance.now(), finger: d.finger, added: true };
   }
 
   /** Rectangle from the first corner to the opposite one at screen point `at`, square to the plan; closes it. */
@@ -1285,6 +1295,42 @@ export class OutlineTool {
       o.pts.forEach((_, i) => { const d = dist(this.insertHandlePos(o, i), p); if (d < bd) { bd = d; best = { id: o.id, i }; } });
     }
     return best;
+  }
+  /** Corners an outline keeps at least: fewer is not a shape. */
+  static readonly MIN_CORNERS = 3;
+  /** Whether corner i of outline `id` can go: not below three corners, and not one the scale was set from (a typed length sits on an edge it ends or starts). */
+  canRemoveCorner(id: string, i: number): boolean { return this.cornerBlock(id, i) === null; }
+  private cornerBlock(id: string, i: number): string | null {
+    const o = this.outlines[id]; if (!o?.closed || !o.pts[i] || o.base) return 'That corner cannot be removed.';
+    if (o.pts.length <= OutlineTool.MIN_CORNERS) return `A shape needs at least ${OutlineTool.MIN_CORNERS} corners.`;
+    const n = o.pts.length;
+    if (this.refs.some(r => r.id === id && (r.i === i || r.i === (i - 1 + n) % n))) return 'This corner sits on an edge the scale was set from, so it has to stay.';
+    return null;
+  }
+  /** Removes corner i of outline `id` as one undo step; says why in a toast when it can't. */
+  removeCorner(id: string, i: number): boolean {
+    const block = this.cornerBlock(id, i);
+    if (block) { this.host.toast(block); return false; }
+    const o = this.outlines[id]!;
+    this.record();
+    const r = removeCorner(o.pts, o.bulges, i);
+    o.pts = r.pts; o.bulges = r.bulges;
+    if (o.radii) o.radii = o.radii.filter((_, k) => k !== i);
+    // Typed lengths on the edges after the gone corner move down one (the edges at it were blocked above).
+    this.refs = this.refs.map(f => f.id === id && f.i > i ? { ...f, i: f.i - 1 } : f);
+    this.selectedCorner = null; this.selectedEdge = null; this.hoverCorner = null;
+    this.update();
+    return true;
+  }
+  /** Where the trash icon beside the selected outline corner sits (screen), if one is selected and can be edited. */
+  private trashPos(): { id: string; i: number; at: Point } | null {
+    const c = this.selectedCorner, o = c && this.outlines[c.id];
+    if (!c || !o?.closed || o.base || this.drawing || this.selected !== o.id || this.drag || !o.pts[c.i]) return null;
+    return { id: c.id, i: c.i, at: floatingIconPos(this.host.toScreen(o.pts[c.i]), this.host.viewSize(), HIT.trash * 2) };
+  }
+  private trashAt(p: Point): { id: string; i: number } | null {
+    const t = this.trashPos();
+    return t && dist(t.at, p) <= HIT.trash ? { id: t.id, i: t.i } : null;
   }
   /** Where segment i's insert-point "+" sits on the selected line (screen), off the run the same way. */
   private lineInsertHandlePos(l: PlacedLine, i: number): Point {
@@ -1547,6 +1593,12 @@ export class OutlineTool {
     }
     if (!symbolsDone) svg += symbolsMarkup;
     svg += top;
+    const tr = this.trashPos();
+    if (tr) {
+      const blocked = !this.canRemoveCorner(tr.id, tr.i), r = MARK.trash, k = r * 1.3;
+      svg += `<g class="trash-handle${blocked ? ' blocked' : ''}" style="--c:${colorOf(this.outlines[tr.id]!)}"><circle cx="${tr.at.x.toFixed(1)}" cy="${tr.at.y.toFixed(1)}" r="${r}"/>`
+        + `<svg x="${(tr.at.x - k / 2).toFixed(1)}" y="${(tr.at.y - k / 2).toFixed(1)}" width="${k.toFixed(1)}" height="${k.toFixed(1)}" viewBox="0 0 24 24">${LUCIDE.trash}</svg></g>`;
+    }
     const fe = this.selectedEdge, feo = fe && this.outlines[fe.id];
     if (fe && feo?.kind === 'surface' && feo.closed) {
       // The end that stays put when a length is typed.

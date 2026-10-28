@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { OutlineTool } from './outline-ui';
 import { GESTURE, HIT } from './overlay-tokens';
 import { History } from './history';
@@ -430,6 +430,93 @@ describe('Duplicate as surface', () => {
     expect(tool.duplicateAsSurface('boundary')).toBeNull();
     expect(tool.duplicateAsSurface('nope')).toBeNull();
     expect(tool.outlines).toEqual(before);
+  });
+});
+
+describe('double-tap to close while drawing (#62, #22)', () => {
+  /** A tool mid-draw with `n` corners placed along a row; no DOM, a stubbed redraw and a scripted clock. */
+  function drawing(n: number) {
+    const tool = Object.create(OutlineTool.prototype) as OutlineTool;
+    const pts = Array.from({ length: n }, (_, i) => ({ x: 100 + i * 100, y: 100 + (i % 2) * 100 }));
+    Object.assign(tool, {
+      outlines: { boundary: { id: 'boundary', kind: 'boundary', name: 'Plot boundary', pts, closed: false } },
+      drawing: 'boundary', replaced: null, selected: null, selectedCorner: null, selectedEdge: null, selectedSymbol: null, placing: null,
+      lineDraft: null, selectedLine: null, selectedLinePoint: null, lastLineTap: null, lastTap: null, refs: [], cal: null,
+      pendingMaterial: null, hiddenLayers: new Set(), hiddenSections: new Set(), shape: 'freehand', visible: new Map(), snap: { outlines: false, surfaces: false },
+      history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(), magnifier: {}, tip: {}, revision: 0, holdTimer: 0,
+      host: { toast: () => {}, toScreen: (p: { x: number; y: number }) => p, toPage: (p: { x: number; y: number }) => p, historyChanged: () => {} },
+    });
+    Object.assign(tool as unknown as Record<string, unknown>, { update: () => {}, render: () => {}, showMagnifier: () => {} });
+    return tool;
+  }
+  const tap = (tool: OutlineTool, at: { x: number; y: number }, downT: number, upT: number) => {
+    vi.stubGlobal('window', { setTimeout: () => 0 });
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValue(downT); tool.pointerDown(at, 'touch');
+    now.mockReturnValue(upT); tool.pointerUp();
+    now.mockRestore(); vi.unstubAllGlobals();
+  };
+
+  test('a double-tap on a new spot closes with no extra corner, even when a slow redraw delays the second tap', () => {
+    const tool = drawing(3);
+    tap(tool, { x: 100, y: 300 }, 1000, 1010);        // first tap places the 4th corner
+    expect(tool.outlines.boundary!.pts).toHaveLength(4);
+    tap(tool, { x: 100, y: 300 }, 1100, 2700);        // second tap, its own handling took 1.6 s
+    expect(tool.outlines.boundary!.closed).toBe(true);
+    expect(tool.outlines.boundary!.pts).toHaveLength(3);
+    expect(tool.drawing).toBeNull();
+  });
+
+  test('two taps well apart in time place two corners and stay open', () => {
+    const tool = drawing(3);
+    tap(tool, { x: 100, y: 300 }, 1000, 1010);
+    tap(tool, { x: 100, y: 300 }, 3000, 3010);
+    expect(tool.outlines.boundary!.closed).toBe(false);
+  });
+});
+
+describe('removing an outline corner (#64)', () => {
+  function closed(n = 4) {
+    const tool = Object.create(OutlineTool.prototype) as OutlineTool;
+    const pts = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }, { x: -50, y: 50 }].slice(0, n);
+    const toasts: string[] = [];
+    Object.assign(tool, {
+      outlines: { boundary: { id: 'boundary', kind: 'boundary', name: 'Plot boundary', pts, closed: true, bulges: pts.map(() => 0), radii: pts.map((_, i) => i) } },
+      drawing: null, replaced: null, selected: 'boundary', selectedCorner: { id: 'boundary', i: 1 }, selectedEdge: null, hoverCorner: 1, selectedSymbol: null, placing: null,
+      lineDraft: null, selectedLine: null, selectedLinePoint: null, lastLineTap: null, lastTap: null, refs: [], cal: null, previewing: false,
+      pendingMaterial: null, hiddenLayers: new Set(), hiddenSections: new Set(), history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(),
+      revision: 0, magnifier: {}, host: { toast: (m: string) => toasts.push(m), historyChanged: () => {} },
+    });
+    Object.assign(tool as unknown as Record<string, unknown>, { update: () => {}, render: () => {} });
+    return { tool, toasts };
+  }
+
+  test('removes the corner and its radius as one undo step, and clears the selection', () => {
+    const { tool } = closed();
+    expect(tool.removeCorner('boundary', 1)).toBe(true);
+    expect(tool.outlines.boundary!.pts).toHaveLength(3);
+    expect(tool.outlines.boundary!.radii).toEqual([0, 2, 3]);
+    expect(tool.selectedCorner).toBeNull();
+    expect((tool as unknown as { hoverCorner: number | null }).hoverCorner).toBeNull();
+    tool.undo();
+    expect(tool.outlines.boundary!.pts).toHaveLength(4);
+  });
+  test('keeps three corners: the fourth cannot go below the minimum', () => {
+    const { tool, toasts } = closed(3);
+    expect(tool.canRemoveCorner('boundary', 0)).toBe(false);
+    expect(tool.removeCorner('boundary', 0)).toBe(false);
+    expect(tool.outlines.boundary!.pts).toHaveLength(3);
+    expect(toasts.at(-1)).toMatch(/3 corners/);
+  });
+  test('blocks a corner on an edge the scale was set from, and shifts later typed lengths down', () => {
+    const { tool, toasts } = closed(5);
+    tool.refs = [{ id: 'boundary', i: 0, feet: 50 }, { id: 'boundary', i: 3, feet: 30 }];
+    expect(tool.canRemoveCorner('boundary', 0)).toBe(false);   // ends edge 0
+    expect(tool.canRemoveCorner('boundary', 1)).toBe(false);   // starts edge... ends edge 0
+    expect(tool.removeCorner('boundary', 1)).toBe(false);
+    expect(toasts.at(-1)).toMatch(/scale/);
+    expect(tool.removeCorner('boundary', 2)).toBe(true);        // edges 1 and 2 merge; edge 3 becomes edge 2
+    expect(tool.refs).toEqual([{ id: 'boundary', i: 0, feet: 50 }, { id: 'boundary', i: 2, feet: 30 }]);
   });
 });
 
