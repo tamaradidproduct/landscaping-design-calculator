@@ -32,6 +32,7 @@ import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
 import { chipPositionAvoiding, edgeMenuItems, type Zone } from './card-helpers';
+import { hasKeyboardInput, filterLengthChars, filteredLengthCursor } from './length-input';
 import { edgeChip } from './edge-chip';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
@@ -79,7 +80,9 @@ type Drag =
   // A point of the selected line being moved, or one of its segments being bent (the press in screen px; the point's page position).
   // `inserted`: see the outline corner's own flag above.
   | { type: 'line-point'; id: string; i: number; start: Point; before: Point; moved: boolean; inserted?: boolean }
-  | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean };
+  | { type: 'line-bend'; id: string; i: number; start: Point; moved: boolean }
+  // A press while drawing a line: a tap on release places a sharp point; a drag places it where pressed and bends the segment into it through `at`.
+  | { type: 'draft'; start: Point; at: Point; moved: boolean };
 
 export class OutlineTool {
   outlines: Record<string, Outline> = {};
@@ -162,7 +165,7 @@ export class OutlineTool {
   /** Lines drawn on the plan (fence, walls, edging, dry river). */
   lines = new LineLayer();
   /** The line being drawn (its points are page points): each tap adds one, until finishLine (Done, Enter) or cancelLine (Esc). */
-  lineDraft: { item: string; points: Point[]; widthFt: number } | null = null;
+  lineDraft: { item: string; points: Point[]; bulges: number[]; widthFt: number } | null = null;
   selectedLine: string | null = null;
   /** The selected line's selected point (Delete point acts on it). */
   selectedLinePoint: number | null = null;
@@ -386,7 +389,7 @@ export class OutlineTool {
     if (this.drawing) this.cancel();
     this.hiddenSections.delete('lines'); // drawing into a hidden section shows it
     this.placing = null; this.selected = null; this.selectedCorner = null; this.selectedEdge = null; this.selectedSymbol = null; this.clearLines();
-    this.lineDraft = { item, points: [], widthFt: lib.defaultWidthFt };
+    this.lineDraft = { item, points: [], bulges: [], widthFt: lib.defaultWidthFt };
     this.revision++; this.update();
   }
   cancelLine() { if (!this.lineDraft) return; this.lineDraft = null; this.lastLineTap = null; this.update(); }
@@ -395,17 +398,22 @@ export class OutlineTool {
     const d = this.lineDraft; if (!d) return;
     if (!draftReady(d.points)) { this.host.toast('Tap at least two points along the run.'); return; }
     this.record();
-    const id = this.lines.add(d.item, d.points, d.widthFt);
+    const id = this.lines.add(d.item, d.points, d.widthFt, d.bulges);
     this.lineDraft = null; this.lastLineTap = null;
     if (id) { this.selectedLine = id; this.selectedLinePoint = null; }
     this.update();
   }
-  private addLinePoint(screen: Point) {
+  /** A tap places a sharp point; `bendTo` (the release of a drag, screen px) bends the segment ending at the new point through it. */
+  private addLinePoint(screen: Point, bendTo?: Point) {
     const d = this.lineDraft; if (!d) return;
     const prev = this.lastLineTap, target = this.host.toPage(this.draftTarget(screen));
     const outcome = draftTap(d.points, target, this.host.pxPerPt(), prev ? { t: prev.t, screenDist: dist(prev.at, screen) } : null, performance.now());
     if (outcome === 'finish') { this.lastLineTap = null; this.finishLine(); return; }
-    if (outcome === 'add') { d.points = [...d.points, target]; this.update(); }
+    if (outcome === 'add') {
+      const last = d.points[d.points.length - 1];
+      d.bulges = last ? [...d.bulges, bendTo ? bulgeToward(last, target, this.host.toPage(bendTo)) : 0] : d.bulges;
+      d.points = [...d.points, target]; this.update();
+    }
     // Every tap is stamped, ignored ones too (a double-tap on a point placed earlier still finishes), after the redraw so a slow one can't use up the window.
     this.lastLineTap = { t: performance.now(), at: screen };
   }
@@ -414,8 +422,14 @@ export class OutlineTool {
     const d = this.lineDraft, last = d?.points[d.points.length - 1];
     return this.shiftKey && last ? constrain45(this.host.toScreen(last), screen).point : screen;
   }
+  /** The draft as the renderer draws it: while a press is dragging, the next point sits where it was pressed with the bend toward the pointer. */
+  private draftPreview(d: NonNullable<OutlineTool['lineDraft']>) {
+    const drag = this.drag?.type === 'draft' && this.drag.moved ? this.drag : null, last = d.points[d.points.length - 1];
+    const at = drag ? drag.start : this.hoverAt, hover = at ? this.host.toPage(this.draftTarget(at)) : null;
+    return { ...d, hover, hoverBulge: drag && last && hover ? bulgeToward(last, hover, this.host.toPage(drag.at)) : 0 };
+  }
   /** Back out the last point of the line being drawn. */
-  private popDraftPoint() { if (this.lineDraft?.points.length) { this.lineDraft.points.pop(); this.lastLineTap = null; this.update(); } }
+  private popDraftPoint() { if (this.lineDraft?.points.length) { this.lineDraft.points.pop(); this.lineDraft.bulges.pop(); this.lastLineTap = null; this.update(); } }
   selectLine(id: string | null) {
     const l = id ? this.lines.placed[id] : null;
     if (this.drawing || (id && (!l || !this.lineShown(l)))) return;
@@ -635,7 +649,8 @@ export class OutlineTool {
   // ---------- Pointer input (screen coordinates) ----------
   pointerDown(p: Point, pointerType: string): boolean {
     this.hideTip();
-    if (this.placing || this.lineDraft) return false; // armed or drawing a line: a tap places (see tap), a drag still pans
+    if (this.placing) return false; // armed: a tap places (see tap), a drag still pans
+    if (this.lineDraft) { this.drag = { type: 'draft', start: p, at: p, moved: false }; return true; } // drawing a line: the release places (a drag bends)
     this.bypassHold = false; clearTimeout(this.holdTimer); this.downFinger = p; this.pressT = performance.now();
     if (!this.drawing) this.stick = null; // keep only the target the placing preview is showing
     if (pointerType !== 'mouse') {
@@ -780,6 +795,10 @@ export class OutlineTool {
       const a = this.host.toPage(d.start), b = this.host.toPage(p);
       this.lines.movePoint(d.id, d.i, { x: d.before.x + b.x - a.x, y: d.before.y + b.y - a.y });
       this.render(); return;
+    }
+    if (d.type === 'draft') {
+      if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return; // still a tap
+      d.moved = true; d.at = p; this.render(); return;
     }
     if (d.type === 'line-bend') {
       if (!d.moved && dist(p, d.start) < GESTURE.holdSlop) return;
@@ -982,6 +1001,7 @@ export class OutlineTool {
     const d = this.drag; this.drag = null; this.stick = null; this.angle = null;
     this.magnifier.hidden = true;
     if (!d) return;
+    if (d.type === 'draft') { if (this.lineDraft) this.addLinePoint(d.start, d.moved ? d.at : undefined); return; }
     if (d.type === 'line-point' || d.type === 'line-bend') {
       // An inserted point is one undo step whether or not it's then dragged (it already changed the line).
       if ((d.moved || (d.type === 'line-point' && d.inserted)) && this.dragBefore) { this.history.record(this.dragBefore); this.revision++; }
@@ -1525,7 +1545,7 @@ export class OutlineTool {
     const ln = linesSvgParts({
       placed: this.lines.ordered(), shown: this.lineShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
       selected: this.selectedLine, selectedPoint: this.selectedLinePoint,
-      draft: this.lineDraft ? { ...this.lineDraft, hover: this.hoverAt ? this.draftTarget(this.hoverAt) : null } : undefined,
+      draft: this.lineDraft ? this.draftPreview(this.lineDraft) : undefined,
     });
     const symbolsMarkup = ln.runs + symbolsSvg({
       placed: this.symbols.ordered(), shown: this.symbolShown, toScreen: h.toScreen, ftPerPt: this.cal?.ftPerPt ?? null, pxPerPt: h.pxPerPt(),
@@ -1710,7 +1730,7 @@ export class OutlineTool {
     const tip = 'Drag the square in the middle of the edge to curve it, or tap the + to add a corner.'
       + (surface ? ' The marked end stays put.' : ft ? ' Lengths on edges running across and down also correct a stretched plan.' : '');
     const menu = edgeMenuItems({ kind: surface ? 'surface' : o.kind === 'feature' ? 'feature' : 'boundary', curved, hasRef: !!ref });
-    const keyboard = !window.matchMedia('(pointer: coarse)').matches; // a desktop keyboard types the length; touch gets the keypad
+    const keyboard = hasKeyboardInput(); // a desktop keyboard types the length; touch gets the keypad
     this.popover.innerHTML = edgeChip({
       text: ft ? `${formatFeet(ft)}${curved ? ' along the curve' : ''}` : surface ? 'No scale' : 'Set length',
       editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip, tipOpen: ui.tipOpen, keyboard,
@@ -1740,6 +1760,14 @@ export class OutlineTool {
       };
       const f = form.querySelector<HTMLInputElement>('#edge-len')!;
       // Escape leaves the field and goes back to the length (the edge stays selected); the tool ignores keys typed in a field.
+      if (keyboard) f.oninput = () => {
+        const val = f.value, v = filterLengthChars(val);
+        if (v !== val) {
+          const at = filteredLengthCursor(val, f.selectionStart ?? val.length);
+          f.value = v;
+          f.setSelectionRange(at, at);
+        }
+      };
       f.onkeydown = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); ui.editing = false; this.renderPopover(); } };
       if (refocus) { f.focus(); if (sel) f.setSelectionRange(sel[0], sel[1]); }
       if (!keyboard) this.wireLengthKeypad(form);

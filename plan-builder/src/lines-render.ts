@@ -3,7 +3,7 @@
 // draft being drawn. Pure string building, used by OutlineTool.render.
 import { lineItemById } from './line-items';
 import { linePathPt, lineWidthPt } from './line-layer';
-import { avgPoint, edgeMid, offHandle } from './outline';
+import { avgPoint, edgeMid, edgePoints, offHandle } from './outline';
 import type { PlacedLine } from './plan-model';
 import { MARK } from './overlay-tokens';
 import type { Point } from './view';
@@ -22,8 +22,8 @@ export interface LinesSvgOptions {
   selected: string | null;
   /** The selected line's selected point. */
   selectedPoint: number | null;
-  /** The line being drawn: its points so far, and the pointer (screen) for the rubber band. */
-  draft?: { item: string; points: Point[]; widthFt: number; hover: Point | null };
+  /** The line being drawn (page points, a bend per segment), and where the next point would land (page) with its pending bend, for the rubber band. */
+  draft?: { item: string; points: Point[]; bulges: number[]; widthFt: number; hover: Point | null; hoverBulge?: number };
 }
 
 const widthPx = (widthFt: number, o: LinesSvgOptions) => Math.max(MIN_WIDTH_PX, lineWidthPt(widthFt, o.ftPerPt) * o.pxPerPt);
@@ -78,7 +78,9 @@ export function linesSvgParts(o: LinesSvgOptions): { runs: string; top: string }
     if (o.selected === l.id) top += handles(l, o);
   }
   if (o.draft && lineItemById(o.draft.item)) {
-    const pts = o.draft.points.map(o.toScreen); if (o.draft.hover) pts.push(o.draft.hover);
+    const d = o.draft, page = [...d.points];
+    if (d.hover) page.push(d.hover);
+    const pts = page.flatMap((p, i) => i + 1 < page.length ? edgePoints(p, page[i + 1], (i + 1 < d.points.length ? d.bulges[i] : d.hoverBulge) ?? 0) : [p]).map(o.toScreen);
     if (pts.length > 1) top += `<path d="${polyline(pts)}" class="line-draft" style="stroke-width:${f(widthPx(o.draft.widthFt, o))}px"/>`;
     o.draft.points.forEach(p => { const s = o.toScreen(p); top += `<circle cx="${f(s.x)}" cy="${f(s.y)}" r="${MARK.corner}" class="corner" style="--c:var(--color-accent)"/>`; });
   }

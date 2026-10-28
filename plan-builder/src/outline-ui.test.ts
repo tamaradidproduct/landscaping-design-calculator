@@ -7,6 +7,7 @@ import { LineLayer } from './line-layer';
 import { plantDiameter } from './plant-size';
 import { symbolById } from './symbols';
 import type { PlanState } from './plan-model';
+import { bulgeToward } from './outline';
 
 describe('corner and bend pointer movement', () => {
   test.each(['corner', 'bend'] as const)('%s movement within hold slop remains a tap', type => {
@@ -516,5 +517,72 @@ describe('removing an outline corner (#64)', () => {
     expect(toasts.at(-1)).toMatch(/scale/);
     expect(tool.removeCorner('boundary', 2)).toBe(true);        // edges 1 and 2 merge; edge 3 becomes edge 2
     expect(tool.refs).toEqual([{ id: 'boundary', i: 0, feet: 50 }, { id: 'boundary', i: 2, feet: 30 }]);
+  });
+});
+
+describe('Drawing a line: a drag bends the segment into the point', () => {
+  function drafting() {
+    const t = Object.create(OutlineTool.prototype) as OutlineTool;
+    const id_ = (p: { x: number; y: number }) => ({ x: p.x, y: p.y });
+    Object.assign(t, {
+      host: { toPage: id_, toScreen: id_, pxPerPt: () => 1, toast: () => {}, historyChanged: () => {}, changed: () => {} }, history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(),
+      outlines: {}, refs: [], hiddenLayers: new Set(), hiddenSections: new Set(), magnifier: {}, revision: 0, update: () => {}, render: () => {}, hideTip: () => {},
+      placing: null, drawing: null, selected: null, selectedCorner: null, selectedEdge: null, selectedSymbol: null, selectedLine: null, selectedLinePoint: null,
+      lastLineTap: null, lastTap: null, hoverCorner: null, drag: null, cal: null, shiftKey: false,
+    });
+    t.startLine('wood-privacy-fence');
+    return t;
+  }
+  const press = (t: OutlineTool, at: { x: number; y: number }, to?: { x: number; y: number }) => {
+    const took = t.pointerDown(at, 'mouse'); if (to) t.pointerMove(to); t.pointerUp(); return took;
+  };
+
+  test('a press with no drag still places a sharp point (the tool takes the press, the release places)', () => {
+    const t = drafting();
+    expect(press(t, { x: 0, y: 0 })).toBe(true);
+    expect(press(t, { x: 100, y: 0 })).toBe(true);
+    expect(t.lineDraft!.points).toEqual([{ x: 0, y: 0 }, { x: 100, y: 0 }]);
+    expect(t.lineDraft!.bulges.every(b => b === 0)).toBe(true);
+  });
+
+  test('dragging from the placement point puts the point where pressed and bends the segment into it through the release', () => {
+    const t = drafting();
+    press(t, { x: 0, y: 0 });
+    press(t, { x: 100, y: 0 }, { x: 50, y: 40 });
+    expect(t.lineDraft!.points[1]).toEqual({ x: 100, y: 0 });
+    expect(t.lineDraft!.bulges[0]).toBeCloseTo(bulgeToward({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 40 }));
+    expect(t.lineDraft!.bulges[0]).not.toBe(0);
+  });
+
+  test('a drag on the first point places it sharp (there is no segment to bend yet)', () => {
+    const t = drafting();
+    press(t, { x: 0, y: 0 }, { x: 60, y: 60 });
+    expect(t.lineDraft!.points).toEqual([{ x: 0, y: 0 }]);
+    expect(t.lineDraft!.bulges).toEqual([]);
+  });
+
+  test('a second finger abandons the drag without placing anything', () => {
+    const t = drafting();
+    press(t, { x: 0, y: 0 });
+    t.pointerDown({ x: 100, y: 0 }, 'touch'); t.pointerMove({ x: 50, y: 40 }); t.cancelPointer();
+    expect(t.lineDraft!.points).toHaveLength(1);
+  });
+
+  test('undo takes back the point and its bend together; Done saves the bends on the line', () => {
+    const t = drafting();
+    press(t, { x: 0, y: 0 }); press(t, { x: 100, y: 0 }, { x: 50, y: 40 }); press(t, { x: 200, y: 0 });
+    t.undo();
+    expect(t.lineDraft!.points).toHaveLength(2);
+    expect(t.lineDraft!.bulges).toHaveLength(1);
+    t.finishLine();
+    const l = Object.values(t.lines.placed)[0];
+    expect(l.bulges?.[0]).toBeCloseTo(bulgeToward({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 40 }));
+    expect(l.points).toHaveLength(2);
+  });
+
+  test('a tiny wobble during a press is a tap, not a bend', () => {
+    const t = drafting();
+    press(t, { x: 0, y: 0 }); press(t, { x: 100, y: 0 }, { x: 101, y: 2 });
+    expect(t.lineDraft!.bulges[0]).toBe(0);
   });
 });

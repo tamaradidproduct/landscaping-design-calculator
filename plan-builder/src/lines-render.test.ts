@@ -65,8 +65,13 @@ describe('linesSvg', () => {
     expect(Math.hypot(ix - bx, iy - by)).toBeGreaterThan(15); // clear of the bend handle's own hit area
   });
   test('a draft is drawn dashed with a rubber band to the pointer', () => {
-    const svg = linesSvg(base([], { draft: { item: 'wood-privacy-fence', points: [P(0, 0), P(50, 0)], widthFt: 1, hover: P(50, 40) } }));
+    const svg = linesSvg(base([], { draft: { item: 'wood-privacy-fence', points: [P(0, 0), P(50, 0)], bulges: [0], widthFt: 1, hover: P(50, 40) } }));
     expect(svg).toContain('line-draft'); expect(svg).toMatch(/50\.0 40\.0/);
+  });
+  test('a bent draft segment is drawn as a curve, not a straight chord', () => {
+    const svg = linesSvg(base([], { draft: { item: 'wood-privacy-fence', points: [P(0, 0), P(100, 0)], bulges: [20], widthFt: 1, hover: null } }));
+    const ys = [...(/class="line-draft"/.test(svg) ? svg.match(/d="([^"]+)" class="line-draft"/)![1].matchAll(/ (-?[\d.]+)/g) : [])].map(m => Math.abs(Number(m[1])));
+    expect(Math.max(...ys)).toBeGreaterThan(15);
   });
   test('the screen transform is applied', () => {
     const svg = linesSvg(base([make('wood-privacy-fence', [P(0, 0), P(100, 0)], 1)], { toScreen: p => ({ x: p.x + 200, y: p.y + 300 }) }));

@@ -37,12 +37,16 @@ export class LineLayer {
   ordered(): PlacedLine[] { return Object.values(this.placed).sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1))); }
 
   /** Store a run on top (l1, l2 …: one past the highest); repeated points are dropped, and fewer than two distinct points stores nothing (null). */
-  add(item: string, points: Point[], widthFt: number): string | null {
-    const pts = points.filter((p, i) => i === 0 || dist(p, points[i - 1]) > SAME_POINT).map(p => ({ x: p.x, y: p.y }));
+  add(item: string, points: Point[], widthFt: number, bulges?: readonly number[]): string | null {
+    const keep = points.map((p, i) => i === 0 || dist(p, points[i - 1]) > SAME_POINT);
+    const pts = points.filter((_, i) => keep[i]).map(p => ({ x: p.x, y: p.y }));
     if (pts.length < 2) return null;
     const ids = Object.keys(this.placed).map(k => Number(k.slice(1))).filter(Number.isFinite);
     const n = Math.max(0, ...ids) + 1, id = `l${n}`;
     this.placed[id] = { id, item, points: pts, widthFt: clampLineWidth(widthFt) };
+    // A bend belongs to the segment ending at its point; a dropped repeat point takes its bend with it.
+    const bent = bulges ? bulges.filter((_, k) => keep[k + 1]) : [];
+    if (bent.some(b => b !== 0)) this.placed[id].bulges = bent;
     return id;
   }
   movePoint(id: string, i: number, to: Point) { const l = this.placed[id]; if (l?.points[i]) l.points[i] = { x: to.x, y: to.y }; }
