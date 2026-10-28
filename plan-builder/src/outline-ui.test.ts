@@ -481,7 +481,7 @@ describe('removing an outline corner (#64)', () => {
     const toasts: string[] = [];
     Object.assign(tool, {
       outlines: { boundary: { id: 'boundary', kind: 'boundary', name: 'Plot boundary', pts, closed: true, bulges: pts.map(() => 0), radii: pts.map((_, i) => i) } },
-      drawing: null, replaced: null, selected: 'boundary', selectedCorner: { id: 'boundary', i: 1 }, selectedEdge: null, selectedSymbol: null, placing: null,
+      drawing: null, replaced: null, selected: 'boundary', selectedCorner: { id: 'boundary', i: 1 }, selectedEdge: null, hoverCorner: 1, selectedSymbol: null, placing: null,
       lineDraft: null, selectedLine: null, selectedLinePoint: null, lastLineTap: null, lastTap: null, refs: [], cal: null, previewing: false,
       pendingMaterial: null, hiddenLayers: new Set(), hiddenSections: new Set(), history: new History(), symbols: new SymbolLayer(), lines: new LineLayer(),
       revision: 0, magnifier: {}, host: { toast: (m: string) => toasts.push(m), historyChanged: () => {} },
@@ -496,6 +496,7 @@ describe('removing an outline corner (#64)', () => {
     expect(tool.outlines.boundary!.pts).toHaveLength(3);
     expect(tool.outlines.boundary!.radii).toEqual([0, 2, 3]);
     expect(tool.selectedCorner).toBeNull();
+    expect((tool as unknown as { hoverCorner: number | null }).hoverCorner).toBeNull();
     tool.undo();
     expect(tool.outlines.boundary!.pts).toHaveLength(4);
   });

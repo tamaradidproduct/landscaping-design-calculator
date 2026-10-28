@@ -396,6 +396,11 @@ describe('removeCorner (#64)', () => {
   test('leaves undefined bulges undefined', () => {
     expect(removeCorner(sq, undefined, 2).bulges).toBeUndefined();
   });
+  test.each([0, 1, 2])('leaves an outline with %i points unchanged', n => {
+    const pts = sq.slice(0, n);
+    const bulges = [0.1, 0.2].slice(0, n);
+    expect(removeCorner(pts, bulges, 0)).toEqual({ pts, bulges });
+  });
   test('is the inverse of insertCorner for straight edges', () => {
     const ins = insertCorner(sq, undefined, 1, 0.5);
     expect(removeCorner(ins.pts, ins.bulges, 2).pts).toEqual(sq);

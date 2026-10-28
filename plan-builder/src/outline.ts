@@ -175,7 +175,9 @@ export function insertCorner(pts: Point[], bulges: number[] | undefined, i: numb
 
 /** Drops point i; the two edges meeting there become one straight edge from the point before to the point after. */
 export function removeCorner(pts: Point[], bulges: number[] | undefined, i: number): { pts: Point[]; bulges: number[] | undefined } {
-  const n = pts.length, newPts = pts.filter((_, k) => k !== i);
+  const n = pts.length;
+  if (n < 3) return { pts, bulges };
+  const newPts = pts.filter((_, k) => k !== i);
   if (!bulges) return { pts: newPts, bulges: undefined };
   const prev = (i - 1 + n) % n, nb = [...bulges];
   nb[prev] = 0; // the merged edge runs from the point before straight to the point after

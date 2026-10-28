@@ -1298,7 +1298,7 @@ export class OutlineTool {
     if (o.radii) o.radii = o.radii.filter((_, k) => k !== i);
     // Typed lengths on the edges after the gone corner move down one (the edges at it were blocked above).
     this.refs = this.refs.map(f => f.id === id && f.i > i ? { ...f, i: f.i - 1 } : f);
-    this.selectedCorner = null; this.selectedEdge = null;
+    this.selectedCorner = null; this.selectedEdge = null; this.hoverCorner = null;
     this.update();
     return true;
   }
