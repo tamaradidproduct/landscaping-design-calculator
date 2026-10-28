@@ -30,6 +30,7 @@ import { material, type MaterialId } from './materials';
 import { containers, insideShape, shapeLabelPoint, shapePath, visibleShapes, type Shape } from './overlap';
 import { button, chipField, esc, figure, token, type KeypadKey } from './ui';
 import { chipPositionAvoiding, edgeMenuItems, type Zone } from './card-helpers';
+import { hasKeyboardInput, filterLengthChars, filteredLengthCursor } from './length-input';
 import { edgeChip } from './edge-chip';
 import { findImageSnap, findSnapOnRay, SNAP_WINDOW } from './snap';
 import type { Point } from './view';
@@ -1658,7 +1659,7 @@ export class OutlineTool {
     const tip = 'Drag the square in the middle of the edge to curve it, or tap the + to add a corner.'
       + (surface ? ' The marked end stays put.' : ft ? ' Lengths on edges running across and down also correct a stretched plan.' : '');
     const menu = edgeMenuItems({ kind: surface ? 'surface' : o.kind === 'feature' ? 'feature' : 'boundary', curved, hasRef: !!ref });
-    const keyboard = !window.matchMedia('(pointer: coarse)').matches; // a desktop keyboard types the length; touch gets the keypad
+    const keyboard = hasKeyboardInput(); // a desktop keyboard types the length; touch gets the keypad
     this.popover.innerHTML = edgeChip({
       text: ft ? `${formatFeet(ft)}${curved ? ' along the curve' : ''}` : surface ? 'No scale' : 'Set length',
       editing, canEdit, menu, menuOpen: ui.menuOpen && !editing, tip, tipOpen: ui.tipOpen, keyboard,
@@ -1688,6 +1689,14 @@ export class OutlineTool {
       };
       const f = form.querySelector<HTMLInputElement>('#edge-len')!;
       // Escape leaves the field and goes back to the length (the edge stays selected); the tool ignores keys typed in a field.
+      if (keyboard) f.oninput = () => {
+        const val = f.value, v = filterLengthChars(val);
+        if (v !== val) {
+          const at = filteredLengthCursor(val, f.selectionStart ?? val.length);
+          f.value = v;
+          f.setSelectionRange(at, at);
+        }
+      };
       f.onkeydown = ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); ui.editing = false; this.renderPopover(); } };
       if (refocus) { f.focus(); if (sel) f.setSelectionRange(sel[0], sel[1]); }
       if (!keyboard) this.wireLengthKeypad(form);
