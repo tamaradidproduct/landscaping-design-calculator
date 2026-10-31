@@ -8,7 +8,7 @@
  * .primary                 filled accent (one per surface)
  * .danger                  destructive text colour
  * .large                   hero size (empty state)
- * .icon                    square glyph button (48 px); .icon.small = 40 px (card header close)
+ * .icon                    square glyph button (48 px)
  * .toggle[aria-pressed]    on/off state
  * .chip                    centred quick pick inside a chip group
  * .compact                 a step smaller (control-md, text-base) for actions inside a layer card
@@ -25,7 +25,6 @@ button.primary { background: var(--color-accent); color: var(--color-on-accent);
 button.danger { color: var(--color-warn); }
 button.large { min-height: var(--control-xl); padding: 0 var(--space-11); }
 button.icon { min-width: var(--control-md); min-height: var(--control-md); padding: 0; font-size: var(--text-2xl); line-height: var(--leading-tight); }
-button.icon.small { min-width: var(--control-sm); min-height: var(--control-sm); font-size: var(--text-3xl); }
 button.toggle[aria-pressed="false"] { color: var(--color-muted); }
 button.icon.danger { color: var(--color-warn); }
 /* Reorder grip: a 48 px hit area beside a layer row */
